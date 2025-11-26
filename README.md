@@ -65,7 +65,7 @@ jobs:
       issues: write
     steps:
       - uses: actions/checkout@v4
-      - uses: jetbrains/junie-gh-action@v1
+      - uses: JetBrains/junie-github-action@main
         with:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
 ```
@@ -129,7 +129,7 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@v4
-      - uses: jetbrains/junie-gh-action@v1
+      - uses: JetBrains/junie-github-action@main
         with:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
           resolve_conflicts: true
@@ -165,7 +165,7 @@ jobs:
       checks: read
     steps:
       - uses: actions/checkout@v4
-      - uses: jetbrains/junie-gh-action@v1
+      - uses: JetBrains/junie-github-action@main
         with:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
           allowed_mcp_servers: mcp_github_checks_server
@@ -192,7 +192,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: jetbrains/junie-gh-action@v1
+      - uses: JetBrains/junie-github-action@main
         with:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
           prompt: |
@@ -221,7 +221,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: jetbrains/junie-gh-action@v1
+      - uses: JetBrains/junie-github-action@main
         with:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
           label_trigger: "auto-fix"
@@ -286,7 +286,7 @@ jobs:
 **Example usage:**
 
 ```yaml
-- uses: jetbrains/junie-gh-action@v1
+- uses: JetBrains/junie-github-action@main
   id: junie
   with:
     junie_api_key: ${{ secrets.JUNIE_API_KEY }}
