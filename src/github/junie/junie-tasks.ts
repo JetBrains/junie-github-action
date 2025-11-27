@@ -13,10 +13,10 @@ import {isReviewOrCommentHasTrigger} from "../validation/trigger";
 import {OUTPUT_VARS} from "../../constants/environment";
 import {RESOLVE_CONFLICTS_TRIGGER_PHRASE_REGEXP} from "../../constants/github";
 import {Octokits} from "../api/client";
-import {GraphQLGitHubDataFetcher} from "./graphql-data-fetcher";
 import {GitHubPromptFormatter} from "./prompt-formatter";
 import {validateInputSize} from "../validation/input-size";
 import {downloadAttachmentsAndRewriteText} from "./attachment-downloader";
+import {GraphQLGitHubDataFetcher} from "../api/graphql-data-fetcher";
 
 async function setValidatedTextTask(junieTask: JunieTask, text: string, taskType: string): Promise<void> {
     // Download attachments and rewrite URLs in the text

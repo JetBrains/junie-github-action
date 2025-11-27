@@ -1,16 +1,11 @@
 import {
-    GitHubCommentedEvent,
-    GitHubCrossReferencedEvent,
+    GitHubCommentedEvent, GitHubCrossReferencedEvent,
+    GitHubFileChange,
     GitHubIssueData,
-    GitHubReferencedEvent,
-    GitHubReviewData,
-    GitHubReviewsData,
-    GitHubReviewThread,
-    GitHubTimelineData,
-    GitHubTimelineEventData,
-    GitHubPullRequestDetails,
-    GitHubFileChange
-} from "./types/github-data";
+    GitHubPullRequestDetails, GitHubReferencedEvent, GitHubReviewData,
+    GitHubReviewsData, GitHubReviewThread,
+    GitHubTimelineData, GitHubTimelineEventData
+} from "../api/github-data";
 
 export class GitHubPromptFormatter {
 

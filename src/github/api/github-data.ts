@@ -9,9 +9,6 @@ export interface GitHubIssueData {
     title: string;
     body: string | null;
     state: string;
-    url: string;
-    html_url: string;
-    timeline_url: string;
     user: GitHubUser;
     pull_request?: {
         url: string;

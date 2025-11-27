@@ -1,18 +1,14 @@
-import {Octokits} from "../api/client";
-import {
-    GitHubIssueData,
-    GitHubTimelineData,
-    GitHubReviewsData,
-    GitHubReviewData,
-    GitHubReviewThread,
-    GitHubPullRequestDetails,
-    GitHubFileChange,
-    GitHubReviewCommentData
-} from "./types/github-data";
-import {PULL_REQUEST_QUERY, ISSUE_QUERY} from "./queries";
-import {PullRequestQueryResponse, IssueQueryResponse} from "./types/graphql-responses";
-import {convertTimelineItems} from "./timeline-converter";
 import {execFileSync} from "child_process";
+import {ISSUE_QUERY, IssueQueryResponse, PULL_REQUEST_QUERY, PullRequestQueryResponse} from "../api/queries";
+import {Octokits} from "./client";
+import {convertTimelineItems} from "../junie/timeline-converter";
+import {
+    GitHubFileChange,
+    GitHubIssueData,
+    GitHubPullRequestDetails, GitHubReviewCommentData,
+    GitHubReviewData, GitHubReviewsData, GitHubReviewThread,
+    GitHubTimelineData
+} from "./github-data";
 
 /**
  * GraphQL-based data fetcher - fetches all data in a single request
@@ -39,9 +35,6 @@ export class GraphQLGitHubDataFetcher {
             title: pr.title,
             body: pr.body,
             state: pr.state.toLowerCase(),
-            url: pr.url,
-            html_url: pr.url,
-            timeline_url: pr.url, // GraphQL doesn't have timeline_url, use pr url
             user: {login: pr.author?.login || "ghost"}
         };
 
@@ -181,9 +174,6 @@ export class GraphQLGitHubDataFetcher {
             title: issueData.title,
             body: issueData.body,
             state: issueData.state.toLowerCase(),
-            url: issueData.url,
-            html_url: issueData.url,
-            timeline_url: issueData.url,
             user: {login: issueData.author?.login || "ghost"}
         };
 

@@ -3,11 +3,11 @@
 
 import {
     GraphQLTimelineItemNode,
+    isCrossReferencedEventNode,
     isIssueCommentNode,
-    isReferencedEventNode,
-    isCrossReferencedEventNode
-} from "./types/graphql-responses";
-import {GitHubTimelineEventData, GitHubTimelineData} from "./types/github-data";
+    isReferencedEventNode
+} from "../api/queries";
+import {GitHubTimelineData, GitHubTimelineEventData} from "../api/github-data";
 
 /**
  * Convert GraphQL timeline items to internal format
