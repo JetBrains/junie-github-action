@@ -7,24 +7,56 @@ import {
     GitHubReviewsData,
     GitHubReviewThread,
     GitHubTimelineData,
-    GitHubTimelineEventData
+    GitHubTimelineEventData,
+    GitHubPullRequestDetails,
+    GitHubFileChange
 } from "./types/github-data";
 
 export class GitHubPromptFormatter {
 
+    private formatPRContext(pr: GitHubPullRequestDetails): string {
+        return `PR #${pr.number}: ${pr.title}
+Author: @${pr.user.login}
+State: ${pr.state}
+Branch: ${pr.head.ref} -> ${pr.base.ref}
+Additions: +${pr.additions} / Deletions: -${pr.deletions}
+Changed Files: ${pr.changed_files}
+Commits: ${pr.commits}`;
+    }
+
+    private formatChangedFiles(files: GitHubFileChange[]): string {
+        if (files.length === 0) {
+            return 'No files changed';
+        }
+
+        return files.map(file =>
+            `- ${file.filename} (${file.status}) +${file.additions}/-${file.deletions} SHA: ${file.sha}`
+        ).join('\n');
+    }
+
     private presentPullRequest(
         issue: GitHubIssueData,
         reviews: GitHubReviewsData,
-        timeline: GitHubTimelineData
+        timeline: GitHubTimelineData,
+        prDetails?: GitHubPullRequestDetails,
+        changedFiles?: GitHubFileChange[]
     ): string {
-        return `### PULL REQUEST: ${issue.title} [${issue.state}]
-${issue.body || ''}
+        let result = '';
 
-### PULL REQUEST REVIEWS:
-${this.presentReviews(reviews)}
+        if (prDetails) {
+            result += `### PULL REQUEST CONTEXT:\n${this.formatPRContext(prDetails)}\n\n`;
+        }
 
-### PULL REQUEST TIMELINE:
-${this.presentTimeline(timeline)}`;
+        result += `### PULL REQUEST: ${issue.title} [${issue.state}]\n${issue.body || ''}\n\n`;
+
+        if (changedFiles) {
+            result += `### CHANGED FILES:\n${this.formatChangedFiles(changedFiles)}\n\n`;
+        }
+
+        result += `### PULL REQUEST REVIEWS:\n${this.presentReviews(reviews)}\n\n`;
+        result += `### PULL REQUEST TIMELINE:\n${this.presentTimeline(timeline)}`;
+
+        return result;
     }
 
     private presentIssue(issue: GitHubIssueData, timeline: GitHubTimelineData): string {
@@ -178,7 +210,9 @@ ${this.presentTimeline(timeline)}`;
         timeline: GitHubTimelineData,
         reviews: GitHubReviewsData,
         commentBody: string,
-        commentAuthor: string
+        commentAuthor: string,
+        prDetails?: GitHubPullRequestDetails,
+        changedFiles?: GitHubFileChange[]
     ): string {
         return `User @${commentAuthor} mentioned you in the comment on pull request '#${issue.number} ${issue.title}'.
 Given the following user comment (aka user issue description) \`<issue_description>\`, could you help me in implementing the necessary changes to meet the specified requirements?
@@ -188,7 +222,7 @@ ${commentBody}
 
 
 See below the whole PR for information:
-${this.presentPullRequest(issue, reviews, timeline)}`;
+${this.presentPullRequest(issue, reviews, timeline, prDetails, changedFiles)}`;
     }
 
     formatPullRequestReviewCommentPrompt(
@@ -196,7 +230,9 @@ ${this.presentPullRequest(issue, reviews, timeline)}`;
         timeline: GitHubTimelineData,
         reviews: GitHubReviewsData,
         commentBody: string,
-        commentAuthor: string
+        commentAuthor: string,
+        prDetails?: GitHubPullRequestDetails,
+        changedFiles?: GitHubFileChange[]
     ): string {
         return `User @${commentAuthor} mentioned you in the review comment on pull request '#${issue.number} ${issue.title}'.
 Given the following user comment (aka user issue description) \`<issue_description>\`, could you help me in implementing the necessary changes to meet the specified requirements?
@@ -206,14 +242,16 @@ ${commentBody}
 
 
 See below the whole PR for information:
-${this.presentPullRequest(issue, reviews, timeline)}`;
+${this.presentPullRequest(issue, reviews, timeline, prDetails, changedFiles)}`;
     }
 
     formatPullRequestReviewPrompt(
         review: GitHubReviewData,
         issue: GitHubIssueData,
         timeline: GitHubTimelineData,
-        reviews: GitHubReviewsData
+        reviews: GitHubReviewsData,
+        prDetails?: GitHubPullRequestDetails,
+        changedFiles?: GitHubFileChange[]
     ): string {
         return `User @${review.user.login} mentioned you in the review on pull request '#${issue.number} ${issue.title}'.
 Given the following user review (aka user issue description) \`<issue_description>\`, could you help me in implementing the necessary changes to meet the specified requirements?
@@ -223,7 +261,7 @@ ${this.presentReview(review, reviews.threads)}
 
 
 See below the whole PR for information:
-${this.presentPullRequest(issue, reviews, timeline)}`;
+${this.presentPullRequest(issue, reviews, timeline, prDetails, changedFiles)}`;
     }
 
     formatIssueCommentPrompt(
@@ -253,11 +291,13 @@ ${this.presentIssue(issue, timeline)}
     formatPullRequestPrompt(
         issue: GitHubIssueData,
         timeline: GitHubTimelineData,
-        reviews: GitHubReviewsData
+        reviews: GitHubReviewsData,
+        prDetails?: GitHubPullRequestDetails,
+        changedFiles?: GitHubFileChange[]
     ): string {
         return `Given the following pull request \`<issue_description>\`, could you help me in implementing the necessary changes to meet the specified requirements?
 <issue_description>
-${this.presentPullRequest(issue, reviews, timeline)}
+${this.presentPullRequest(issue, reviews, timeline, prDetails, changedFiles)}
 </issue_description>`;
     }
 }

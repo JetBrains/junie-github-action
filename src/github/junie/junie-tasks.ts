@@ -13,13 +13,17 @@ import {isReviewOrCommentHasTrigger} from "../validation/trigger";
 import {OUTPUT_VARS} from "../../constants/environment";
 import {RESOLVE_CONFLICTS_TRIGGER_PHRASE_REGEXP} from "../../constants/github";
 import {Octokits} from "../api/client";
-import {GitHubDataFetcher} from "./github-data-fetcher";
+import {GraphQLGitHubDataFetcher} from "./graphql-data-fetcher";
 import {GitHubPromptFormatter} from "./prompt-formatter";
 import {validateInputSize} from "../validation/input-size";
+import {downloadAttachmentsAndRewriteText} from "./attachment-downloader";
 
-function setValidatedTextTask(junieTask: JunieTask, text: string, taskType: string): void {
-    validateInputSize(text, taskType);
-    junieTask.textTask = {text};
+async function setValidatedTextTask(junieTask: JunieTask, text: string, taskType: string): Promise<void> {
+    // Download attachments and rewrite URLs in the text
+    const textWithLocalAttachments = await downloadAttachmentsAndRewriteText(text);
+    const newText = (junieTask.textTask?.text || "") + "\n" + textWithLocalAttachments;
+    validateInputSize(newText, taskType);
+    junieTask.textTask = {text: newText};
 }
 
 export async function prepareJunieTask(
@@ -32,11 +36,11 @@ export async function prepareJunieTask(
     const repo = context.payload.repository.name;
 
     // Create fetcher and formatter instances
-    const fetcher = new GitHubDataFetcher(octokit);
+    const fetcher = new GraphQLGitHubDataFetcher(octokit);
     const formatter = new GitHubPromptFormatter();
 
     if (context.inputs.prompt) {
-        setValidatedTextTask(junieTask, context.inputs.prompt, "user-prompt");
+        await setValidatedTextTask(junieTask, context.inputs.prompt, "user-prompt");
     }
 
     // Handle issue comment (not on PR)
@@ -45,8 +49,8 @@ export async function prepareJunieTask(
         const commentBody = context.payload.comment.body;
         const commentAuthor = context.payload.comment.user.login;
 
-        const issue = await fetcher.fetchIssue(owner, repo, issueNumber);
-        const timeline = await fetcher.fetchTimeline(owner, repo, issueNumber);
+        // Single GraphQL query for all issue data
+        const {issue, timeline} = await fetcher.fetchIssueData(owner, repo, issueNumber);
 
         const promptText = formatter.formatIssueCommentPrompt(
             issue,
@@ -54,18 +58,18 @@ export async function prepareJunieTask(
             commentBody,
             commentAuthor
         );
-        setValidatedTextTask(junieTask, promptText, "issue-comment");
+        await setValidatedTextTask(junieTask, promptText, "issue-comment");
     }
 
     // Handle issue event (opened/edited)
     if (isIssuesEvent(context)) {
         const issueNumber = context.payload.issue.number;
 
-        const issue = await fetcher.fetchIssue(owner, repo, issueNumber);
-        const timeline = await fetcher.fetchTimeline(owner, repo, issueNumber);
+        // Single GraphQL query for all issue data
+        const {issue, timeline} = await fetcher.fetchIssueData(owner, repo, issueNumber);
 
         const promptText = formatter.formatIssuePrompt(issue, timeline);
-        setValidatedTextTask(junieTask, promptText, "issue");
+        await setValidatedTextTask(junieTask, promptText, "issue");
     }
 
     // Handle PR comment
@@ -74,18 +78,23 @@ export async function prepareJunieTask(
         const commentBody = context.payload.comment.body;
         const commentAuthor = context.payload.comment.user.login;
 
-        const issue = await fetcher.fetchIssue(owner, repo, pullNumber);
-        const timeline = await fetcher.fetchTimeline(owner, repo, pullNumber);
-        const reviews = await fetcher.fetchReviews(owner, repo, pullNumber);
+        // Single GraphQL query for all PR data - much faster than 5 REST calls!
+        const {issue, timeline, reviews, prDetails, changedFiles} = await fetcher.fetchPullRequestData(
+            owner,
+            repo,
+            pullNumber
+        );
 
         const promptText = formatter.formatPullRequestCommentPrompt(
             issue,
             timeline,
             reviews,
             commentBody,
-            commentAuthor
+            commentAuthor,
+            prDetails,
+            changedFiles
         );
-        setValidatedTextTask(junieTask, promptText, "pr-comment");
+        await setValidatedTextTask(junieTask, promptText, "pr-comment");
     }
 
     // Handle PR review
@@ -93,18 +102,28 @@ export async function prepareJunieTask(
         const pullNumber = context.payload.pull_request.number;
         const reviewId = context.payload.review.id;
 
-        const review = await fetcher.fetchReview(owner, repo, pullNumber, reviewId);
-        const issue = await fetcher.fetchIssue(owner, repo, pullNumber);
-        const timeline = await fetcher.fetchTimeline(owner, repo, pullNumber);
-        const reviews = await fetcher.fetchReviews(owner, repo, pullNumber);
+        // Single GraphQL query for all PR data
+        const {issue, timeline, reviews, prDetails, changedFiles} = await fetcher.fetchPullRequestData(
+            owner,
+            repo,
+            pullNumber
+        );
+
+        // Find the specific review from the fetched reviews
+        const review = reviews.reviews.find(r => r.id === reviewId);
+        if (!review) {
+            throw new Error(`Review ${reviewId} not found in PR ${pullNumber}`);
+        }
 
         const promptText = formatter.formatPullRequestReviewPrompt(
             review,
             issue,
             timeline,
-            reviews
+            reviews,
+            prDetails,
+            changedFiles
         );
-        setValidatedTextTask(junieTask, promptText, "pr-review");
+        await setValidatedTextTask(junieTask, promptText, "pr-review");
     }
 
     // Handle PR review comment
@@ -113,30 +132,44 @@ export async function prepareJunieTask(
         const commentBody = context.payload.comment.body;
         const commentAuthor = context.payload.comment.user.login;
 
-        const issue = await fetcher.fetchIssue(owner, repo, pullNumber);
-        const timeline = await fetcher.fetchTimeline(owner, repo, pullNumber);
-        const reviews = await fetcher.fetchReviews(owner, repo, pullNumber);
+        // Single GraphQL query for all PR data
+        const {issue, timeline, reviews, prDetails, changedFiles} = await fetcher.fetchPullRequestData(
+            owner,
+            repo,
+            pullNumber
+        );
 
         const promptText = formatter.formatPullRequestReviewCommentPrompt(
             issue,
             timeline,
             reviews,
             commentBody,
-            commentAuthor
+            commentAuthor,
+            prDetails,
+            changedFiles
         );
-        setValidatedTextTask(junieTask, promptText, "pr-review-comment");
+        await setValidatedTextTask(junieTask, promptText, "pr-review-comment");
     }
 
     // Handle PR event (opened/edited)
     if (isPullRequestEvent(context)) {
         const pullNumber = context.payload.pull_request.number;
 
-        const issue = await fetcher.fetchIssue(owner, repo, pullNumber);
-        const timeline = await fetcher.fetchTimeline(owner, repo, pullNumber);
-        const reviews = await fetcher.fetchReviews(owner, repo, pullNumber);
+        // Single GraphQL query for all PR data
+        const {issue, timeline, reviews, prDetails, changedFiles} = await fetcher.fetchPullRequestData(
+            owner,
+            repo,
+            pullNumber
+        );
 
-        const promptText = formatter.formatPullRequestPrompt(issue, timeline, reviews);
-        setValidatedTextTask(junieTask, promptText, "pull-request");
+        const promptText = formatter.formatPullRequestPrompt(
+            issue,
+            timeline,
+            reviews,
+            prDetails,
+            changedFiles
+        );
+        await setValidatedTextTask(junieTask, promptText, "pull-request");
     }
 
     if (context.inputs.resolveConflicts || isReviewOrCommentHasTrigger(context, RESOLVE_CONFLICTS_TRIGGER_PHRASE_REGEXP)) {

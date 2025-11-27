@@ -16,7 +16,39 @@ export interface GitHubIssueData {
     pull_request?: {
         url: string;
         html_url: string;
+        diff_url: string;
     };
+}
+
+export interface GitHubPullRequestDetails {
+    number: number;
+    title: string;
+    body: string | null;
+    state: string;
+    html_url: string;
+    user: GitHubUser;
+    head: {
+        ref: string;
+        sha: string;
+    };
+    base: {
+        ref: string;
+        sha: string;
+    };
+    additions: number;
+    deletions: number;
+    changed_files: number;
+    commits: number;
+}
+
+export interface GitHubFileChange {
+    sha: string;
+    filename: string;
+    status: string;
+    additions: number;
+    deletions: number;
+    changes: number;
+    patch?: string;
 }
 
 export interface GitHubReviewCommentData {
@@ -61,6 +93,7 @@ export interface GitHubCommentedEvent extends GitHubTimelineEvent {
     event: 'commented';
     body: string;
     user: GitHubUser;
+    html_url: string;
 }
 
 export interface GitHubReferencedEvent extends GitHubTimelineEvent {
