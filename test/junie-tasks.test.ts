@@ -165,7 +165,6 @@ describe("prepareJunieTask", () => {
                     listFiles: mock(() => Promise.resolve({
                         data: [
                             {
-                                sha: "file1sha",
                                 filename: "file1.ts",
                                 status: "modified",
                                 additions: 5,

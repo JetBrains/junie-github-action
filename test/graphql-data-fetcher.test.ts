@@ -1,0 +1,336 @@
+import {describe, test, expect, mock, beforeEach} from "bun:test";
+import {GraphQLGitHubDataFetcher} from "../src/github/api/graphql-data-fetcher";
+import {Octokits} from "../src/github/api/client";
+import type {PullRequestQueryResponse, IssueQueryResponse} from "../src/github/api/queries";
+
+describe("GraphQLGitHubDataFetcher", () => {
+    let mockOctokit: Octokits;
+    let fetcher: GraphQLGitHubDataFetcher;
+
+    beforeEach(() => {
+        mockOctokit = {
+            graphql: mock(() => Promise.resolve({})) as any,
+            rest: {} as any
+        };
+        fetcher = new GraphQLGitHubDataFetcher(mockOctokit);
+    });
+
+    describe("fetchPullRequestData", () => {
+        test("should fetch and convert PR data successfully", async () => {
+            const mockPRResponse: PullRequestQueryResponse = {
+                repository: {
+                    pullRequest: {
+                        number: 42,
+                        title: "Test PR",
+                        body: "PR description",
+                        bodyHTML: "<p>PR description</p>",
+                        state: "OPEN",
+                        url: "https://github.com/owner/repo/pull/42",
+                        author: {login: "testuser"},
+                        baseRefName: "main",
+                        headRefName: "feature",
+                        headRefOid: "abc123",
+                        baseRefOid: "def456",
+                        additions: 10,
+                        deletions: 5,
+                        changedFiles: 2,
+                        createdAt: "2024-01-01T00:00:00Z",
+                        updatedAt: "2024-01-02T00:00:00Z",
+                        commits: {
+                            totalCount: 3,
+                            nodes: [
+                                {
+                                    commit: {
+                                        oid: "commit1",
+                                        messageHeadline: "First commit",
+                                        message: "First commit message",
+                                        committedDate: "2024-01-01T00:00:00Z"
+                                    }
+                                }
+                            ]
+                        },
+                        files: {
+                            nodes: [
+                                {
+                                    path: "src/test.ts",
+                                    additions: 10,
+                                    deletions: 5,
+                                    changeType: "MODIFIED"
+                                },
+                                {
+                                    path: "src/deleted.ts",
+                                    additions: 0,
+                                    deletions: 20,
+                                    changeType: "DELETED"
+                                }
+                            ]
+                        },
+                        timelineItems: {
+                            nodes: [
+                                {
+                                    __typename: "IssueComment",
+                                    id: "comment1",
+                                    databaseId: 1,
+                                    body: "Test comment",
+                                    author: {login: "commenter"},
+                                    createdAt: "2024-01-01T00:00:00Z",
+                                    url: "https://github.com/owner/repo/issues/42#issuecomment-1"
+                                }
+                            ]
+                        },
+                        reviews: {
+                            nodes: [
+                                {
+                                    id: "review1",
+                                    databaseId: 1,
+                                    author: {login: "reviewer"},
+                                    body: "LGTM",
+                                    state: "APPROVED",
+                                    submittedAt: "2024-01-02T00:00:00Z",
+                                    url: "https://github.com/owner/repo/pull/42#pullrequestreview-1",
+                                    comments: {
+                                        nodes: [
+                                            {
+                                                id: "comment1",
+                                                databaseId: 1,
+                                                body: "Nice work",
+                                                path: "src/test.ts",
+                                                position: 5,
+                                                diffHunk: "@@ -1,3 +1,3 @@",
+                                                author: {login: "reviewer"},
+                                                createdAt: "2024-01-02T00:00:00Z",
+                                                url: "https://github.com/owner/repo/pull/42#discussion_r1",
+                                                replyTo: null
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            };
+
+            mockOctokit.graphql = mock(() => Promise.resolve(mockPRResponse)) as any;
+
+            const result = await fetcher.fetchPullRequestData("owner", "repo", 42);
+
+            expect(result.issue.number).toBe(42);
+            expect(result.issue.title).toBe("Test PR");
+            expect(result.issue.state).toBe("open");
+            expect(result.issue.user.login).toBe("testuser");
+
+            expect(result.prDetails.number).toBe(42);
+            expect(result.prDetails.additions).toBe(10);
+            expect(result.prDetails.deletions).toBe(5);
+            expect(result.prDetails.head.ref).toBe("feature");
+            expect(result.prDetails.base.ref).toBe("main");
+
+            expect(result.changedFiles).toHaveLength(2);
+            expect(result.changedFiles[0].filename).toBe("src/test.ts");
+            expect(result.changedFiles[0].status).toBe("modified");
+
+            expect(result.reviews.reviews).toHaveLength(1);
+            expect(result.reviews.reviews[0].state).toBe("APPROVED");
+
+            expect(result.reviews.threads).toHaveLength(1);
+            expect(result.reviews.threads[0].comments).toHaveLength(1);
+        });
+
+        test("should handle null author as 'ghost'", async () => {
+            const mockPRResponse: PullRequestQueryResponse = {
+                repository: {
+                    pullRequest: {
+                        number: 42,
+                        title: "Test PR",
+                        body: "PR description",
+                        bodyHTML: "<p>PR description</p>",
+                        state: "OPEN",
+                        url: "https://github.com/owner/repo/pull/42",
+                        author: null,
+                        baseRefName: "main",
+                        headRefName: "feature",
+                        headRefOid: "abc123",
+                        baseRefOid: "def456",
+                        additions: 0,
+                        deletions: 0,
+                        changedFiles: 0,
+                        createdAt: "2024-01-01T00:00:00Z",
+                        updatedAt: "2024-01-02T00:00:00Z",
+                        commits: {totalCount: 0, nodes: []},
+                        files: {nodes: []},
+                        timelineItems: {nodes: []},
+                        reviews: {nodes: []}
+                    }
+                }
+            };
+
+            mockOctokit.graphql = mock(() => Promise.resolve(mockPRResponse)) as any;
+
+            const result = await fetcher.fetchPullRequestData("owner", "repo", 42);
+
+            expect(result.issue.user.login).toBe("ghost");
+            expect(result.prDetails.user.login).toBe("ghost");
+        });
+
+        test("should retry on transient errors", async () => {
+            let callCount = 0;
+            const mockPRResponse: PullRequestQueryResponse = {
+                repository: {
+                    pullRequest: {
+                        number: 42,
+                        title: "Test PR",
+                        body: "PR description",
+                        bodyHTML: "<p>PR description</p>",
+                        state: "OPEN",
+                        url: "https://github.com/owner/repo/pull/42",
+                        author: {login: "testuser"},
+                        baseRefName: "main",
+                        headRefName: "feature",
+                        headRefOid: "abc123",
+                        baseRefOid: "def456",
+                        additions: 0,
+                        deletions: 0,
+                        changedFiles: 0,
+                        createdAt: "2024-01-01T00:00:00Z",
+                        updatedAt: "2024-01-02T00:00:00Z",
+                        commits: {totalCount: 0, nodes: []},
+                        files: {nodes: []},
+                        timelineItems: {nodes: []},
+                        reviews: {nodes: []}
+                    }
+                }
+            };
+
+            mockOctokit.graphql = mock(() => {
+                callCount++;
+                if (callCount < 2) {
+                    return Promise.reject({status: 500, message: "Internal Server Error"});
+                }
+                return Promise.resolve(mockPRResponse);
+            }) as any;
+
+            const result = await fetcher.fetchPullRequestData("owner", "repo", 42);
+
+            expect(result.issue.number).toBe(42);
+            expect(callCount).toBe(2);
+        });
+
+        test("should not retry on 404 errors", async () => {
+            mockOctokit.graphql = mock(() =>
+                Promise.reject({status: 404, message: "Not Found"})
+            ) as any;
+
+            await expect(fetcher.fetchPullRequestData("owner", "repo", 42)).rejects.toThrow();
+        });
+    });
+
+    describe("fetchIssueData", () => {
+        test("should fetch and convert issue data successfully", async () => {
+            const mockIssueResponse: IssueQueryResponse = {
+                repository: {
+                    issue: {
+                        number: 123,
+                        title: "Test Issue",
+                        body: "Issue description",
+                        bodyHTML: "<p>Issue description</p>",
+                        state: "OPEN",
+                        url: "https://github.com/owner/repo/issues/123",
+                        author: {login: "issueauthor"},
+                        createdAt: "2024-01-01T00:00:00Z",
+                        updatedAt: "2024-01-02T00:00:00Z",
+                        timelineItems: {
+                            nodes: [
+                                {
+                                    __typename: "IssueComment",
+                                    id: "comment1",
+                                    databaseId: 1,
+                                    body: "Test comment",
+                                    author: {login: "commenter"},
+                                    createdAt: "2024-01-01T00:00:00Z",
+                                    url: "https://github.com/owner/repo/issues/123#issuecomment-1"
+                                }
+                            ]
+                        }
+                    }
+                }
+            };
+
+            mockOctokit.graphql = mock(() => Promise.resolve(mockIssueResponse)) as any;
+
+            const result = await fetcher.fetchIssueData("owner", "repo", 123);
+
+            expect(result.issue.number).toBe(123);
+            expect(result.issue.title).toBe("Test Issue");
+            expect(result.issue.state).toBe("open");
+            expect(result.issue.user.login).toBe("issueauthor");
+            expect(result.timeline.events).toHaveLength(1);
+        });
+
+        test("should handle null author as 'ghost'", async () => {
+            const mockIssueResponse: IssueQueryResponse = {
+                repository: {
+                    issue: {
+                        number: 123,
+                        title: "Test Issue",
+                        body: "Issue description",
+                        bodyHTML: "<p>Issue description</p>",
+                        state: "OPEN",
+                        url: "https://github.com/owner/repo/issues/123",
+                        author: null,
+                        createdAt: "2024-01-01T00:00:00Z",
+                        updatedAt: "2024-01-02T00:00:00Z",
+                        timelineItems: {nodes: []}
+                    }
+                }
+            };
+
+            mockOctokit.graphql = mock(() => Promise.resolve(mockIssueResponse)) as any;
+
+            const result = await fetcher.fetchIssueData("owner", "repo", 123);
+
+            expect(result.issue.user.login).toBe("ghost");
+        });
+
+        test("should retry on transient errors", async () => {
+            let callCount = 0;
+            const mockIssueResponse: IssueQueryResponse = {
+                repository: {
+                    issue: {
+                        number: 123,
+                        title: "Test Issue",
+                        body: "Issue description",
+                        bodyHTML: "<p>Issue description</p>",
+                        state: "OPEN",
+                        url: "https://github.com/owner/repo/issues/123",
+                        author: {login: "issueauthor"},
+                        createdAt: "2024-01-01T00:00:00Z",
+                        updatedAt: "2024-01-02T00:00:00Z",
+                        timelineItems: {nodes: []}
+                    }
+                }
+            };
+
+            mockOctokit.graphql = mock(() => {
+                callCount++;
+                if (callCount < 3) {
+                    return Promise.reject({status: 502, message: "Bad Gateway"});
+                }
+                return Promise.resolve(mockIssueResponse);
+            }) as any;
+
+            const result = await fetcher.fetchIssueData("owner", "repo", 123);
+
+            expect(result.issue.number).toBe(123);
+            expect(callCount).toBe(3);
+        });
+
+        test("should not retry on authentication errors", async () => {
+            mockOctokit.graphql = mock(() =>
+                Promise.reject({status: 401, message: "Unauthorized"})
+            ) as any;
+
+            await expect(fetcher.fetchIssueData("owner", "repo", 123)).rejects.toThrow();
+        });
+    });
+});

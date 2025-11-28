@@ -25,7 +25,7 @@ Commits: ${pr.commits}`;
         }
 
         return files.map(file =>
-            `- ${file.filename} (${file.status}) +${file.additions}/-${file.deletions} SHA: ${file.sha}`
+            `- ${file.filename} (${file.status}) +${file.additions}/-${file.deletions}`
         ).join('\n');
     }
 

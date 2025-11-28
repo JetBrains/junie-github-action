@@ -39,7 +39,6 @@ export interface GitHubPullRequestDetails {
 }
 
 export interface GitHubFileChange {
-    sha: string;
     filename: string;
     status: string;
     additions: number;

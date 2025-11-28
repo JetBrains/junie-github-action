@@ -1,4 +1,3 @@
-import {execFileSync} from "child_process";
 import {ISSUE_QUERY, IssueQueryResponse, PULL_REQUEST_QUERY, PullRequestQueryResponse} from "../api/queries";
 import {Octokits} from "./client";
 import {convertTimelineItems} from "../junie/timeline-converter";
@@ -116,34 +115,14 @@ export class GraphQLGitHubDataFetcher {
             commits: pr.commits.totalCount
         };
 
-        // GraphQL doesn't provide SHA, so compute it using git hash-object
-        const changedFiles: GitHubFileChange[] = pr.files.nodes.map((file) => {
-            let sha: string;
-
-            // Don't compute SHA for deleted files
-            if (file.changeType === "DELETED") {
-                sha = "deleted";
-            } else {
-                try {
-                    // Use git hash-object to compute the SHA for the current file content
-                    sha = execFileSync("git", ["hash-object", file.path], {
-                        encoding: "utf-8"
-                    }).trim();
-                } catch (error) {
-                    console.warn(`Failed to compute SHA for ${file.path}:`, error);
-                    sha = "unknown";
-                }
-            }
-
-            return {
-                sha,
-                filename: file.path,
-                status: file.changeType.toLowerCase(),
-                additions: file.additions,
-                deletions: file.deletions,
-                changes: file.additions + file.deletions
-            };
-        });
+        // Convert changed files
+        const changedFiles: GitHubFileChange[] = pr.files.nodes.map((file) => ({
+            filename: file.path,
+            status: file.changeType.toLowerCase(),
+            additions: file.additions,
+            deletions: file.deletions,
+            changes: file.additions + file.deletions
+        }));
 
         // Convert timeline items using shared converter
         const timeline: GitHubTimelineData = convertTimelineItems(pr.timelineItems.nodes);
