@@ -49,8 +49,13 @@ function shouldUseExistingPRBranch(
     console.log(`Token owner: ${tokenOwnerLogin}`);
     console.log(`Create new branch setting: ${createNewBranchForPR}`);
 
-    if (!createNewBranchForPR || silentMode) {
-        console.log(`Using existing branch`);
+    if (createNewBranchForPR){
+        console.log(`Create new branch: createNewBranchForPR setting is enabled`);
+        return false;
+    }
+
+    if (silentMode) {
+        console.log(`Using existing branch: silent mode is enabled`);
         return true;
     }
 
