@@ -12,6 +12,7 @@ const defaultInputs = {
     resolveConflicts: false,
     createNewBranchForPR: false,
     silentMode: false,
+    useSingleComment: false,
     junieWorkingDir: "/tmp/junie-work",
     appToken: "test-token",
     prompt: "",
@@ -100,6 +101,7 @@ export interface MockContextOverrides {
 export const createMockContext = (overrides: MockContextOverrides = {}): ParsedGitHubContext => {
     return {
         runId: "1234567890",
+        workflow: "Test Workflow",
         eventName: (overrides.eventName as any) || "issue_comment",
         eventAction: overrides.eventAction || "created",
         actor: overrides.actor || "contributor-user",

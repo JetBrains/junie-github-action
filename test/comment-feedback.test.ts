@@ -2,21 +2,25 @@ import { describe, test, expect, beforeEach, afterEach, spyOn, mock } from "bun:
 import {
   writeInitialFeedbackComment,
   writeFinishFeedbackComment,
-  type FinishFeedbackData,
 } from "../src/github/operations/comments/feedback";
+import type {FinishFeedbackData} from "../src/github/operations/comments/types";
 import {
   mockIssueCommentContext,
   mockPullRequestCommentContext,
   mockPullRequestReviewCommentContext,
 } from "./mockContext";
 import type { Octokit } from "@octokit/rest";
+import type { PullRequestReviewCommentEvent } from "@octokit/webhooks-types";
 import * as core from "@actions/core";
 import * as clientModule from "../src/github/api/client";
 import {GitHubContext} from "../src/github/context";
+import {createJunieCommentMarker} from "../src/constants/github";
 
 describe("Comment Feedback Operations", () => {
   let createCommentSpy: any;
   let updateCommentSpy: any;
+  let listCommentsSpy: any;
+  let listReviewCommentsSpy: any;
   let createReplyForReviewCommentSpy: any;
   let updateReviewCommentSpy: any;
   let setOutputSpy: any;
@@ -29,21 +33,28 @@ describe("Comment Feedback Operations", () => {
         issues: {
           createComment: mock(async () => ({ data: { id: 12345 } })),
           updateComment: mock(async () => ({ data: { id: 12345 } })),
+          listComments: mock(async () => ({ data: [] })),
         },
         pulls: {
           createReplyForReviewComment: mock(async () => ({ data: { id: 67890 } })),
           updateReviewComment: mock(async () => ({ data: { id: 67890 } })),
+          listReviewComments: mock(async () => ({ data: [] })),
         },
       },
     } as any;
 
     createCommentSpy = mockOctokit.rest.issues.createComment;
     updateCommentSpy = mockOctokit.rest.issues.updateComment;
+    listCommentsSpy = mockOctokit.rest.issues.listComments;
     createReplyForReviewCommentSpy = mockOctokit.rest.pulls.createReplyForReviewComment;
     updateReviewCommentSpy = mockOctokit.rest.pulls.updateReviewComment;
+    listReviewCommentsSpy = mockOctokit.rest.pulls.listReviewComments;
 
-    // Mock createOctokit to return our mock
-    createOctokitSpy = spyOn(clientModule, "createOctokit").mockReturnValue(mockOctokit as any);
+    // Mock createOctokit to return Octokits structure
+    createOctokitSpy = spyOn(clientModule, "createOctokit").mockReturnValue({
+      rest: mockOctokit,
+      graphql: {} as any,
+    } as any);
 
     setOutputSpy = spyOn(core, "setOutput").mockImplementation(() => {});
   });
@@ -149,12 +160,209 @@ describe("Comment Feedback Operations", () => {
       expect(createCommentSpy).not.toHaveBeenCalled();
       expect(setOutputSpy).not.toHaveBeenCalled();
     });
+
+    test("should include Junie marker in comment body", async () => {
+      await writeInitialFeedbackComment(mockOctokit, mockIssueCommentContext);
+
+      const marker = createJunieCommentMarker(mockIssueCommentContext.workflow);
+      expect(createCommentSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: expect.stringContaining(marker),
+        })
+      );
+    });
+
+    test("should create new comment when useSingleComment is enabled but no existing comment found", async () => {
+      const singleCommentContext = {
+        ...mockIssueCommentContext,
+        inputs: {
+          ...mockIssueCommentContext.inputs,
+          useSingleComment: true,
+        },
+      } as GitHubContext;
+
+      // Mock listComments to return no existing Junie comments
+      listCommentsSpy.mockResolvedValue({ data: [] });
+
+      const commentId = await writeInitialFeedbackComment(mockOctokit, singleCommentContext);
+
+      expect(commentId).toBe(12345);
+      expect(listCommentsSpy).toHaveBeenCalledTimes(1);
+      expect(createCommentSpy).toHaveBeenCalledTimes(1);
+      expect(updateCommentSpy).not.toHaveBeenCalled();
+    });
+
+    test("should update existing comment when useSingleComment is enabled and comment found", async () => {
+      const singleCommentContext = {
+        ...mockIssueCommentContext,
+        inputs: {
+          ...mockIssueCommentContext.inputs,
+          useSingleComment: true,
+        },
+      } as GitHubContext;
+
+      // Mock listComments to return an existing Junie comment
+      listCommentsSpy.mockResolvedValue({
+        data: [
+          { id: 11111, body: "Some other comment" },
+          { id: 99999, body: `${createJunieCommentMarker("Test Workflow")}\nHey, it's Junie by JetBrains! I started working...` },
+        ],
+      });
+
+      const commentId = await writeInitialFeedbackComment(mockOctokit, singleCommentContext);
+
+      expect(commentId).toBe(99999);
+      expect(listCommentsSpy).toHaveBeenCalledTimes(1);
+      expect(updateCommentSpy).toHaveBeenCalledTimes(1);
+      expect(createCommentSpy).not.toHaveBeenCalled();
+
+      const updateCallArgs = updateCommentSpy.mock.calls[0][0];
+      expect(updateCallArgs.comment_id).toBe(99999);
+      expect(updateCallArgs.body).toContain(createJunieCommentMarker("Test Workflow"));
+    });
+
+    test("should find most recent Junie comment when multiple exist", async () => {
+      const singleCommentContext = {
+        ...mockIssueCommentContext,
+        inputs: {
+          ...mockIssueCommentContext.inputs,
+          useSingleComment: true,
+        },
+      } as GitHubContext;
+
+      // Mock listComments to return multiple Junie comments
+      listCommentsSpy.mockResolvedValue({
+        data: [
+          { id: 11111, body: `${createJunieCommentMarker("Test Workflow")}\nOld Junie comment` },
+          { id: 22222, body: "Non-Junie comment" },
+          { id: 33333, body: `${createJunieCommentMarker("Test Workflow")}\nMost recent Junie comment` },
+        ],
+      });
+
+      const commentId = await writeInitialFeedbackComment(mockOctokit, singleCommentContext);
+
+      // Should use the most recent (last in array) Junie comment
+      expect(commentId).toBe(33333);
+      expect(updateCommentSpy).toHaveBeenCalledWith({
+        owner: "test-owner",
+        repo: "test-repo",
+        comment_id: 33333,
+        body: expect.stringContaining(createJunieCommentMarker("Test Workflow")),
+      });
+    });
+
+    test("should update review comment when useSingleComment is enabled for review comments", async () => {
+      const singleCommentContext = {
+        ...mockPullRequestReviewCommentContext,
+        inputs: {
+          ...mockPullRequestReviewCommentContext.inputs,
+          useSingleComment: true,
+        },
+      } as GitHubContext;
+
+      const parentCommentId = (mockPullRequestReviewCommentContext.payload as PullRequestReviewCommentEvent).comment.id;
+
+      // Mock listReviewComments to return an existing Junie review comment in the same thread
+      listReviewCommentsSpy.mockResolvedValue({
+        data: [
+          { id: 88888, body: `${createJunieCommentMarker("Test Workflow")}\nExisting Junie review comment`, in_reply_to_id: parentCommentId },
+        ],
+      });
+
+      const commentId = await writeInitialFeedbackComment(mockOctokit, singleCommentContext);
+
+      expect(commentId).toBe(88888);
+      expect(listReviewCommentsSpy).toHaveBeenCalledTimes(1);
+      expect(updateReviewCommentSpy).toHaveBeenCalledTimes(1);
+      expect(createReplyForReviewCommentSpy).not.toHaveBeenCalled();
+    });
+
+    test("should search only within specific review comment thread", async () => {
+      const singleCommentContext = {
+        ...mockPullRequestReviewCommentContext,
+        inputs: {
+          ...mockPullRequestReviewCommentContext.inputs,
+          useSingleComment: true,
+        },
+      } as GitHubContext;
+
+      const parentCommentId = (mockPullRequestReviewCommentContext.payload as PullRequestReviewCommentEvent).comment.id;
+
+      // Mock listReviewComments with comments in different threads
+      listReviewCommentsSpy.mockResolvedValue({
+        data: [
+          // Comment in a different thread - should be ignored
+          { id: 11111, body: `${createJunieCommentMarker("Test Workflow")}\nJunie in different thread`, in_reply_to_id: 999 },
+          // Comment in our thread - should be found
+          { id: 22222, body: `${createJunieCommentMarker("Test Workflow")}\nJunie in our thread`, in_reply_to_id: parentCommentId },
+          // Another comment in different thread
+          { id: 33333, body: `${createJunieCommentMarker("Test Workflow")}\nAnother Junie`, in_reply_to_id: 888 },
+        ],
+      });
+
+      const commentId = await writeInitialFeedbackComment(mockOctokit, singleCommentContext);
+
+      // Should find the comment from our thread (22222), not from other threads
+      expect(commentId).toBe(22222);
+      expect(updateReviewCommentSpy).toHaveBeenCalledWith({
+        owner: "test-owner",
+        repo: "test-repo",
+        comment_id: 22222,
+        body: expect.stringContaining(createJunieCommentMarker("Test Workflow")),
+      });
+    });
+
+    test("should find parent comment if it has Junie marker", async () => {
+      const singleCommentContext = {
+        ...mockPullRequestReviewCommentContext,
+        inputs: {
+          ...mockPullRequestReviewCommentContext.inputs,
+          useSingleComment: true,
+        },
+      } as GitHubContext;
+
+      const parentCommentId = (mockPullRequestReviewCommentContext.payload as PullRequestReviewCommentEvent).comment.id;
+
+      // Mock listReviewComments where the parent comment itself has the marker
+      listReviewCommentsSpy.mockResolvedValue({
+        data: [
+          // The parent comment itself has Junie marker
+          { id: parentCommentId, body: `${createJunieCommentMarker("Test Workflow")}\nJunie parent comment` },
+          // Other comments in different threads
+          { id: 77777, body: "Regular comment", in_reply_to_id: 999 },
+        ],
+      });
+
+      const commentId = await writeInitialFeedbackComment(mockOctokit, singleCommentContext);
+
+      // Should find the parent comment itself
+      expect(commentId).toBe(parentCommentId);
+    });
+
+    test("should gracefully handle errors when searching for existing comments", async () => {
+      const singleCommentContext = {
+        ...mockIssueCommentContext,
+        inputs: {
+          ...mockIssueCommentContext.inputs,
+          useSingleComment: true,
+        },
+      } as GitHubContext;
+
+      // Mock listComments to throw an error
+      listCommentsSpy.mockRejectedValue(new Error("API Error"));
+
+      // Should fall back to creating a new comment
+      const commentId = await writeInitialFeedbackComment(mockOctokit, singleCommentContext);
+
+      expect(commentId).toBe(12345);
+      expect(listCommentsSpy).toHaveBeenCalledTimes(1);
+      expect(createCommentSpy).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe("writeFinishFeedbackComment", () => {
     const baseFinishData: Omit<FinishFeedbackData, "isJobFailed" | "successData" | "failureData"> = {
       initCommentId: "12345",
-      githubToken: "test-token",
       parsedContext: mockIssueCommentContext,
     };
 
@@ -170,7 +378,7 @@ describe("Comment Feedback Operations", () => {
         },
       };
 
-      await writeFinishFeedbackComment(data);
+      await writeFinishFeedbackComment(mockOctokit, data);
 
       expect(updateCommentSpy).toHaveBeenCalledWith({
         owner: "test-owner",
@@ -192,7 +400,7 @@ describe("Comment Feedback Operations", () => {
         },
       };
 
-      await writeFinishFeedbackComment(data);
+      await writeFinishFeedbackComment(mockOctokit, data);
 
       expect(updateCommentSpy).toHaveBeenCalledWith({
         owner: "test-owner",
@@ -215,7 +423,7 @@ describe("Comment Feedback Operations", () => {
         },
       };
 
-      await writeFinishFeedbackComment(data);
+      await writeFinishFeedbackComment(mockOctokit, data);
 
       expect(updateCommentSpy).toHaveBeenCalledWith({
         owner: "test-owner",
@@ -238,7 +446,7 @@ describe("Comment Feedback Operations", () => {
         },
       };
 
-      await writeFinishFeedbackComment(data);
+      await writeFinishFeedbackComment(mockOctokit, data);
 
       expect(updateCommentSpy).toHaveBeenCalledWith({
         owner: "test-owner",
@@ -259,7 +467,7 @@ describe("Comment Feedback Operations", () => {
         },
       };
 
-      await writeFinishFeedbackComment(data);
+      await writeFinishFeedbackComment(mockOctokit, data);
 
       expect(updateCommentSpy).toHaveBeenCalledWith({
         owner: "test-owner",
@@ -278,7 +486,7 @@ describe("Comment Feedback Operations", () => {
         },
       };
 
-      await writeFinishFeedbackComment(data);
+      await writeFinishFeedbackComment(mockOctokit, data);
 
       expect(updateCommentSpy).toHaveBeenCalledWith({
         owner: "test-owner",
@@ -297,7 +505,7 @@ describe("Comment Feedback Operations", () => {
         },
       };
 
-      await writeFinishFeedbackComment(data);
+      await writeFinishFeedbackComment(mockOctokit, data);
 
       expect(updateCommentSpy).toHaveBeenCalledWith({
         owner: "test-owner",
@@ -319,7 +527,7 @@ describe("Comment Feedback Operations", () => {
         },
       };
 
-      await writeFinishFeedbackComment(data);
+      await writeFinishFeedbackComment(mockOctokit, data);
 
       expect(updateReviewCommentSpy).toHaveBeenCalledWith({
         owner: "test-owner",
@@ -337,7 +545,7 @@ describe("Comment Feedback Operations", () => {
         failureData: {},
       };
 
-      await writeFinishFeedbackComment(data);
+      await writeFinishFeedbackComment(mockOctokit, data);
 
       expect(updateCommentSpy).toHaveBeenCalledWith({
         owner: "test-owner",

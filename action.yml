@@ -31,6 +31,10 @@ inputs:
     description: "Silent mode - skip comments, branch creation, commits. Only prepare data and run Junie for output consumption."
     required: false
     default: "false"
+  use_single_comment:
+    description: "Use a single comment that gets updated instead of creating new comments for each run(per workflow)"
+    required: false
+    default: "false"
 
   # Junie configuration
   prompt:
@@ -114,6 +118,7 @@ runs:
         RESOLVE_CONFLICTS: ${{ inputs.resolve_conflicts }}
         CREATE_NEW_BRANCH_FOR_PR: ${{ inputs.create_new_branch_for_pr }}
         SILENT_MODE: ${{ inputs.silent_mode }}
+        USE_SINGLE_COMMENT: ${{ inputs.use_single_comment }}
         ALL_INPUTS: ${{ toJson(inputs) }}
 
 

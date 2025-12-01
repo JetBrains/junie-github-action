@@ -1,17 +1,18 @@
 import * as core from "@actions/core";
-import {FinishFeedbackData, writeFinishFeedbackComment} from "../github/operations/comments/feedback";
+import {writeFinishFeedbackComment} from "../github/operations/comments/feedback";
+import type {FinishFeedbackData} from "../github/operations/comments/types";
 import {GitHubContext} from "../github/context";
 import {ActionType} from "./handle-results";
 import {ENV_VARS, OUTPUT_VARS} from "../constants/environment";
 import {formatJunieSummary} from "./format-summary";
 import {appendFileSync} from "fs";
+import {createOctokit} from "../github/api/client";
 
 /**
  * Writes feedback comment to GitHub issue/PR if initCommentId is available
  */
 async function writeFeedbackComment(isJobFailed: boolean, initCommentId: string): Promise<void> {
     const data: FinishFeedbackData = {
-        githubToken: process.env[ENV_VARS.GITHUB_TOKEN]!,
         initCommentId: initCommentId,
         isJobFailed: isJobFailed,
         parsedContext: JSON.parse(process.env[OUTPUT_VARS.PARSED_CONTEXT]!) as GitHubContext
@@ -31,7 +32,8 @@ async function writeFeedbackComment(isJobFailed: boolean, initCommentId: string)
         }
     }
 
-    await writeFinishFeedbackComment(data)
+    const octokits = createOctokit(process.env[ENV_VARS.GITHUB_TOKEN]!);
+    await writeFinishFeedbackComment(octokits.rest, data)
 }
 
 /**

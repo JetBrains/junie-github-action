@@ -12,6 +12,7 @@ A powerful GitHub Action that integrates [Junie](https://www.jetbrains.com/junie
 - **Flexible Triggers**: Activate via mentions, assignees, labels, or custom prompts
 - **Smart Branch Management**: Context-aware branch creation and management
 - **Silent Mode**: Run analysis-only workflows without comments or git operations
+- **Single Comment Mode**: Update a single comment instead of creating multiple comments for each run (per workflow)
 - **Comprehensive Feedback**: Real-time updates via GitHub comments with links to PRs and commits
 - **Rich Job Summaries**: Beautiful markdown reports in GitHub Actions with execution details
 - **MCP Extensibility**: Integrate custom Model Context Protocol servers for enhanced capabilities
@@ -198,6 +199,76 @@ jobs:
 
 ---
 
+### Single Comment Mode
+
+**Use Case**: Keep GitHub conversations clean by updating a single comment instead of creating multiple comments
+
+```yaml
+name: Junie
+
+on:
+  issue_comment:
+    types: [created]
+  issues:
+    types: [opened]
+
+jobs:
+  junie:
+    if: contains(github.event.comment.body, '@junie') || contains(github.event.issue.body, '@junie')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: JetBrains/junie-github-action@main
+        with:
+          junie_api_key: ${{ secrets.JUNIE_API_KEY }}
+          use_single_comment: true
+```
+
+**How it works**:
+- On first run, Junie creates a new comment with progress and results
+- On subsequent runs, Junie finds and updates the same comment instead of creating new ones
+- **Workflow-specific**: Each workflow maintains its own comment, allowing multiple Junie workflows in the same issue/PR
+- Works even when using different tokens or GitHub Apps
+- **For PR review comments** (code-level): Searches only within the specific comment thread, preventing cross-thread updates
+
+**When to use**:
+- Long-running issue conversations with multiple Junie invocations
+- PRs where you call Junie multiple times for different tasks
+- Keeping the comment section clean and organized
+- Reducing notification spam for issue/PR participants
+
+**Example conversation**:
+```markdown
+User: @junie please add input validation
+[Junie creates comment: "Working on it..."]
+[Junie updates same comment: "✓ Done! Added validation to forms.ts"]
+
+User: @junie also add unit tests
+[Junie updates same comment: "Working on it..."]
+[Junie updates same comment: "✓ Done! Added tests to forms.test.ts"]
+```
+
+**Thread-aware behavior** for PR code review comments:
+- When commenting on specific lines of code, Junie updates comments only within that thread
+- Different review threads maintain independent Junie comments
+- Prevents confusion when discussing multiple topics in the same PR
+
+```markdown
+# Thread 1: On line 42 in auth.ts
+User: @junie add error handling here
+[Junie updates comment in Thread 1]
+
+# Thread 2: On line 156 in database.ts
+User: @junie optimize this query
+[Junie updates comment in Thread 2 - independent from Thread 1]
+```
+
+---
+
 ### CI Failure Analysis
 
 **Use Case**: Investigate and fix failing tests or checks
@@ -319,6 +390,7 @@ jobs:
 |-------|-------------|---------|
 | `resolve_conflicts` | Enable automatic conflict detection (not needed for manual `@junie` resolution) | `false` |
 | `silent_mode` | Run Junie without comments, branch creation, or commits - only prepare data and output results | `false` |
+| `use_single_comment` | Update a single comment for all runs instead of creating new comments each time | `false` |
 
 #### Authentication
 

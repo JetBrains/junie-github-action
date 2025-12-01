@@ -47,6 +47,7 @@ type AutomationEventName = (typeof AUTOMATION_EVENT_NAMES)[number];
 
 type BaseContext = {
     runId: string;
+    workflow: string;
     eventAction?: string;
     actor: string;
     actorEmail: string;
@@ -57,6 +58,7 @@ type BaseContext = {
         resolveConflicts: boolean;
         createNewBranchForPR: boolean;
         silentMode: boolean;
+        useSingleComment: boolean;
         junieWorkingDir: string;
         appToken: string;
         baseBranch?: string;
@@ -108,6 +110,7 @@ export function parseGitHubContext(tokenOwner: TokenOwner): GitHubContext {
     const context = github.context;
     const commonFields = {
         runId: process.env.GITHUB_RUN_ID!,
+        workflow: process.env.GITHUB_WORKFLOW || "Junie",
         eventAction: context.payload.action,
         actor: context.actor,
         actorEmail: getActorEmail(),
@@ -116,6 +119,7 @@ export function parseGitHubContext(tokenOwner: TokenOwner): GitHubContext {
             resolveConflicts: process.env.RESOLVE_CONFLICTS == "true",
             createNewBranchForPR: process.env.CREATE_NEW_BRANCH_FOR_PR == "true",
             silentMode: process.env.SILENT_MODE == "true",
+            useSingleComment: process.env.USE_SINGLE_COMMENT == "true",
             junieWorkingDir: process.env.JUNIE_WORKING_DIR!,
             headRef: process.env.GITHUB_HEAD_REF,
             appToken: process.env.APP_TOKEN!,

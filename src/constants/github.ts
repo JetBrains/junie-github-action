@@ -26,6 +26,23 @@ export const DEFAULT_TRIGGER_PHRASE = "@junie";
 // Templates and Messages
 // ============================================================================
 
+/**
+ * Creates a hidden marker for identifying Junie comments from a specific workflow.
+ * This HTML comment is invisible to users but allows finding Junie comments
+ * even when different tokens or bots are used.
+ *
+ * Including workflow name prevents different Junie workflows from overwriting
+ * each other's comments in the same issue/PR.
+ *
+ * @param workflowName - Name of the GitHub Actions workflow (from GITHUB_WORKFLOW env var)
+ * @returns HTML comment marker unique to this workflow
+ */
+export function createJunieCommentMarker(workflowName: string): string {
+    // Sanitize workflow name to be safe in HTML comments (remove -- and >)
+    const sanitized = workflowName.replace(/--/g, '-').replace(/>/g, '');
+    return `<!-- junie-bot-comment:${sanitized} -->`;
+}
+
 export const INIT_COMMENT_BODY = "Hey, it's Junie by JetBrains! I started working..."
 
 export const PR_BODY_TEMPLATE = (junieBody: string, issueId?: number) => `
