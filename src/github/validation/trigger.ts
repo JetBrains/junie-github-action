@@ -14,7 +14,7 @@ export function checkContainsTrigger(context: GitHubContext): boolean {
     const {
         inputs: {assigneeTrigger, labelTrigger, triggerPhrase},
     } = context;
-    const triggerPhraseRegex = new RegExp(`(^|\\s)${escapeRegExp(triggerPhrase)}([\\s.,!?;:]|$)`);
+    const triggerPhraseRegex = new RegExp(`(^|\\s)${escapeRegExp(triggerPhrase)}([\\s.,!?;:]|$)`, 'i');
 
     if (isIssuesAssignedEvent(context)) {
         let triggerUser = assigneeTrigger.replace(/^@/, "");
