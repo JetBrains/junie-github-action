@@ -252,7 +252,7 @@ export function parseGitHubContext(tokenOwner: TokenOwner): GitHubContext {
             parsedContext = {
                 ...commonFields,
                 eventName: context.eventName,
-                payload: context.payload as unknown as WorkflowRunEvent,
+                payload,
                 isPR,
                 entityNumber: isPR ? payload.workflow_run.pull_requests[0].number : undefined,
             };
