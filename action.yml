@@ -169,6 +169,16 @@ runs:
         if-no-files-found: warn
         include-hidden-files: true
 
+    - name: Upload Junie logs as artifact
+      if: always() && steps.prepare.outputs.SHOULD_SKIP != 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: junie-logs
+        path: ~/.junie/logs
+        retention-days: 7
+        if-no-files-found: warn
+        include-hidden-files: true
+
     - uses: EndBug/add-and-commit@v9
       name: Commit changes
       id: commit
