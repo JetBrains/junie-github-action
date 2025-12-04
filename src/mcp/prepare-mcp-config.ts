@@ -56,11 +56,11 @@ export async function prepareMcpConfig(
     core.setOutput(OUTPUT_VARS.EJ_MCP_CONFIG, configJsonString);
 
     // Create ~/.junie directory if it doesn't exist
-    const junieDir = join(homedir(), '.junie');
-    await mkdir(junieDir, {recursive: true});
+    const junieCMPDir = join(homedir(),'.junie', 'mcp');
+    await mkdir(junieCMPDir, {recursive: true});
 
     // Write mcp.json config file to ~/.junie/mcp.json
-    const mcpConfigPath = join(junieDir, 'mcp.json');
+    const mcpConfigPath = join(junieCMPDir, 'mcp.json');
     await writeFile(mcpConfigPath, configJsonString, 'utf-8');
 
     return configJsonString;
