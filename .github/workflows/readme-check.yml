@@ -1,0 +1,46 @@
+name: README Check and Update
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'src/**'
+      - 'action.yml'
+      - 'README.md'
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'action.yml'
+      - 'README.md'
+
+jobs:
+  check-readme:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
+          fetch-depth: 0
+
+      - uses: JetBrains/junie-github-action@main
+        with:
+          junie_api_key: ${{ secrets.JUNIE_API_KEY }}
+          use_single_comment: true
+          prompt: |
+            Please review the README.md file and ensure it is up-to-date with the current codebase.
+
+            Tasks:
+            1. Check if action.yml inputs/outputs are correctly documented in README.md
+            2. Verify all code examples in README.md are correct
+            3. Check if any new features in src/ are documented
+            4. Ensure configuration examples match the actual implementation
+
+            If you find any discrepancies or improvements needed:
+            - Update README.md accordingly
+
+            If everything is up-to-date, just confirm that the README is accurate.

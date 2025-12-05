@@ -1,0 +1,38 @@
+name: Fix Failed Checks
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+jobs:
+  fix-failures:
+    if: github.event.workflow_run.conclusion == 'failure' && github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      actions: read
+      checks: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_branch }}
+
+      - uses: JetBrains/junie-github-action@main
+        with:
+          junie_api_key: ${{ secrets.JUNIE_API_KEY }}
+          allowed_mcp_servers: mcp_github_checks_server
+          use_single_comment: true
+          prompt: |
+            CI workflow "${{ github.event.workflow_run.name }}" failed on branch ${{ github.event.workflow_run.head_branch }}.
+
+            Please:
+            1. Use the get_pr_failed_checks_info MCP tool to analyze the error logs
+            2. Investigate the root cause of the failures
+            3. Suggest fixes for the failing tests or type errors
+            4. Ensure all tests pass after your changes
+
+            Focus on fixing the actual issues, not just making tests pass artificially.
+            Do not change code, just suggest fixes
