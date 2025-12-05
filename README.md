@@ -126,7 +126,7 @@ jobs:
 | Input | Description | Default |
 |-------|-------------|---------|
 | `prompt` | Custom instructions for Junie | - |
-| `junie_version` | Junie CLI version to install | `481.1.0` |
+| `junie_version` | Junie CLI version to install | `532.2.0` |
 | `junie_work_dir` | Working directory for Junie files | `/tmp/junie-work` |
 | `allowed_mcp_servers` | MCP servers to enable (comma-separated) | - |
 
