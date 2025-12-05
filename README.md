@@ -84,15 +84,25 @@ on:
 
 jobs:
   junie:
-    if: contains(github.event.comment.body, '@junify') || contains(github.event.issue.body, '@junify')
+    if: |
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@junify')) ||
+      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@junify')) ||
+      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@junify')) ||
+      (github.event_name == 'issues' && (contains(github.event.issue.body, '@junify') || contains(github.event.issue.title, '@junify')))
     runs-on: ubuntu-latest
     permissions:
       contents: write
       pull-requests: write
       issues: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: JetBrains/junie-github-action@main
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run Junie
+        id: junie
+        uses: JetBrains/junie-github-action@main
         with:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
 ```
