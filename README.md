@@ -461,8 +461,10 @@ jobs:
         with:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
           allowed_mcp_servers: mcp_github_checks_server
+          use_single_comment: true
           prompt: |
-            Investigate the failed CI checks and suggest fixes.
+            CI check ${{ github.event.workflow_run.name }} failed.
+            Investigate workflow file and logs to suggest fixes.
             Use the get_pr_failed_checks_info MCP tool to analyze error logs.
 ```
 
