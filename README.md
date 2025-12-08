@@ -1,5 +1,9 @@
 # Junie GitHub Action
 
+[![GitHub Marketplace](https://img.shields.io/badge/Marketplace-Junie%20Action-blue.svg?colorA=24292e&colorB=0366d6&style=flat&longCache=true&logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA4AAAAOCAYAAAAfSC3RAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAM6wAADOsB5dZE0gAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAERSURBVCiRhZG/SsMxFEZPfsVJ61jbxaF0cRQRcRJ9hlYn30IHN/+9iquDCOIsblIrOjqKgy5aKoJQj4O3EEtbPwhJbr6Te28CmdSKeqzeqr0YbfVIrTBKakvtOl5dtTkK+v4HfA9PEyBFCY9AGVgCBLaBp1jPAyfAJ/AAdIEG0dNAiyP7+K1qIfMdonZic6+WJoBJvQlvuwDqcXadUuqPA1NKAlexbRTAIMvMOCjTbMwl1LtI/6KWJ5Q6rT6Ht1MA58AX8Apcqqt5r2qhrgAXQC3CZ6i1+KMd9TRu3MvA3aH/fFPnBodb6oe6HM8+lYHrGdRXW8M9bMZtPXUji69lmf5Cmamq7quNLFZXD9Rq7v0Bpc1o/tp0fisAAAAASUVORK5CYII=)](https://github.com/marketplace/actions/junie-github-action)
+[![Release](https://img.shields.io/github/v/release/JetBrains/junie-github-action)](https://github.com/JetBrains/junie-github-action/releases)
+[![License](https://img.shields.io/github/license/JetBrains/junie-github-action)](LICENSE)
+
 A powerful GitHub Action that integrates [Junie](https://www.jetbrains.com/junie/) (JetBrains' AI coding agent) into your GitHub workflows to automate code changes, issue resolution, PR management, and conflict resolution. Junie can understand your codebase, implement fixes, review changes, and respond to developer requests directly in issues and pull requests.
 
 ## 📑 Table of Contents
@@ -102,10 +106,16 @@ jobs:
 
       - name: Run Junie
         id: junie
-        uses: JetBrains/junie-github-action@main
+        uses: JetBrains/junie-github-action@v1
         with:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
 ```
+
+**Version Tags:**
+- Use `@v1` for the latest v1.x.x version (recommended - automatically gets updates)
+- Use `@v0` for the latest v0.x.x version (pre-release)
+- Use `@v1.0.0` for a specific version (pinned - no automatic updates)
+- Use `@main` for the latest development version (not recommended for production)
 
 3. Start using Junie:
    - Comment `@junie-agent help me fix this bug` on an issue
@@ -173,7 +183,7 @@ jobs:
 **Example usage:**
 
 ```yaml
-- uses: JetBrains/junie-github-action@main
+- uses: JetBrains/junie-github-action@v1
   id: junie
   with:
     junie_api_key: ${{ secrets.JUNIE_API_KEY }}
@@ -237,7 +247,7 @@ When Junie creates a PR or pushes commits, the following workflows will **NOT be
 To allow Junie's changes to trigger other workflows, provide a custom token:
 
 ```yaml
-- uses: JetBrains/junie-github-action@main
+- uses: JetBrains/junie-github-action@v1
   with:
     junie_api_key: ${{ secrets.JUNIE_API_KEY }}
     custom_github_token: ${{ secrets.CUSTOM_GITHUB_TOKEN }}
@@ -287,7 +297,7 @@ jobs:
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
 
       # Use the generated token
-      - uses: JetBrains/junie-github-action@main
+      - uses: JetBrains/junie-github-action@v1
         with:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
           custom_github_token: ${{ steps.app-token.outputs.token }}
@@ -347,7 +357,7 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@v4
-      - uses: JetBrains/junie-github-action@main
+      - uses: JetBrains/junie-github-action@v1
         with:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
           resolve_conflicts: true
@@ -382,7 +392,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: JetBrains/junie-github-action@main
+      - uses: JetBrains/junie-github-action@v1
         id: junie
         with:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
@@ -431,7 +441,7 @@ jobs:
       issues: write
     steps:
       - uses: actions/checkout@v4
-      - uses: JetBrains/junie-github-action@main
+      - uses: JetBrains/junie-github-action@v1
         with:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
           use_single_comment: true
@@ -467,7 +477,7 @@ jobs:
       checks: read
     steps:
       - uses: actions/checkout@v4
-      - uses: JetBrains/junie-github-action@main
+      - uses: JetBrains/junie-github-action@v1
         with:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
           allowed_mcp_servers: mcp_github_checks_server
@@ -497,7 +507,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: JetBrains/junie-github-action@main
+      - uses: JetBrains/junie-github-action@v1
         with:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
           label_trigger: "auto-fix"

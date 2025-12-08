@@ -1,0 +1,124 @@
+name: Create Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_bump:
+        description: "Version bump type"
+        required: false
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+        default: minor
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      next_version: ${{ steps.next_version.outputs.next_version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.0
+
+      - name: Install dependencies
+        run: bun i
+
+      - name: Run type check
+        run: bun run typecheck
+
+      - name: Run tests
+        run: bun test
+
+      - name: Get latest tag
+        id: get_latest_tag
+        run: |
+          # Get only version tags (v + number pattern)
+          latest_tag=$(git tag -l 'v[0-9]*' | sort -V | tail -1 || echo "v0.0.0")
+          echo "latest_tag=$latest_tag" >> $GITHUB_OUTPUT
+          echo "Latest tag: $latest_tag"
+
+      - name: Calculate next version
+        id: next_version
+        run: |
+          latest_tag="${{ steps.get_latest_tag.outputs.latest_tag }}"
+          bump_type="${{ inputs.version_bump }}"
+
+          # Remove 'v' prefix and split by dots
+          version=${latest_tag#v}
+          IFS='.' read -ra VERSION_PARTS <<< "$version"
+
+          major=${VERSION_PARTS[0]:-0}
+          minor=${VERSION_PARTS[1]:-0}
+          patch=${VERSION_PARTS[2]:-0}
+
+          # Increment version based on bump type
+          case "$bump_type" in
+            major)
+              major=$((major + 1))
+              minor=0
+              patch=0
+              ;;
+            minor)
+              minor=$((minor + 1))
+              patch=0
+              ;;
+            patch)
+              patch=$((patch + 1))
+              ;;
+          esac
+
+          next_version="v${major}.${minor}.${patch}"
+          echo "next_version=$next_version" >> $GITHUB_OUTPUT
+          echo "Next version: $next_version (bump: $bump_type)"
+
+      - name: Create and push tag
+        run: |
+          next_version="${{ steps.next_version.outputs.next_version }}"
+          git tag -a "$next_version" -m "Release $next_version"
+          git push origin "$next_version"
+
+      - name: Create Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          next_version="${{ steps.next_version.outputs.next_version }}"
+
+          gh release create "$next_version" \
+            --title "Release $next_version" \
+            --generate-notes
+
+  update-major-tag:
+    needs: create-release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Update major version tag
+        run: |
+          next_version="${{ needs.create-release.outputs.next_version }}"
+          # Extract major version (e.g., v1 from v1.2.3)
+          major_version=$(echo "$next_version" | cut -d. -f1)
+
+          # Update the major version tag to point to this release
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -fa "$major_version" -m "Update $major_version tag to $next_version"
+          git push origin "$major_version" --force
+
+          echo "✅ Updated $major_version tag to point to $next_version"
