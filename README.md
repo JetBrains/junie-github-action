@@ -106,7 +106,7 @@ jobs:
 
       - name: Run Junie
         id: junie
-        uses: JetBrains/junie-github-action@v1
+        uses: JetBrains/junie-github-action@v0
         with:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
 ```
@@ -146,7 +146,7 @@ jobs:
 |-------|-------------|---------|
 | `prompt` | Custom instructions for Junie | - |
 | `junie_version` | Junie CLI version to install | `532.2.0` |
-| `junie_work_dir` | Working directory for Junie files | `/tmp/junie-work` |
+| `junie_working_dir` | Working directory for Junie files | `/tmp/junie-work` |
 | `allowed_mcp_servers` | MCP servers to enable (comma-separated) | - |
 
 **Available MCP Servers**:
@@ -164,7 +164,7 @@ jobs:
 
 | Input | Description | Required |
 |-------|-------------|----------|
-| `junie_api_key` | JetBrains Junie API key | Yes |
+| `junie_api_key` | JetBrains Junie API key | No |
 | `custom_github_token` | Custom GitHub token (optional) | No |
 
 ### Outputs
@@ -344,6 +344,10 @@ on:
   push:
   workflow_dispatch:
     inputs:
+      action:
+        description: "Action type (must be 'resolve-conflicts')"
+        required: true
+        default: resolve-conflicts
       prNumber:
         description: "PR number"
         required: true
