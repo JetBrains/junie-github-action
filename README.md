@@ -102,7 +102,7 @@ jobs:
 
       - name: Run Junie
         id: junie
-        uses: JetBrains/junie-github-action@v1
+        uses: JetBrains/junie-github-action@v0
         with:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
 ```
@@ -133,7 +133,7 @@ jobs:
 
 | Input | Description | Default |
 |-------|-------------|---------|
-| `base_branch` | Base branch for creating new branches | `github.base_ref` |
+| `base_branch` | Base branch for creating new branches (defaults to PR base via github.base_ref; falls back to repository default branch when base_ref is not available) | `github.base_ref` |
 | `create_new_branch_for_pr` | Create new branch for PR contributors | `false` |
 
 #### Junie Configuration
@@ -202,7 +202,8 @@ permissions:
   contents: write      # Required to create branches, make commits, and push changes
   pull-requests: write # Required to create PRs, add comments to PRs, and update PR status
   issues: write        # Required to add comments to issues and update issue metadata
-  checks: read         # Optional: only needed for CI failure analysis with MCP servers
+  checks: read         # Optional: needed for CI failure analysis with MCP servers
+  actions: read        # Optional: needed to download workflow job logs in CI failure analysis
 ```
 
 **Minimal permissions** for `silent_mode` (read-only operations):
@@ -470,6 +471,7 @@ jobs:
       contents: write
       pull-requests: write
       checks: read
+      actions: read
     steps:
       - uses: actions/checkout@v4
       - uses: JetBrains/junie-github-action@v0
