@@ -118,7 +118,6 @@ jobs:
 - **Fix Failing CI Tests** - Diagnose and fix test failures automatically
 - **Security Audit for Secrets** - Scan commits for accidentally committed credentials
 - **Dependency Update Assistant** - Review and adapt to breaking changes in dependencies
-- **API Documentation Generator** - Generate OpenAPI/Swagger docs from code
 
 Each recipe includes complete workflows, prompts, and configuration examples you can copy and adapt.
 
