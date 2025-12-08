@@ -138,7 +138,7 @@ jobs:
 
 | Input | Description | Default |
 |-------|-------------|---------|
-| `base_branch` | Base branch for creating new branches | `github.base_ref` |
+| `base_branch` | Base branch for creating new branches | PR events: `github.base_ref`; otherwise repository default branch |
 | `create_new_branch_for_pr` | Create new branch for PR contributors | `false` |
 
 #### Junie Configuration
@@ -165,8 +165,10 @@ jobs:
 
 | Input | Description | Required |
 |-------|-------------|----------|
-| `junie_api_key` | JetBrains Junie API key | Yes |
+| `junie_api_key` | JetBrains Junie API key | No |
 | `custom_github_token` | Custom GitHub token (optional) | No |
+
+Note: While not marked as required in action.yml (to allow skip/resolve-conflicts workflows), `junie_api_key` must be provided for any run that actually executes the Junie CLI.
 
 ### Outputs
 
@@ -207,7 +209,8 @@ permissions:
   contents: write      # Required to create branches, make commits, and push changes
   pull-requests: write # Required to create PRs, add comments to PRs, and update PR status
   issues: write        # Required to add comments to issues and update issue metadata
-  checks: read         # Optional: only needed for CI failure analysis with MCP servers
+  checks: read         # Optional: needed for CI failure analysis with MCP GitHub Checks server
+  actions: read        # Optional: needed to download workflow job logs for CI failure analysis
 ```
 
 **Minimal permissions** for `silent_mode` (read-only operations):
@@ -345,6 +348,10 @@ on:
   push:
   workflow_dispatch:
     inputs:
+      action:
+        description: "Action selector"
+        required: false
+        default: "resolve-conflicts"
       prNumber:
         description: "PR number"
         required: true
