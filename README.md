@@ -28,7 +28,7 @@ A powerful GitHub Action that integrates [Junie](https://www.jetbrains.com/junie
 - **CI Failure Analysis**: Investigates failed checks and suggests fixes using MCP integration
 - **Flexible Triggers**: Activate via mentions, assignees, labels, or custom prompts
 - **Smart Branch Management**: Context-aware branch creation and management
-- **Silent Mode**: Run analysis-only workflows without comments or git operations
+- **Silent Mode**: Run analysis-only workflows without comments, branch creation, or commits
 - **Single Comment Mode**: Update a single comment instead of creating multiple comments for each run (per workflow)
 - **Comprehensive Feedback**: Real-time updates via GitHub comments with links to PRs and commits
 - **Rich Job Summaries**: Beautiful markdown reports in GitHub Actions with execution details
@@ -69,23 +69,23 @@ on:
     types: [created]
   pull_request_review_comment:
     types: [created]
+  pull_request:
+    types: [opened, edited, labeled]
   issues:
-    types: [opened, assigned]
+    types: [opened, assigned, labeled]
   pull_request_review:
     types: [submitted]
 
 jobs:
   junie:
-    if: |
-      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@junie-agent')) ||
-      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@junie-agent')) ||
-      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@junie-agent')) ||
-      (github.event_name == 'issues' && (contains(github.event.issue.body, '@junie-agent') || contains(github.event.issue.title, '@junie-agent')))
     runs-on: ubuntu-latest
     permissions:
       contents: write
       pull-requests: write
       issues: write
+      # Optional, only if you enable the GitHub Checks MCP server
+      checks: read      # to read check runs
+      actions: read     # to download job logs
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -94,7 +94,7 @@ jobs:
 
       - name: Run Junie
         id: junie
-        uses: JetBrains/junie-github-action@v1
+        uses: JetBrains/junie-github-action@v0
         with:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
 ```
@@ -107,7 +107,7 @@ jobs:
 3. Start using Junie:
    - Comment `@junie-agent help me fix this bug` on an issue
    - Mention `@junie-agent review this change` in a PR
-   - Add the `junie` label to trigger automatically
+   - Add the `junie` label to an issue or PR to trigger automatically
 
 ## Cookbook
 
@@ -206,7 +206,8 @@ permissions:
   contents: write      # Required to create branches, make commits, and push changes
   pull-requests: write # Required to create PRs, add comments to PRs, and update PR status
   issues: write        # Required to add comments to issues and update issue metadata
-  checks: read         # Optional: only needed for CI failure analysis with MCP servers
+  checks: read         # Optional: needed for CI failure analysis (read check runs)
+  actions: read        # Optional: needed to download workflow job logs for MCP checks server
 ```
 
 **Minimal permissions** for `silent_mode` (read-only operations):
@@ -275,7 +276,7 @@ b. **Add secrets to repository:**
    - Add `APP_ID` with your App ID
    - Add `APP_PRIVATE_KEY` with the entire contents of the `.pem` file
 
-e. **Use in workflow:**
+c. **Use in workflow:**
 
 ```yaml
 jobs:
