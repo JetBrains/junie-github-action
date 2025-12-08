@@ -1,7 +1,7 @@
-name: "Junie GH Action v1.0"
+name: "Official Junie GitHub Action (BETA)"
 description: "Powerful GitHub automation with Junie."
 branding:
-  icon: "at-sign"
+  icon: "cpu"
   color: "green"
 
 inputs:
