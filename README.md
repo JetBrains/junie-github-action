@@ -109,6 +109,23 @@ jobs:
    - Mention `@junie-agent review this change` in a PR
    - Add the `junie` label to trigger automatically
 
+### Using Structured Prompts (Experimental)
+
+For better prompt organization and AI comprehension, you can enable the structured prompt format:
+
+```yaml
+- name: Run Junie
+  uses: JetBrains/junie-github-action@v1
+  with:
+    junie_api_key: ${{ secrets.JUNIE_API_KEY }}
+    use_structured_prompt: true  # Enable XML-based structured format
+```
+
+**Benefits:**
+- Better organized prompt with clear XML sections
+
+**Note:** This is an experimental feature. The default legacy format remains stable for production use.
+
 ## Cookbook
 
 📚 **Looking for practical examples?** Check out the [Cookbook](COOKBOOK.md) for real-world recipes including:
@@ -159,6 +176,7 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 | `resolve_conflicts` | Enable automatic conflict detection (not needed for manual `@junie-agent` resolution) | `false` |
 | `silent_mode` | Run Junie without comments, branch creation, or commits - only prepare data and output results | `false` |
 | `use_single_comment` | Update a single comment for all runs instead of creating new comments each time | `false` |
+| `use_structured_prompt` | Use the new structured prompt format with XML tags for better organization | `false` |
 
 #### Authentication
 

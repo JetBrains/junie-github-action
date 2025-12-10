@@ -35,6 +35,10 @@ inputs:
     description: "Use a single comment that gets updated instead of creating new comments for each run(per workflow)"
     required: false
     default: "false"
+  use_structured_prompt:
+    description: "Use the new structured prompt format with XML tags for better organization"
+    required: false
+    default: "false"
 
   # Junie configuration
   prompt:
@@ -119,6 +123,7 @@ runs:
         CREATE_NEW_BRANCH_FOR_PR: ${{ inputs.create_new_branch_for_pr }}
         SILENT_MODE: ${{ inputs.silent_mode }}
         USE_SINGLE_COMMENT: ${{ inputs.use_single_comment }}
+        USE_STRUCTURED_PROMPT: ${{ inputs.use_structured_prompt }}
         ALL_INPUTS: ${{ toJson(inputs) }}
 
 
