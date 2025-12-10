@@ -94,7 +94,7 @@ jobs:
 
       - name: Run Junie
         id: junie
-        uses: JetBrains/junie-github-action@v1
+        uses: JetBrains/junie-github-action@v0
         with:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
 ```
@@ -166,6 +166,8 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 |-------|-------------|----------|
 | `junie_api_key` | JetBrains Junie API key | Yes |
 | `custom_github_token` | Custom GitHub token (optional) | No |
+
+Note: While not marked as `required` in action.yml, `junie_api_key` is required in practice — the action will fail at runtime if it is not provided.
 
 ### Outputs
 
@@ -275,7 +277,7 @@ b. **Add secrets to repository:**
    - Add `APP_ID` with your App ID
    - Add `APP_PRIVATE_KEY` with the entire contents of the `.pem` file
 
-e. **Use in workflow:**
+c. **Use in workflow:**
 
 ```yaml
 jobs:
