@@ -69,18 +69,15 @@ on:
     types: [created]
   pull_request_review_comment:
     types: [created]
+  pull_request:
+    types: [opened, edited]
   issues:
-    types: [opened, assigned]
+    types: [opened, assigned, labeled]
   pull_request_review:
     types: [submitted]
 
 jobs:
   junie:
-    if: |
-      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@junie-agent')) ||
-      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@junie-agent')) ||
-      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@junie-agent')) ||
-      (github.event_name == 'issues' && (contains(github.event.issue.body, '@junie-agent') || contains(github.event.issue.title, '@junie-agent')))
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -94,7 +91,7 @@ jobs:
 
       - name: Run Junie
         id: junie
-        uses: JetBrains/junie-github-action@v1
+        uses: JetBrains/junie-github-action@v0
         with:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
 ```
@@ -164,7 +161,7 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 
 | Input | Description | Required |
 |-------|-------------|----------|
-| `junie_api_key` | JetBrains Junie API key | Yes |
+| `junie_api_key` | JetBrains Junie API key (required unless using resolve_conflicts-only workflows) | Yes |
 | `custom_github_token` | Custom GitHub token (optional) | No |
 
 ### Outputs
