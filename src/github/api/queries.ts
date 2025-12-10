@@ -22,6 +22,7 @@ export const PULL_REQUEST_QUERY = `
         changedFiles
         createdAt
         updatedAt
+        lastEditedAt
 
         # Commits
         commits(first: 100) {
@@ -58,6 +59,7 @@ export const PULL_REQUEST_QUERY = `
                 login
               }
               createdAt
+              lastEditedAt
               url
             }
             ... on CrossReferencedEvent {
@@ -96,6 +98,7 @@ export const PULL_REQUEST_QUERY = `
             body
             state
             submittedAt
+            lastEditedAt
             url
 
             # Review comments (threads)
@@ -111,12 +114,11 @@ export const PULL_REQUEST_QUERY = `
                   login
                 }
                 createdAt
+                lastEditedAt
                 url
                 replyTo {
                   id
                 }
-                # GitHub doesn't have a direct "resolved" field in GraphQL
-                # We'll need to infer it from the thread structure
               }
             }
           }
@@ -141,6 +143,7 @@ export const ISSUE_QUERY = `
         }
         createdAt
         updatedAt
+        lastEditedAt
 
         # Timeline events
         timelineItems(first: 100, itemTypes: [ISSUE_COMMENT, CROSS_REFERENCED_EVENT, REFERENCED_EVENT]) {
@@ -154,6 +157,7 @@ export const ISSUE_QUERY = `
                 login
               }
               createdAt
+              lastEditedAt
               url
             }
             ... on CrossReferencedEvent {
@@ -205,6 +209,7 @@ export interface GraphQLIssueCommentNode {
     body: string;
     author: GraphQLUser | null;
     createdAt: string;
+    lastEditedAt: string | null;
     url: string;
 }
 
@@ -265,6 +270,7 @@ export interface GraphQLReviewCommentNode {
     diffHunk: string;
     author: GraphQLUser | null;
     createdAt: string;
+    lastEditedAt: string | null;
     url: string;
     replyTo: { id: string } | null;
 }
@@ -280,6 +286,7 @@ export interface GraphQLReviewNode {
     body: string;
     state: string;
     submittedAt: string;
+    lastEditedAt: string | null;
     url: string;
     comments: GraphQLReviewComments;
 }
@@ -305,6 +312,7 @@ export interface GraphQLPullRequest {
     changedFiles: number;
     createdAt: string;
     updatedAt: string;
+    lastEditedAt: string | null;
     commits: GraphQLCommits;
     files: GraphQLFiles;
     timelineItems: GraphQLTimelineItems;
@@ -321,6 +329,7 @@ export interface GraphQLIssue {
     author: GraphQLUser | null;
     createdAt: string;
     updatedAt: string;
+    lastEditedAt: string | null;
     timelineItems: GraphQLTimelineItems;
 }
 
@@ -365,4 +374,9 @@ export interface ViewerQueryResponse {
         login: string;
         databaseId: number;
     };
+}
+
+export interface FetchedData {
+    pullRequest?: GraphQLPullRequest;
+    issue?: GraphQLIssue;
 }

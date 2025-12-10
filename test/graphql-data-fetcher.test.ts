@@ -16,7 +16,7 @@ describe("GraphQLGitHubDataFetcher", () => {
     });
 
     describe("fetchPullRequestData", () => {
-        test("should fetch and convert PR data successfully", async () => {
+        test("should fetch and return PR data successfully", async () => {
             const mockPRResponse: PullRequestQueryResponse = {
                 repository: {
                     pullRequest: {
@@ -36,6 +36,7 @@ describe("GraphQLGitHubDataFetcher", () => {
                         changedFiles: 2,
                         createdAt: "2024-01-01T00:00:00Z",
                         updatedAt: "2024-01-02T00:00:00Z",
+                        lastEditedAt: null,
                         commits: {
                             totalCount: 3,
                             nodes: [
@@ -74,6 +75,7 @@ describe("GraphQLGitHubDataFetcher", () => {
                                     body: "Test comment",
                                     author: {login: "commenter"},
                                     createdAt: "2024-01-01T00:00:00Z",
+                                    lastEditedAt: null,
                                     url: "https://github.com/owner/repo/issues/42#issuecomment-1"
                                 }
                             ]
@@ -87,6 +89,7 @@ describe("GraphQLGitHubDataFetcher", () => {
                                     body: "LGTM",
                                     state: "APPROVED",
                                     submittedAt: "2024-01-02T00:00:00Z",
+                                    lastEditedAt: null,
                                     url: "https://github.com/owner/repo/pull/42#pullrequestreview-1",
                                     comments: {
                                         nodes: [
@@ -99,6 +102,7 @@ describe("GraphQLGitHubDataFetcher", () => {
                                                 diffHunk: "@@ -1,3 +1,3 @@",
                                                 author: {login: "reviewer"},
                                                 createdAt: "2024-01-02T00:00:00Z",
+                                                lastEditedAt: null,
                                                 url: "https://github.com/owner/repo/pull/42#discussion_r1",
                                                 replyTo: null
                                             }
@@ -115,29 +119,23 @@ describe("GraphQLGitHubDataFetcher", () => {
 
             const result = await fetcher.fetchPullRequestData("owner", "repo", 42);
 
-            expect(result.issue.number).toBe(42);
-            expect(result.issue.title).toBe("Test PR");
-            expect(result.issue.state).toBe("open");
-            expect(result.issue.user.login).toBe("testuser");
-
-            expect(result.prDetails.number).toBe(42);
-            expect(result.prDetails.additions).toBe(10);
-            expect(result.prDetails.deletions).toBe(5);
-            expect(result.prDetails.head.ref).toBe("feature");
-            expect(result.prDetails.base.ref).toBe("main");
-
-            expect(result.changedFiles).toHaveLength(2);
-            expect(result.changedFiles[0].filename).toBe("src/test.ts");
-            expect(result.changedFiles[0].status).toBe("modified");
-
-            expect(result.reviews.reviews).toHaveLength(1);
-            expect(result.reviews.reviews[0].state).toBe("APPROVED");
-
-            expect(result.reviews.threads).toHaveLength(1);
-            expect(result.reviews.threads[0].comments).toHaveLength(1);
+            expect(result.pullRequest.number).toBe(42);
+            expect(result.pullRequest.title).toBe("Test PR");
+            expect(result.pullRequest.state).toBe("OPEN");
+            expect(result.pullRequest.author?.login).toBe("testuser");
+            expect(result.pullRequest.additions).toBe(10);
+            expect(result.pullRequest.deletions).toBe(5);
+            expect(result.pullRequest.headRefName).toBe("feature");
+            expect(result.pullRequest.baseRefName).toBe("main");
+            expect(result.pullRequest.files.nodes).toHaveLength(2);
+            expect(result.pullRequest.files.nodes[0].path).toBe("src/test.ts");
+            expect(result.pullRequest.files.nodes[0].changeType).toBe("MODIFIED");
+            expect(result.pullRequest.reviews.nodes).toHaveLength(1);
+            expect(result.pullRequest.reviews.nodes[0].state).toBe("APPROVED");
+            expect(result.pullRequest.reviews.nodes[0].comments.nodes).toHaveLength(1);
         });
 
-        test("should handle null author as 'ghost'", async () => {
+        test("should handle null author", async () => {
             const mockPRResponse: PullRequestQueryResponse = {
                 repository: {
                     pullRequest: {
@@ -157,6 +155,7 @@ describe("GraphQLGitHubDataFetcher", () => {
                         changedFiles: 0,
                         createdAt: "2024-01-01T00:00:00Z",
                         updatedAt: "2024-01-02T00:00:00Z",
+                        lastEditedAt: null,
                         commits: {totalCount: 0, nodes: []},
                         files: {nodes: []},
                         timelineItems: {nodes: []},
@@ -169,8 +168,7 @@ describe("GraphQLGitHubDataFetcher", () => {
 
             const result = await fetcher.fetchPullRequestData("owner", "repo", 42);
 
-            expect(result.issue.user.login).toBe("ghost");
-            expect(result.prDetails.user.login).toBe("ghost");
+            expect(result.pullRequest.author).toBeNull();
         });
 
         test("should retry on transient errors", async () => {
@@ -194,6 +192,7 @@ describe("GraphQLGitHubDataFetcher", () => {
                         changedFiles: 0,
                         createdAt: "2024-01-01T00:00:00Z",
                         updatedAt: "2024-01-02T00:00:00Z",
+                        lastEditedAt: null,
                         commits: {totalCount: 0, nodes: []},
                         files: {nodes: []},
                         timelineItems: {nodes: []},
@@ -212,7 +211,7 @@ describe("GraphQLGitHubDataFetcher", () => {
 
             const result = await fetcher.fetchPullRequestData("owner", "repo", 42);
 
-            expect(result.issue.number).toBe(42);
+            expect(result.pullRequest.number).toBe(42);
             expect(callCount).toBe(2);
         });
 
@@ -226,7 +225,7 @@ describe("GraphQLGitHubDataFetcher", () => {
     });
 
     describe("fetchIssueData", () => {
-        test("should fetch and convert issue data successfully", async () => {
+        test("should fetch and return issue data successfully", async () => {
             const mockIssueResponse: IssueQueryResponse = {
                 repository: {
                     issue: {
@@ -239,6 +238,7 @@ describe("GraphQLGitHubDataFetcher", () => {
                         author: {login: "issueauthor"},
                         createdAt: "2024-01-01T00:00:00Z",
                         updatedAt: "2024-01-02T00:00:00Z",
+                        lastEditedAt: null,
                         timelineItems: {
                             nodes: [
                                 {
@@ -248,6 +248,7 @@ describe("GraphQLGitHubDataFetcher", () => {
                                     body: "Test comment",
                                     author: {login: "commenter"},
                                     createdAt: "2024-01-01T00:00:00Z",
+                                    lastEditedAt: null,
                                     url: "https://github.com/owner/repo/issues/123#issuecomment-1"
                                 }
                             ]
@@ -262,12 +263,12 @@ describe("GraphQLGitHubDataFetcher", () => {
 
             expect(result.issue.number).toBe(123);
             expect(result.issue.title).toBe("Test Issue");
-            expect(result.issue.state).toBe("open");
-            expect(result.issue.user.login).toBe("issueauthor");
-            expect(result.timeline.events).toHaveLength(1);
+            expect(result.issue.state).toBe("OPEN");
+            expect(result.issue.author?.login).toBe("issueauthor");
+            expect(result.issue.timelineItems.nodes).toHaveLength(1);
         });
 
-        test("should handle null author as 'ghost'", async () => {
+        test("should handle null author", async () => {
             const mockIssueResponse: IssueQueryResponse = {
                 repository: {
                     issue: {
@@ -280,6 +281,7 @@ describe("GraphQLGitHubDataFetcher", () => {
                         author: null,
                         createdAt: "2024-01-01T00:00:00Z",
                         updatedAt: "2024-01-02T00:00:00Z",
+                        lastEditedAt: null,
                         timelineItems: {nodes: []}
                     }
                 }
@@ -289,7 +291,7 @@ describe("GraphQLGitHubDataFetcher", () => {
 
             const result = await fetcher.fetchIssueData("owner", "repo", 123);
 
-            expect(result.issue.user.login).toBe("ghost");
+            expect(result.issue.author).toBeNull();
         });
 
         test("should retry on transient errors", async () => {
@@ -306,6 +308,7 @@ describe("GraphQLGitHubDataFetcher", () => {
                         author: {login: "issueauthor"},
                         createdAt: "2024-01-01T00:00:00Z",
                         updatedAt: "2024-01-02T00:00:00Z",
+                        lastEditedAt: null,
                         timelineItems: {nodes: []}
                     }
                 }

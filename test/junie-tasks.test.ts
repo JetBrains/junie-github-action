@@ -41,12 +41,14 @@ describe("prepareJunieTask", () => {
                     title: "Test Issue",
                     body: "Issue body",
                     state: "open",
-                    user: {login: "author"}
+                    user: {login: "author"},
+                    updated_at: "2024-01-01T00:00:00Z"
                 },
                 comment: {
                     id: 1,
                     body: "@junie-agent help",
-                    user: {login: "commenter"}
+                    user: {login: "commenter"},
+                    created_at: "2024-01-01T00:00:00Z"
                 },
                 repository: {
                     owner: {login: "owner"},
@@ -82,6 +84,7 @@ describe("prepareJunieTask", () => {
                                 changedFiles: 2,
                                 createdAt: "2024-01-01T00:00:00Z",
                                 updatedAt: "2024-01-01T00:00:00Z",
+                                lastEditedAt: null,
                                 commits: {totalCount: 3, nodes: []},
                                 files: {nodes: []},
                                 timelineItems: {nodes: []},
@@ -94,6 +97,7 @@ describe("prepareJunieTask", () => {
                                             body: "Changes needed",
                                             state: "COMMENTED",
                                             submittedAt: "2024-01-01T00:00:00Z",
+                                            lastEditedAt: null,
                                             url: `https://github.com/${variables.owner}/${variables.repo}/pull/${variables.number}#pullrequestreview-456`,
                                             comments: {nodes: []}
                                         }
@@ -117,6 +121,7 @@ describe("prepareJunieTask", () => {
                                 author: {login: "author"},
                                 createdAt: "2024-01-01T00:00:00Z",
                                 updatedAt: "2024-01-01T00:00:00Z",
+                                lastEditedAt: null,
                                 timelineItems: {nodes: []}
                             }
                         }
@@ -190,7 +195,7 @@ describe("prepareJunieTask", () => {
     });
 
     describe("with user prompt", () => {
-        test("should set textTask from inputs.prompt", async () => {
+        test("should set task from inputs.prompt", async () => {
             const context = createMockContext({
                 eventName: "workflow_dispatch",
                 inputs: {
@@ -208,8 +213,9 @@ describe("prepareJunieTask", () => {
 
             const result = await prepareJunieTask(context, branchInfo, octokit);
 
-            expect(result.textTask).toBeDefined();
-            expect(result.textTask?.text.trim()).toBe("Do something");
+            expect(result).toBeDefined();
+            expect(typeof result).toBe("string");
+            expect(result.trim()).toBe("Do something");
             expect(core.setOutput).toHaveBeenCalledWith("EJ_TASK", expect.any(String));
         });
     });
@@ -224,11 +230,12 @@ describe("prepareJunieTask", () => {
 
             const result = await prepareJunieTask(context, branchInfo, octokit);
 
-            expect(result.textTask).toBeDefined();
-            expect(result.textTask?.text).toContain("User @commenter mentioned you");
-            expect(result.textTask?.text).toContain("#123 Test Issue");
-            expect(result.textTask?.text).toContain("@junie-agent help");
-            expect(result.textTask?.text).toContain("### ISSUE:");
+            expect(result).toBeDefined();
+            expect(typeof result).toBe("string");
+            expect(result).toContain("User @commenter mentioned you");
+            expect(result).toContain("#123 Test Issue");
+            expect(result).toContain("@junie-agent help");
+            expect(result).toContain("### ISSUE:");
         });
     });
 
@@ -255,9 +262,10 @@ describe("prepareJunieTask", () => {
 
             const result = await prepareJunieTask(context, branchInfo, octokit);
 
-            expect(result.textTask).toBeDefined();
-            expect(result.textTask?.text).toContain("### ISSUE:");
-            expect(result.textTask?.text).toContain("Test Issue");
+            expect(result).toBeDefined();
+            expect(typeof result).toBe("string");
+            expect(result).toContain("### ISSUE:");
+            expect(result).toContain("Test Issue");
         });
     });
 
@@ -279,7 +287,8 @@ describe("prepareJunieTask", () => {
                     comment: {
                         id: 1,
                         body: "Please fix this",
-                        user: {login: "reviewer"}
+                        user: {login: "reviewer"},
+                        created_at: "2024-01-01T00:00:00Z"
                     },
                     repository: {
                         owner: {login: "owner"},
@@ -291,11 +300,12 @@ describe("prepareJunieTask", () => {
 
             const result = await prepareJunieTask(context, branchInfo, octokit);
 
-            expect(result.textTask).toBeDefined();
-            expect(result.textTask?.text).toContain("User @reviewer mentioned you in the comment on pull request");
-            expect(result.textTask?.text).toContain("Please fix this");
-            expect(result.textTask?.text).toContain("### PULL REQUEST CONTEXT:");
-            expect(result.textTask?.text).toContain("### CHANGED FILES:");
+            expect(result).toBeDefined();
+            expect(typeof result).toBe("string");
+            expect(result).toContain("User @reviewer mentioned you in the comment on pull request");
+            expect(result).toContain("Please fix this");
+            expect(result).toContain("### PULL REQUEST CONTEXT:");
+            expect(result).toContain("### CHANGED FILES:");
         });
     });
 
@@ -312,7 +322,8 @@ describe("prepareJunieTask", () => {
                     review: {
                         id: 456,
                         user: {login: "reviewer"},
-                        body: "Changes needed"
+                        body: "Changes needed",
+                        submitted_at: "2024-01-01T00:00:00Z"
                     },
                     repository: {
                         owner: {login: "owner"},
@@ -324,8 +335,9 @@ describe("prepareJunieTask", () => {
 
             const result = await prepareJunieTask(context, branchInfo, octokit);
 
-            expect(result.textTask).toBeDefined();
-            expect(result.textTask?.text).toContain("User @reviewer mentioned you in the review on pull request");
+            expect(result).toBeDefined();
+            expect(typeof result).toBe("string");
+            expect(result).toContain("User @reviewer mentioned you in the review on pull request");
         });
     });
 
@@ -342,7 +354,8 @@ describe("prepareJunieTask", () => {
                     comment: {
                         id: 1,
                         body: "Fix this line",
-                        user: {login: "reviewer"}
+                        user: {login: "reviewer"},
+                        created_at: "2024-01-01T00:00:00Z"
                     },
                     repository: {
                         owner: {login: "owner"},
@@ -354,9 +367,10 @@ describe("prepareJunieTask", () => {
 
             const result = await prepareJunieTask(context, branchInfo, octokit);
 
-            expect(result.textTask).toBeDefined();
-            expect(result.textTask?.text).toContain("User @reviewer mentioned you in the review comment on pull request");
-            expect(result.textTask?.text).toContain("Fix this line");
+            expect(result).toBeDefined();
+            expect(typeof result).toBe("string");
+            expect(result).toContain("User @reviewer mentioned you in the review comment on pull request");
+            expect(result).toContain("Fix this line");
         });
     });
 
@@ -371,7 +385,8 @@ describe("prepareJunieTask", () => {
                         title: "Test PR",
                         body: "PR description",
                         state: "open",
-                        user: {login: "author"}
+                        user: {login: "author"},
+                        updated_at: "2024-01-01T00:00:00Z"
                     },
                     repository: {
                         owner: {login: "owner"},
@@ -383,14 +398,15 @@ describe("prepareJunieTask", () => {
 
             const result = await prepareJunieTask(context, branchInfo, octokit);
 
-            expect(result.textTask).toBeDefined();
-            expect(result.textTask?.text).toContain("### PULL REQUEST CONTEXT:");
-            expect(result.textTask?.text).toContain("### PULL REQUEST:");
+            expect(result).toBeDefined();
+            expect(typeof result).toBe("string");
+            expect(result).toContain("### PULL REQUEST CONTEXT:");
+            expect(result).toContain("### PULL REQUEST:");
         });
     });
 
     describe("merge task", () => {
-        test("should set mergeTask when resolveConflicts input is true", async () => {
+        test("should set merge task when resolveConflicts input is true", async () => {
             const context = createMockContext({
                 inputs: {
                     ...createMockContext().inputs,
@@ -401,12 +417,13 @@ describe("prepareJunieTask", () => {
 
             const result = await prepareJunieTask(context, branchInfo, octokit);
 
-            expect(result.mergeTask).toBeDefined();
-            expect(result.mergeTask?.branch).toBe("main");
-            expect(result.mergeTask?.type).toBe("merge");
+            expect(result).toBeDefined();
+            expect(typeof result).toBe("string");
+            expect(result).toContain("Merge onto main");
+            expect(result).toContain("main");
         });
 
-        test("should set mergeTask when comment has resolve trigger phrase", async () => {
+        test("should set merge task when comment has resolve trigger phrase", async () => {
             const context = createMockContext({
                 eventName: "issue_comment",
                 isPR: true,
@@ -419,7 +436,8 @@ describe("prepareJunieTask", () => {
                     comment: {
                         id: 1,
                         body: "@junie-agent resolve conflicts",
-                        user: {login: "user"}
+                        user: {login: "user"},
+                        created_at: "2024-01-01T00:00:00Z"
                     },
                     repository: {
                         owner: {login: "owner"},
@@ -431,9 +449,10 @@ describe("prepareJunieTask", () => {
 
             const result = await prepareJunieTask(context, branchInfo, octokit);
 
-            expect(result.mergeTask).toBeDefined();
-            expect(result.mergeTask?.branch).toBe("main");
-            expect(result.mergeTask?.type).toBe("merge");
+            expect(result).toBeDefined();
+            expect(typeof result).toBe("string");
+            expect(result).toContain("Merge onto main");
+            expect(result).toContain("main");
         });
     });
 
@@ -456,6 +475,7 @@ describe("prepareJunieTask", () => {
 
             const result = await prepareJunieTask(context, branchInfo, octokit);
 
+            expect(result).toBeDefined();
             expect(core.setOutput).toHaveBeenCalledWith("EJ_TASK", JSON.stringify(result));
         });
     });
@@ -483,12 +503,14 @@ describe("prepareJunieTask", () => {
             // Test issue comment
             const issueContext = createMockContext({eventName: "issue_comment", isPR: false});
             const issueResult = await prepareJunieTask(issueContext, branchInfo, octokit);
-            expect(issueResult.textTask).toBeDefined();
+            expect(issueResult).toBeDefined();
+            expect(typeof issueResult).toBe("string");
 
             // Test PR comment
             const prContext = createMockContext({eventName: "issue_comment", isPR: true});
             const prResult = await prepareJunieTask(prContext, branchInfo, octokit);
-            expect(prResult.textTask).toBeDefined();
+            expect(prResult).toBeDefined();
+            expect(typeof prResult).toBe("string");
 
             // Both should have been processed successfully
             expect(core.setOutput).toHaveBeenCalledTimes(2);
