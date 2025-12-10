@@ -15,11 +15,26 @@ export enum ActionType {
 
 export async function handleResults() {
     try {
-        const junieJsonOutput = JSON.parse(process.env[ENV_VARS.JSON_JUNIE_OUTPUT]!) as any
+        const stringJunieJsonOutput = process.env[ENV_VARS.JSON_JUNIE_OUTPUT]
+        if (!stringJunieJsonOutput) {
+            throw new Error(
+                `❌ Failed to retrieve Junie execution results. ` +
+                `This could be due to:\n` +
+                `• Junie execution did not complete successfully\n` +
+                `• Junie output was empty or invalid\n` +
+                `Please check the Junie execution logs for details.`
+            );
+        }
+        const junieJsonOutput = JSON.parse(stringJunieJsonOutput) as any
         const context = JSON.parse(process.env[OUTPUT_VARS.PARSED_CONTEXT]!) as GitHubContext
         const junieErrors = junieJsonOutput.errors
         if (junieErrors && (junieErrors as string[]).length > 0) {
-            throw new Error(`Junie run failed with errors: ${junieErrors.join('\n')}`)
+            const errorList = (junieErrors as string[]).map(err => `  • ${err}`).join('\n');
+            throw new Error(
+                `❌ Junie execution encountered errors during task processing.\n\n` +
+                `Errors reported:\n${errorList}\n\n` +
+                `Review the errors above and check the Junie execution logs for more details.`
+            );
         }
         const actionToDo = await getActionToDo(context.inputs.silentMode);
         const title = junieJsonOutput.taskName
