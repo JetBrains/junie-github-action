@@ -94,7 +94,7 @@ jobs:
 
       - name: Run Junie
         id: junie
-        uses: JetBrains/junie-github-action@v1
+        uses: JetBrains/junie-github-action@v0
         with:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
 ```
@@ -137,7 +137,7 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 
 | Input | Description | Default |
 |-------|-------------|---------|
-| `base_branch` | Base branch for creating new branches | `github.base_ref` |
+| `base_branch` | Base branch for creating new branches | `repo default branch` (uses `github.base_ref` when available) |
 | `create_new_branch_for_pr` | Create new branch for PR contributors | `false` |
 
 #### Junie Configuration
@@ -156,7 +156,7 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 
 | Input | Description | Default |
 |-------|-------------|---------|
-| `resolve_conflicts` | Enable automatic conflict detection (not needed for manual `@junie-agent` resolution) | `false` |
+| `resolve_conflicts` | Enable automatic conflict detection and resolution. You can also trigger it by commenting "resolve conflicts" on a PR or via `workflow_dispatch` with `action: resolve-conflicts`. | `false` |
 | `silent_mode` | Run Junie without comments, branch creation, or commits - only prepare data and output results | `false` |
 | `use_single_comment` | Update a single comment for all runs instead of creating new comments each time | `false` |
 
@@ -206,7 +206,8 @@ permissions:
   contents: write      # Required to create branches, make commits, and push changes
   pull-requests: write # Required to create PRs, add comments to PRs, and update PR status
   issues: write        # Required to add comments to issues and update issue metadata
-  checks: read         # Optional: only needed for CI failure analysis with MCP servers
+  checks: read         # Optional: needed for CI failure analysis (MCP GitHub Checks server)
+  actions: read        # Optional: needed for CI log extraction (MCP GitHub Checks server)
 ```
 
 **Minimal permissions** for `silent_mode` (read-only operations):
