@@ -214,9 +214,10 @@ describe("prepareJunieTask", () => {
             const result = await prepareJunieTask(context, branchInfo, octokit);
 
             expect(result).toBeDefined();
-            expect(typeof result).toBe("string");
-            expect(result.trim()).toBe("Do something");
-            expect(core.setOutput).toHaveBeenCalledWith("EJ_TASK", expect.any(String));
+            expect(result.task).toBeDefined();
+            expect(result.task?.trim()).toBe("Do something");
+            expect(result.mergeTask).toBeUndefined();
+            expect(core.setOutput).toHaveBeenCalledWith("JUNIE_JSON_TASK", expect.any(String));
         });
     });
 
@@ -231,11 +232,12 @@ describe("prepareJunieTask", () => {
             const result = await prepareJunieTask(context, branchInfo, octokit);
 
             expect(result).toBeDefined();
-            expect(typeof result).toBe("string");
-            expect(result).toContain("User @commenter mentioned you");
-            expect(result).toContain("#123 Test Issue");
-            expect(result).toContain("@junie-agent help");
-            expect(result).toContain("### ISSUE:");
+            expect(result.task).toBeDefined();
+            expect(result.mergeTask).toBeUndefined();
+            expect(result.task).toContain("User @commenter mentioned you");
+            expect(result.task).toContain("#123 Test Issue");
+            expect(result.task).toContain("@junie-agent help");
+            expect(result.task).toContain("### ISSUE:");
         });
     });
 
@@ -263,9 +265,10 @@ describe("prepareJunieTask", () => {
             const result = await prepareJunieTask(context, branchInfo, octokit);
 
             expect(result).toBeDefined();
-            expect(typeof result).toBe("string");
-            expect(result).toContain("### ISSUE:");
-            expect(result).toContain("Test Issue");
+            expect(result.task).toBeDefined();
+            expect(result.mergeTask).toBeUndefined();
+            expect(result.task).toContain("### ISSUE:");
+            expect(result.task).toContain("Test Issue");
         });
     });
 
@@ -301,11 +304,12 @@ describe("prepareJunieTask", () => {
             const result = await prepareJunieTask(context, branchInfo, octokit);
 
             expect(result).toBeDefined();
-            expect(typeof result).toBe("string");
-            expect(result).toContain("User @reviewer mentioned you in the comment on pull request");
-            expect(result).toContain("Please fix this");
-            expect(result).toContain("### PULL REQUEST CONTEXT:");
-            expect(result).toContain("### CHANGED FILES:");
+            expect(result.task).toBeDefined();
+            expect(result.mergeTask).toBeUndefined();
+            expect(result.task).toContain("User @reviewer mentioned you in the comment on pull request");
+            expect(result.task).toContain("Please fix this");
+            expect(result.task).toContain("### PULL REQUEST CONTEXT:");
+            expect(result.task).toContain("### CHANGED FILES:");
         });
     });
 
@@ -336,8 +340,9 @@ describe("prepareJunieTask", () => {
             const result = await prepareJunieTask(context, branchInfo, octokit);
 
             expect(result).toBeDefined();
-            expect(typeof result).toBe("string");
-            expect(result).toContain("User @reviewer mentioned you in the review on pull request");
+            expect(result.task).toBeDefined();
+            expect(result.mergeTask).toBeUndefined();
+            expect(result.task).toContain("User @reviewer mentioned you in the review on pull request");
         });
     });
 
@@ -368,9 +373,10 @@ describe("prepareJunieTask", () => {
             const result = await prepareJunieTask(context, branchInfo, octokit);
 
             expect(result).toBeDefined();
-            expect(typeof result).toBe("string");
-            expect(result).toContain("User @reviewer mentioned you in the review comment on pull request");
-            expect(result).toContain("Fix this line");
+            expect(result.task).toBeDefined();
+            expect(result.mergeTask).toBeUndefined();
+            expect(result.task).toContain("User @reviewer mentioned you in the review comment on pull request");
+            expect(result.task).toContain("Fix this line");
         });
     });
 
@@ -399,9 +405,10 @@ describe("prepareJunieTask", () => {
             const result = await prepareJunieTask(context, branchInfo, octokit);
 
             expect(result).toBeDefined();
-            expect(typeof result).toBe("string");
-            expect(result).toContain("### PULL REQUEST CONTEXT:");
-            expect(result).toContain("### PULL REQUEST:");
+            expect(result.task).toBeDefined();
+            expect(result.mergeTask).toBeUndefined();
+            expect(result.task).toContain("### PULL REQUEST CONTEXT:");
+            expect(result.task).toContain("### PULL REQUEST:");
         });
     });
 
@@ -418,9 +425,9 @@ describe("prepareJunieTask", () => {
             const result = await prepareJunieTask(context, branchInfo, octokit);
 
             expect(result).toBeDefined();
-            expect(typeof result).toBe("string");
-            expect(result).toContain("Merge onto main");
-            expect(result).toContain("main");
+            expect(result.mergeTask).toBeDefined();
+            expect(result.task).toBeUndefined();
+            expect(result.mergeTask?.branch).toBe("main");
         });
 
         test("should set merge task when comment has resolve trigger phrase", async () => {
@@ -450,9 +457,9 @@ describe("prepareJunieTask", () => {
             const result = await prepareJunieTask(context, branchInfo, octokit);
 
             expect(result).toBeDefined();
-            expect(typeof result).toBe("string");
-            expect(result).toContain("Merge onto main");
-            expect(result).toContain("main");
+            expect(result.mergeTask).toBeDefined();
+            expect(result.task).toBeUndefined();
+            expect(result.mergeTask?.branch).toBe("main");
         });
     });
 
@@ -476,7 +483,7 @@ describe("prepareJunieTask", () => {
             const result = await prepareJunieTask(context, branchInfo, octokit);
 
             expect(result).toBeDefined();
-            expect(core.setOutput).toHaveBeenCalledWith("EJ_TASK", JSON.stringify(result));
+            expect(core.setOutput).toHaveBeenCalledWith("JUNIE_JSON_TASK", JSON.stringify(result));
         });
     });
 
@@ -504,13 +511,15 @@ describe("prepareJunieTask", () => {
             const issueContext = createMockContext({eventName: "issue_comment", isPR: false});
             const issueResult = await prepareJunieTask(issueContext, branchInfo, octokit);
             expect(issueResult).toBeDefined();
-            expect(typeof issueResult).toBe("string");
+            expect(issueResult.task).toBeDefined();
+            expect(issueResult.mergeTask).toBeUndefined();
 
             // Test PR comment
             const prContext = createMockContext({eventName: "issue_comment", isPR: true});
             const prResult = await prepareJunieTask(prContext, branchInfo, octokit);
             expect(prResult).toBeDefined();
-            expect(typeof prResult).toBe("string");
+            expect(prResult.task).toBeDefined();
+            expect(prResult.mergeTask).toBeUndefined();
 
             // Both should have been processed successfully
             expect(core.setOutput).toHaveBeenCalledTimes(2);

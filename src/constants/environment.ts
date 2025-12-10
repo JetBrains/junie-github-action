@@ -45,7 +45,7 @@ export const OUTPUT_VARS = {
     EJ_CLI_TOKEN: "EJ_CLI_TOKEN",
 
     // Task and MCP configuration
-    EJ_TASK: "EJ_TASK",
+    JUNIE_JSON_TASK: "JUNIE_JSON_TASK",
     EJ_MCP_CONFIG: "EJ_MCP_CONFIG",
 
     // Exception handling

@@ -8,3 +8,12 @@ export type PrepareJunieOptions = {
     octokit: Octokits;
     tokenConfig: GitHubTokenConfig;
 };
+
+export interface MergeTask {
+    branch: string;
+}
+
+export interface CliInput {
+    task?: string;
+    mergeTask?: MergeTask;
+}

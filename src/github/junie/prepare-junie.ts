@@ -30,6 +30,8 @@ export async function prepare({
     }
     core.setOutput(OUTPUT_VARS.SHOULD_SKIP, 'false');
 
+    await prepareJunieCLIToken(context)
+
     await gitAuth(context, tokenConfig)
 
     await writeInitialFeedbackComment(octokit.rest, context);
@@ -48,8 +50,6 @@ export async function prepare({
             branchInfo: branchInfo,
         })
     }
-
-    await prepareJunieCLIToken(context)
 
     await prepareJunieTask(context, branchInfo, octokit)
 }

@@ -64,6 +64,7 @@ jobs:
 - Comment `@junie-agent add error handling here` on a PR → Junie implements the changes
 - Create an issue with `@junie-agent` in the title or body → Junie analyzes and proposes a solution
 - Submit a PR review mentioning `@junie-agent` → Junie addresses your feedback
+- Comment `@junie-agent resolve conflicts` on a PR with merge conflicts → Junie resolves the conflicts
 
 **Features enabled:**
 - ✅ Single comment mode - updates one comment instead of creating multiple
@@ -493,6 +494,68 @@ jobs:
 - Add auto-merge if Junie approves and tests pass
 - Configure for specific types of updates (major vs patch)
 
+---
+
+## 6. Automatic Merge Conflict Resolution
+
+**Problem:** Merge conflicts block PRs and require manual resolution. When you merge changes to main/master, all open PRs need to be updated and conflicts resolved.
+
+**Solution:** Automatically detects PRs with conflicts when you push to base branch and resolves them.
+
+<details>
+<summary>View complete workflow</summary>
+
+```yaml
+# .github/workflows/resolve-conflicts.yml
+name: Resolve Conflicts
+
+on:
+  push:
+    branches:
+      - main  # Add other base branches if needed (master, develop, etc.)
+  workflow_dispatch: # To trigger from action
+    inputs:
+      action:
+        description: 'Action name'
+        required: true
+        default: "resolve-conflicts"
+      prNumber:
+        description: "PR number"
+        required: true
+
+jobs:
+  check-conflicts:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run Junie
+        id: junie
+        uses: JetBrains/junie-github-action@main
+        with:
+          junie_api_key: ${{ secrets.JUNIE_API_KEY }}
+          resolve_conflicts: true
+```
+
+</details>
+
+**How it works:**
+1. You push changes to main branch
+2. Workflow automatically finds all open PRs where main is the base branch
+3. Checks each PR for merge conflicts (mergeable_state === 'dirty')
+4. For each conflicted PR, triggers the workflow again via dispatch API with specific PR number
+5. In the dispatched run, Junie merges base branch into PR branch and resolves conflicts
+
+**Use cases:**
+- **Auto-resolution after merge:** Merge to main → all conflicted PRs automatically updated
+- **Keep PRs fresh:** Every push to main branch keeps all PRs conflict-free
+- **Reduce manual work:** No need to manually update and resolve conflicts in multiple PRs
 ---
 
 ## Need Help?

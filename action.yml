@@ -138,14 +138,13 @@ runs:
       id: junie-run
       env:
         CLI_TOKEN: ${{ steps.prepare.outputs.EJ_CLI_TOKEN }}
-        EJ_TASK: ${{ steps.prepare.outputs.EJ_TASK }}
+        JUNIE_JSON_TASK: ${{ steps.prepare.outputs.JUNIE_JSON_TASK }}
         EJ_AUTH_GITHUB_TOKEN: ${{ steps.prepare.outputs.EJ_AUTH_GITHUB_TOKEN  }}
-        EJ_TASK_TEXT: ${{ steps.prepare.outputs.EJ_TASK_TEXT }}
         MULTI_RUNS: true
         MATTERHORN_DEBUG_LOG: false
         WORKING_DIR: ${{ inputs.junie_work_dir }}
       run: |
-        OUTPUT=$(junie --cache-dir="${WORKING_DIR}" --output-format="json" --auth="${CLI_TOKEN}" "${EJ_TASK}")
+        OUTPUT=$(junie --cache-dir="${WORKING_DIR}" --input-format="json" --output-format="json" --auth="${CLI_TOKEN}" <<<"${JUNIE_JSON_TASK}")
         echo "json_output<<EOF" >> $GITHUB_OUTPUT
         echo "$OUTPUT" >> $GITHUB_OUTPUT
         echo "EOF" >> $GITHUB_OUTPUT
