@@ -53,6 +53,10 @@ inputs:
     description: "Directory to use for Junie working files"
     required: false
     default: "/tmp/junie-work"
+  junie_guidelines_filename:
+    description: "Filename(should be in <project-root>/.junie dir) of the guidelines file to use"
+    required: false
+    default: "guidelines.md"
   allowed_mcp_servers:
     description: "Comma-separated list of github MCP servers to use. Allowed server names: mcp_github_checks_server"
     required: false
@@ -137,6 +141,7 @@ runs:
       shell: bash
       id: junie-run
       env:
+        JUNIE_GUIDELINES: ${{ inputs.junie_guidelines_filename }}
         CLI_TOKEN: ${{ steps.prepare.outputs.EJ_CLI_TOKEN }}
         JUNIE_JSON_TASK: ${{ steps.prepare.outputs.JUNIE_JSON_TASK }}
         EJ_AUTH_GITHUB_TOKEN: ${{ steps.prepare.outputs.EJ_AUTH_GITHUB_TOKEN  }}

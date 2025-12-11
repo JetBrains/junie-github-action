@@ -155,6 +155,7 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 | `prompt` | Custom instructions for Junie | - |
 | `junie_version` | Junie CLI version to install | `532.2.0` |
 | `junie_work_dir` | Working directory for Junie files | `/tmp/junie-work` |
+| `junie_guidelines_filename` | Filename of the guidelines file (should be in `<project-root>/.junie` dir) | `guidelines.md` |
 | `allowed_mcp_servers` | MCP servers to enable (comma-separated) | - |
 
 **Available MCP Servers**:
