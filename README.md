@@ -61,17 +61,22 @@ on:
   pull_request_review_comment:
     types: [created]
   issues:
-    types: [opened, assigned]
+    types: [opened, assigned, labeled]
   pull_request_review:
-    types: [submitted]
+    types: [submitted, edited]
+  pull_request:
+    types: [opened, edited, reopened]
 
 jobs:
   junie:
+    # Let the action handle trigger detection internally (mentions, labels, assignees, PR/issue titles)
+    # The job runs on relevant events and the action will skip automatically when no trigger matched
     if: |
-      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@junie-agent')) ||
-      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@junie-agent')) ||
-      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@junie-agent')) ||
-      (github.event_name == 'issues' && (contains(github.event.issue.body, '@junie-agent') || contains(github.event.issue.title, '@junie-agent')))
+      github.event_name == 'issue_comment' ||
+      github.event_name == 'pull_request_review_comment' ||
+      github.event_name == 'pull_request_review' ||
+      (github.event_name == 'issues' && (github.event.action == 'opened' || github.event.action == 'assigned' || github.event.action == 'labeled')) ||
+      (github.event_name == 'pull_request' && (github.event.action == 'opened' || github.event.action == 'edited' || github.event.action == 'reopened'))
     runs-on: ubuntu-latest
     permissions:
       contents: write
