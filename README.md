@@ -60,18 +60,24 @@ on:
     types: [created]
   pull_request_review_comment:
     types: [created]
-  issues:
-    types: [opened, assigned]
   pull_request_review:
     types: [submitted]
+  issues:
+    types: [opened, assigned, labeled]
+  pull_request:
+    types: [opened, edited]
 
 jobs:
   junie:
+    # Basic mention/keyword triggers; see docs below for label/assignee variants
     if: |
       (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@junie-agent')) ||
       (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@junie-agent')) ||
       (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@junie-agent')) ||
-      (github.event_name == 'issues' && (contains(github.event.issue.body, '@junie-agent') || contains(github.event.issue.title, '@junie-agent')))
+      (github.event_name == 'issues' && github.event.action == 'opened' && (contains(github.event.issue.body, '@junie-agent') || contains(github.event.issue.title, '@junie-agent'))) ||
+      (github.event_name == 'pull_request' && (github.event.action == 'opened' || github.event.action == 'edited') && (contains(github.event.pull_request.body, '@junie-agent') || contains(github.event.pull_request.title, '@junie-agent'))) ||
+      (github.event_name == 'issues' && github.event.action == 'labeled' && github.event.label.name == 'junie') ||
+      (github.event_name == 'issues' && github.event.action == 'assigned')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -151,6 +157,13 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 | `silent_mode` | Run Junie without comments, branch creation, or commits - only prepare data and output results | `false` |
 | `use_single_comment` | Update a single comment for all runs instead of creating new comments each time | `false` |
 | `use_structured_prompt` | Use the new structured prompt format with XML tags for better organization | `true`  |
+
+#### Conflict Resolution
+
+- Manual trigger: comment `resolve conflicts` on a PR (in the conversation, a review, or a review comment) to have Junie attempt to resolve merge conflicts for that PR.
+- Automatic detection: set `resolve_conflicts: true` in the action inputs to have the action detect PRs with merge conflicts during PR or push contexts and run conflict resolution automatically.
+
+Note: The `resolve conflicts` trigger is case-insensitive.
 
 #### Authentication
 
