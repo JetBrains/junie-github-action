@@ -198,6 +198,16 @@ async function setupWorkingBranch(context: GitHubContext, octokit: Octokits): Pr
             prBaseBranch = baseBranch;
             baseBranch = sourceBranch;
         }
+
+        // If we need to resolve conflicts, ensure we have full git history for merge operations
+        if (context.inputs.resolveConflicts || isReviewOrCommentHasResolveConflictsTrigger(context)) {
+            if (prBaseBranch) {
+                await ensureMergeHistory(prBaseBranch)
+            } else {
+                await ensureMergeHistory(sourceBranch);
+            }
+            await ensureMergeHistory(baseBranch)
+        }
     }
 
     if (isPushEvent(context)) {
@@ -270,12 +280,6 @@ export async function ensureMergeHistory(branch: string) {
  */
 export async function setupBranch(octokit: Octokits, context: GitHubContext) {
     let branchInfo = await setupWorkingBranch(context, octokit)
-
-    // If we need to resolve conflicts, ensure we have full git history for merge operations
-    if (context.inputs.resolveConflicts || isReviewOrCommentHasResolveConflictsTrigger(context)) {
-        branchInfo.isNewBranch ? await ensureMergeHistory(branchInfo.prBaseBranch!) : await ensureMergeHistory(branchInfo.workingBranch);
-        await ensureMergeHistory(branchInfo.baseBranch);
-    }
 
     // Set GitHub Actions outputs for use in subsequent steps
     core.setOutput(OUTPUT_VARS.BASE_BRANCH, branchInfo.baseBranch);
