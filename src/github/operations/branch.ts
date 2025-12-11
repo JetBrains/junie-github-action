@@ -49,7 +49,7 @@ function shouldUseExistingPRBranch(
     console.log(`Token owner: ${tokenOwnerLogin}`);
     console.log(`Create new branch setting: ${createNewBranchForPR}`);
 
-    if (createNewBranchForPR){
+    if (createNewBranchForPR) {
         console.log(`Create new branch: createNewBranchForPR setting is enabled`);
         return false;
     }
@@ -230,21 +230,21 @@ async function setupWorkingBranch(context: GitHubContext, octokit: Octokits): Pr
  * GitHub Actions by default clones with shallow history (depth=1).
  * For merge operations, we need the full history of the base branch to find the merge-base.
  *
- * @param baseBranch - The branch to merge from (e.g., "main")
+ * @param branch - The branch to merge from (e.g., "main")
  * @throws {Error} if unable to fetch history
  */
-export async function ensureMergeHistory(baseBranch: string) {
-    console.log(`Fetching full history of ${baseBranch} for merge operation...`);
+export async function ensureMergeHistory(branch: string) {
+    console.log(`Fetching full history of ${branch} for merge operation...`);
 
     try {
         // Fetch the base branch with full history (no --depth = complete history)
-        await $`git fetch origin ${baseBranch}`;
-        console.log(`✓ Successfully fetched ${baseBranch} with full history`);
+        await $`git fetch origin ${branch}`;
+        console.log(`✓ Successfully fetched ${branch} with full history`);
     } catch (error) {
         throw new Error(
-            `❌ Failed to fetch ${baseBranch} history for merge operation. ` +
+            `❌ Failed to fetch ${branch} history for merge operation. ` +
             `This could be due to:\n` +
-            `• Branch "${baseBranch}" does not exist in the repository\n` +
+            `• Branch "${branch}" does not exist in the repository\n` +
             `• Network connectivity issues\n` +
             `• Insufficient permissions to fetch from the repository\n` +
             `• Git authentication problems\n` +
@@ -273,7 +273,8 @@ export async function setupBranch(octokit: Octokits, context: GitHubContext) {
 
     // If we need to resolve conflicts, ensure we have full git history for merge operations
     if (context.inputs.resolveConflicts || isReviewOrCommentHasTrigger(context, RESOLVE_CONFLICTS_TRIGGER_PHRASE_REGEXP)) {
-        await ensureMergeHistory(branchInfo.prBaseBranch || branchInfo.baseBranch);
+        branchInfo.isNewBranch ? await ensureMergeHistory(branchInfo.prBaseBranch!) : await ensureMergeHistory(branchInfo.workingBranch);
+        await ensureMergeHistory(branchInfo.baseBranch);
     }
 
     // Set GitHub Actions outputs for use in subsequent steps
