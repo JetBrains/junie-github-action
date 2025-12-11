@@ -181,7 +181,7 @@ async function setupWorkingBranch(context: GitHubContext, octokit: Octokits): Pr
 
         if (useExistingBranch) {
             try {
-                await $`git checkout ${sourceBranch}`;
+                await $`git checkout -B ${sourceBranch} origin/${sourceBranch}`;
 
                 console.log(`✓ Successfully checked out PR branch for PR #${entityNumber}`);
 
@@ -220,7 +220,7 @@ async function setupWorkingBranch(context: GitHubContext, octokit: Octokits): Pr
         return await createNewBranch(baseBranch, branchName, prBaseBranch)
     }
 
-    await $`git checkout ${baseBranch}`;
+    await $`git checkout -B ${baseBranch} origin/${baseBranch}`;
 
     return {
         baseBranch: baseBranch,
@@ -243,7 +243,7 @@ export async function ensureBranchHistory(branch: string, depth?: number) {
     console.log(`Fetching full history of ${branch}...`);
 
     try {
-        await $`git fetch origin ${depth ? `--depth=${depth}` : ""} ${branch}`;
+        await $`git fetch origin ${depth ? `--depth=${depth}` : ""} +${branch}:refs/remotes/origin/${branch}`;
         console.log(`✓ Successfully fetched ${branch} history`);
     } catch (error) {
         throw new Error(
