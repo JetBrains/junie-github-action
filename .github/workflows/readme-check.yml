@@ -32,7 +32,7 @@ jobs:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
           use_single_comment: true
           prompt: |
-            Please review the README.md file and ensure it is up-to-date with the current codebase.
+            Review pr diff and update documentation to match code changes.
 
             Tasks:
             1. Check if action.yml inputs/outputs are correctly documented in README.md
@@ -44,3 +44,6 @@ jobs:
             - Update README.md accordingly
 
             If everything is up-to-date, just confirm that the README is accurate.
+            
+            Procedure:
+            Use gh pr diff ${{ github.event.pull_request.head.ref }} to get a diff of the PR. 
