@@ -35,6 +35,10 @@ inputs:
     description: "Use a single comment that gets updated instead of creating new comments for each run(per workflow)"
     required: false
     default: "false"
+  use_structured_prompt:
+    description: "Use the new structured prompt format with XML tags for better organization"
+    required: false
+    default: "true"
 
   # Junie configuration
   prompt:
@@ -49,6 +53,10 @@ inputs:
     description: "Directory to use for Junie working files"
     required: false
     default: "/tmp/junie-work"
+  junie_guidelines_filename:
+    description: "Filename(should be in <project-root>/.junie dir) of the guidelines file to use"
+    required: false
+    default: "guidelines.md"
   allowed_mcp_servers:
     description: "Comma-separated list of github MCP servers to use. Allowed server names: mcp_github_checks_server"
     required: false
@@ -119,6 +127,7 @@ runs:
         CREATE_NEW_BRANCH_FOR_PR: ${{ inputs.create_new_branch_for_pr }}
         SILENT_MODE: ${{ inputs.silent_mode }}
         USE_SINGLE_COMMENT: ${{ inputs.use_single_comment }}
+        USE_STRUCTURED_PROMPT: ${{ inputs.use_structured_prompt }}
         ALL_INPUTS: ${{ toJson(inputs) }}
 
 
@@ -132,6 +141,7 @@ runs:
       shell: bash
       id: junie-run
       env:
+        JUNIE_GUIDELINES_FILENAME: ${{ inputs.junie_guidelines_filename }}
         CLI_TOKEN: ${{ steps.prepare.outputs.EJ_CLI_TOKEN }}
         JUNIE_JSON_TASK: ${{ steps.prepare.outputs.JUNIE_JSON_TASK }}
         EJ_AUTH_GITHUB_TOKEN: ${{ steps.prepare.outputs.EJ_AUTH_GITHUB_TOKEN  }}

@@ -44,16 +44,7 @@ A powerful GitHub Action that integrates [Junie](https://www.jetbrains.com/junie
 
 ### Basic Setup
 
-You can set up Junie in two ways:
-
-#### Option 1: Automatic Setup (Recommended)
-
-Visit [https://junie.labs.jb.gg/cli](https://junie.labs.jb.gg/cli) and follow the interactive setup wizard. It will automatically:
-- Configure repository secrets
-- Create workflow files
-- Set up proper permissions
-
-#### Option 2: Manual Setup
+#### Manual Setup
 
 1. Add your Junie API key to repository secrets:
    - Go to **Settings → Secrets and variables → Actions**
@@ -94,7 +85,7 @@ jobs:
 
       - name: Run Junie
         id: junie
-        uses: JetBrains/junie-github-action@v1
+        uses: JetBrains/junie-github-action@v0
         with:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
 ```
@@ -107,7 +98,6 @@ jobs:
 3. Start using Junie:
    - Comment `@junie-agent help me fix this bug` on an issue
    - Mention `@junie-agent review this change` in a PR
-   - Add the `junie` label to trigger automatically
 
 ## Cookbook
 
@@ -147,6 +137,7 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 | `prompt` | Custom instructions for Junie | - |
 | `junie_version` | Junie CLI version to install | `532.2.0` |
 | `junie_work_dir` | Working directory for Junie files | `/tmp/junie-work` |
+| `junie_guidelines_filename` | Filename of the guidelines file (should be in `<project-root>/.junie` dir) | `guidelines.md` |
 | `allowed_mcp_servers` | MCP servers to enable (comma-separated) | - |
 
 **Available MCP Servers**:
@@ -159,6 +150,7 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 | `resolve_conflicts` | Enable automatic conflict detection (not needed for manual `@junie-agent` resolution) | `false` |
 | `silent_mode` | Run Junie without comments, branch creation, or commits - only prepare data and output results | `false` |
 | `use_single_comment` | Update a single comment for all runs instead of creating new comments each time | `false` |
+| `use_structured_prompt` | Use the new structured prompt format with XML tags for better organization | `true`  |
 
 #### Authentication
 
@@ -227,7 +219,7 @@ When using the default `github.token` (automatically provided by GitHub Actions)
 
 For example, if you use the default token:
 ```yaml
-- uses: JetBrains/junie-github-action@main
+- uses: JetBrains/junie-github-action@v0
   with:
     junie_api_key: ${{ secrets.JUNIE_API_KEY }}
     # No custom_github_token specified - uses default github.token

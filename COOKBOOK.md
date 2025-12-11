@@ -112,7 +112,7 @@ jobs:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
           use_single_comment: "true"
           prompt: |
-            Review this PR for:
+            Review pr diff for:
 
             **Security:**
             - SQL injection, XSS, exposed secrets
@@ -145,7 +145,10 @@ jobs:
             - [ ] Performance: No bottlenecks
             - [ ] Documentation: Complex logic explained
 
-            Do NOT modify any files.
+            Procedure:
+            Use gh pr diff ${{ github.event.pull_request.head.ref }} to get a diff of the PR. 
+
+            Only provide feedback without modifying files.
 ```
 
 </details>
@@ -198,9 +201,8 @@ jobs:
         with:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
           create_new_branch_for_pr: "true"
-          base_branch: "main"
           prompt: |
-            This PR was just merged. Update documentation to match code changes.
+            Review pr diff and update documentation to match code changes.
 
             **Check for outdated docs:**
             - README.md examples using changed APIs
@@ -214,6 +216,9 @@ jobs:
             - Add "Added in vX.X" for new features
             - Only modify documentation files (README.md, docs/**)
             - If nothing to update, don't make changes
+
+            Procedure:
+            Use gh pr diff ${{ github.event.pull_request.head.ref }} to get a diff of the PR.
 ```
 
 </details>
@@ -289,15 +294,6 @@ jobs:
 
             ## 📝 Files to Change
             - `path/file`: [what needs to change]
-
-            ## 🧪 Test Locally
-            [command to verify fix]
-
-            **Fix simple issues only:**
-            - Test failures: Fix failed assertion
-            - Build errors: Add missing dependency or fix syntax
-            - Timeouts: Optimize performance or increase limit
-            - Flaky tests: Add retry logic or fix race condition
 
             Only provide analysis without modifying files.
 ```
@@ -386,7 +382,10 @@ jobs:
             [If no secrets found:]
             No secrets detected in this commit.
 
-            Do NOT modify any files.
+            Procedure:
+            Use gh pr diff ${{ github.event.pull_request.head.ref }} to get a diff of the PR. 
+
+            Only provide feedback without modifying files.
 
       - name: Check results
         if: steps.junie.outputs.junie_summary != ''
@@ -414,89 +413,7 @@ jobs:
 
 ---
 
-## 5. Dependency Update Assistant
-
-**Problem:** Dependabot opens PRs for dependency updates, but you need to review changelogs, check for breaking changes, and update code accordingly.
-
-**Solution:** Junie reviews dependency update PRs, summarizes changes, and updates code if needed.
-
-<details>
-<summary>View complete workflow</summary>
-
-```yaml
-# .github/workflows/dependency-review.yml
-name: Dependency Review
-
-on:
-  pull_request:
-    types: [opened, synchronize]
-
-jobs:
-  review:
-    # Only run on dependency update PRs
-    if: |
-      github.event.pull_request.user.login == 'dependabot[bot]' ||
-      contains(github.event.pull_request.title, 'deps:') ||
-      contains(github.event.pull_request.labels.*.name, 'dependencies')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - uses: JetBrains/junie-github-action@v0
-        with:
-          junie_api_key: ${{ secrets.JUNIE_API_KEY }}
-          use_single_comment: "true"
-          prompt: |
-            Review this dependency update.
-
-            **Analysis:**
-            1. Identify changed dependencies (package.json, requirements.txt, go.mod)
-            2. Find CHANGELOG/migration guides
-            3. Identify breaking changes and deprecations
-            4. Search codebase for usage of changed APIs
-            5. Determine impact on our code
-
-            **Provide review:**
-            ## 📦 Dependency Update Review
-            **Updated:** [package] `v1.0.0` → `v2.0.0`
-
-            **Changes:**
-            - ✨ New features: [list]
-            - ⚠️ Breaking changes: [list]
-            - 🔧 Bug fixes: [list]
-
-            **Impact on our code:**
-            [Files/areas affected and what needs to change]
-
-            **Links:** [Changelog] | [Migration guide]
-
-            **Apply fixes only if easy:**
-            - No breaking changes → Don't modify files
-            - Simple fix (1-2 files) → Update code for breaking changes
-            - Complex migration → Don't modify files, only provide analysis
-```
-
-</details>
-
-**How it works:**
-1. Triggers on PRs from Dependabot or labeled "dependencies"
-2. Reads changelogs and identifies breaking changes
-3. Searches codebase for affected usage
-4. Applies fixes if straightforward, otherwise provides migration guide
-
-**Tips:**
-- Combine with automated testing (run tests after Junie's changes)
-- Add auto-merge if Junie approves and tests pass
-- Configure for specific types of updates (major vs patch)
-
----
-
-## 6. Automatic Merge Conflict Resolution
+## 5. Automatic Merge Conflict Resolution
 
 **Problem:** Merge conflicts block PRs and require manual resolution. When you merge changes to main/master, all open PRs need to be updated and conflicts resolved.
 
@@ -527,6 +444,7 @@ jobs:
   check-conflicts:
     runs-on: ubuntu-latest
     permissions:
+      actions: write
       contents: write
       pull-requests: write
       actions: write
