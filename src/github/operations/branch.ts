@@ -34,6 +34,7 @@ export type BranchInfo = {
  * @param actor - Current user triggering the workflow
  * @param prAuthor - Original author of the pull request
  * @param tokenOwnerLogin - Owner of the token being used (often a bot or app)
+ * @param state - Current state of the pull request (e.g., "OPEN", "CLOSED", "MERGED")
  * @returns `true` if existing PR branch should be used, `false` to create new branch
  */
 function shouldUseExistingPRBranch(
@@ -42,12 +43,18 @@ function shouldUseExistingPRBranch(
     actor: string,
     prAuthor: string,
     tokenOwnerLogin: string,
+    state: string
 ): boolean {
     console.log(`Silent mode: ${silentMode}`);
     console.log(`PR author: ${prAuthor}`);
     console.log(`Actor: ${actor}`);
     console.log(`Token owner: ${tokenOwnerLogin}`);
     console.log(`Create new branch setting: ${createNewBranchForPR}`);
+
+    if (state === "CLOSED" || state === "MERGED") {
+        console.log(`Create new branch: PR is ${state}`);
+        return true;
+    }
 
     if (createNewBranchForPR) {
         console.log(`Create new branch: createNewBranchForPR setting is enabled`);
@@ -120,7 +127,7 @@ async function setupWorkingBranch(context: GitHubContext, octokit: Octokits): Pr
     const entityNumber = context.entityNumber;
     const isPR = context.isPR;
     const createNewBranchForPR = context.inputs.createNewBranchForPR;
-    const fetchDepth = 20
+    const fetchDepth = context.inputs.resolveConflicts || isReviewOrCommentHasResolveConflictsTrigger(context) ? undefined : 20
 
     if (isPR && entityNumber) {
         let sourceBranch: string
@@ -166,13 +173,14 @@ async function setupWorkingBranch(context: GitHubContext, octokit: Octokits): Pr
             context.actor,
             prAuthor,
             context.tokenOwner.login,
+            state
         );
 
-        if (state === "CLOSED" || state === "MERGED") {
-            console.log(`PR #${entityNumber} is ${state}, creating new branch`);
-        } else if (useExistingBranch) {
+        await ensureBranchHistory(baseBranch, fetchDepth);
+        await ensureBranchHistory(sourceBranch, fetchDepth);
+
+        if (useExistingBranch) {
             try {
-                await $`git fetch origin --depth=${fetchDepth} ${sourceBranch}`;
                 await $`git checkout ${sourceBranch}`;
 
                 console.log(`✓ Successfully checked out PR branch for PR #${entityNumber}`);
@@ -198,16 +206,6 @@ async function setupWorkingBranch(context: GitHubContext, octokit: Octokits): Pr
             prBaseBranch = baseBranch;
             baseBranch = sourceBranch;
         }
-
-        // If we need to resolve conflicts, ensure we have full git history for merge operations
-        if (context.inputs.resolveConflicts || isReviewOrCommentHasResolveConflictsTrigger(context)) {
-            if (prBaseBranch) {
-                await ensureMergeHistory(prBaseBranch)
-            } else {
-                await ensureMergeHistory(sourceBranch);
-            }
-            await ensureMergeHistory(baseBranch)
-        }
     }
 
     if (isPushEvent(context)) {
@@ -215,16 +213,14 @@ async function setupWorkingBranch(context: GitHubContext, octokit: Octokits): Pr
         console.log(`Push event detected, base branch: ${baseBranch}`);
     }
 
-    // Fetch and checkout the base branch
-    await $`git fetch origin ${baseBranch} --depth=${fetchDepth}`;
-    await $`git checkout ${baseBranch}`;
-
     if (!context.inputs.silentMode) {
         const entityType = isPR ? "pr" : entityNumber ? "issue" : "run";
         const branchName = `${WORKING_BRANCH_PREFIX}${entityType}-${entityNumber}-${context.runId}`;
 
         return await createNewBranch(baseBranch, branchName, prBaseBranch)
     }
+
+    await $`git checkout ${baseBranch}`;
 
     return {
         baseBranch: baseBranch,
@@ -235,24 +231,23 @@ async function setupWorkingBranch(context: GitHubContext, octokit: Octokits): Pr
 }
 
 /**
- * Ensures the repository has sufficient git history for merge operations.
+ * Ensures the repository has sufficient git history
  *
  * GitHub Actions by default clones with shallow history (depth=1).
- * For merge operations, we need the full history of the base branch to find the merge-base.
  *
  * @param branch - The branch to merge from (e.g., "main")
+ * @param depth - The depth of the git clone (default=20)
  * @throws {Error} if unable to fetch history
  */
-export async function ensureMergeHistory(branch: string) {
-    console.log(`Fetching full history of ${branch} for merge operation...`);
+export async function ensureBranchHistory(branch: string, depth?: number) {
+    console.log(`Fetching full history of ${branch}...`);
 
     try {
-        // Fetch the base branch with full history (no --depth = complete history)
-        await $`git fetch origin ${branch}`;
-        console.log(`✓ Successfully fetched ${branch} with full history`);
+        await $`git fetch origin ${depth ? `--depth=${depth}` : ""} ${branch}`;
+        console.log(`✓ Successfully fetched ${branch} history`);
     } catch (error) {
         throw new Error(
-            `❌ Failed to fetch ${branch} history for merge operation. ` +
+            `❌ Failed to fetch ${branch} history. ` +
             `This could be due to:\n` +
             `• Branch "${branch}" does not exist in the repository\n` +
             `• Network connectivity issues\n` +
