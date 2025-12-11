@@ -60,10 +60,12 @@ on:
     types: [created]
   pull_request_review_comment:
     types: [created]
-  issues:
-    types: [opened, assigned]
   pull_request_review:
-    types: [submitted]
+    types: [submitted, edited]
+  pull_request:
+    types: [opened, edited]
+  issues:
+    types: [opened, assigned, labeled]
 
 jobs:
   junie:
@@ -71,7 +73,9 @@ jobs:
       (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@junie-agent')) ||
       (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@junie-agent')) ||
       (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@junie-agent')) ||
-      (github.event_name == 'issues' && (contains(github.event.issue.body, '@junie-agent') || contains(github.event.issue.title, '@junie-agent')))
+      (github.event_name == 'pull_request' && (contains(github.event.pull_request.body, '@junie-agent') || contains(github.event.pull_request.title, '@junie-agent'))) ||
+      (github.event_name == 'issues' && (contains(github.event.issue.body, '@junie-agent') || contains(github.event.issue.title, '@junie-agent'))) ||
+      (github.event_name == 'issues' && (github.event.action == 'assigned' || github.event.action == 'labeled'))
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -98,6 +102,7 @@ jobs:
 3. Start using Junie:
    - Comment `@junie-agent help me fix this bug` on an issue
    - Mention `@junie-agent review this change` in a PR
+   - In a PR comment or review, write `resolve conflicts` to have Junie resolve merge conflicts
 
 ## Cookbook
 
@@ -151,6 +156,12 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 | `silent_mode` | Run Junie without comments, branch creation, or commits - only prepare data and output results | `false` |
 | `use_single_comment` | Update a single comment for all runs instead of creating new comments each time | `false` |
 | `use_structured_prompt` | Use the new structured prompt format with XML tags for better organization | `true`  |
+
+##### Conflict resolution triggers
+
+- Set `resolve_conflicts: true` to automatically detect PRs with merge conflicts and attempt to resolve them.
+- Or, in a PR comment or review, write `resolve conflicts` (case-insensitive) to force conflict resolution mode.
+- When conflict resolution is triggered, the action fetches full git history for the relevant branches and may create a PR or push commits as needed, even if no additional file changes are detected.
 
 #### Authentication
 
