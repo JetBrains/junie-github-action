@@ -44,16 +44,7 @@ A powerful GitHub Action that integrates [Junie](https://www.jetbrains.com/junie
 
 ### Basic Setup
 
-You can set up Junie in two ways:
-
-#### Option 1: Automatic Setup (Recommended)
-
-Visit [https://junie.labs.jb.gg/cli](https://junie.labs.jb.gg/cli) and follow the interactive setup wizard. It will automatically:
-- Configure repository secrets
-- Create workflow files
-- Set up proper permissions
-
-#### Option 2: Manual Setup
+#### Manual Setup
 
 1. Add your Junie API key to repository secrets:
    - Go to **Settings → Secrets and variables → Actions**
@@ -94,7 +85,7 @@ jobs:
 
       - name: Run Junie
         id: junie
-        uses: JetBrains/junie-github-action@v1
+        uses: JetBrains/junie-github-action@v0
         with:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
 ```
@@ -115,7 +106,7 @@ For better prompt organization and AI comprehension, you can enable the structur
 
 ```yaml
 - name: Run Junie
-  uses: JetBrains/junie-github-action@v1
+  uses: JetBrains/junie-github-action@v0
   with:
     junie_api_key: ${{ secrets.JUNIE_API_KEY }}
     use_structured_prompt: true  # Enable XML-based structured format
@@ -245,7 +236,7 @@ When using the default `github.token` (automatically provided by GitHub Actions)
 
 For example, if you use the default token:
 ```yaml
-- uses: JetBrains/junie-github-action@main
+- uses: JetBrains/junie-github-action@v0
   with:
     junie_api_key: ${{ secrets.JUNIE_API_KEY }}
     # No custom_github_token specified - uses default github.token
