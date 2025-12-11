@@ -31,6 +31,7 @@ jobs:
         with:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
           use_single_comment: true
+          create_new_branch_for_pr: true
           prompt: |
             Review pr diff and update documentation to match code changes.
 

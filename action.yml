@@ -141,7 +141,7 @@ runs:
       shell: bash
       id: junie-run
       env:
-        JUNIE_GUIDELINES: ${{ inputs.junie_guidelines_filename }}
+        JUNIE_GUIDELINES_FILENAME: ${{ inputs.junie_guidelines_filename }}
         CLI_TOKEN: ${{ steps.prepare.outputs.EJ_CLI_TOKEN }}
         JUNIE_JSON_TASK: ${{ steps.prepare.outputs.JUNIE_JSON_TASK }}
         EJ_AUTH_GITHUB_TOKEN: ${{ steps.prepare.outputs.EJ_AUTH_GITHUB_TOKEN  }}
