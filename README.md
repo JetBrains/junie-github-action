@@ -152,6 +152,42 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 | `use_single_comment` | Update a single comment for all runs instead of creating new comments each time | `false` |
 | `use_structured_prompt` | Use the new structured prompt format with XML tags for better organization | `true`  |
 
+#### Structured Prompt Format (default)
+
+Starting with PR #3 (New prompt generation), Junie builds a structured prompt by default. The action collects repository context and wraps it in XML-like sections for the model:
+
+- `user_instruction`, `repository`, `actor`
+- `pull_request_info` or `issue_info`
+- `commits`, `timeline`, `reviews`, `changed_files` (when available)
+
+To use the legacy, non-structured formatter instead, disable it in your workflow:
+
+```yaml
+- uses: JetBrains/junie-github-action@v0
+  with:
+    junie_api_key: ${{ secrets.JUNIE_API_KEY }}
+    use_structured_prompt: "false"
+```
+
+Notes:
+- Your custom `prompt` (if provided) is inserted inside the `<user_instruction>` section.
+- The structured sections are generated automatically from PR/issue context; you don't need to craft them manually.
+
+Example structure the agent receives (contents abbreviated):
+
+```xml
+<user_instruction>
+  ...
+</user_instruction>
+<repository>...</repository>
+<pull_request_info>...</pull_request_info>
+<commits>...</commits>
+<timeline>...</timeline>
+<reviews>...</reviews>
+<changed_files>...</changed_files>
+<actor>...</actor>
+```
+
 #### Authentication
 
 | Input | Description | Required |
