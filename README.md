@@ -60,18 +60,23 @@ on:
     types: [created]
   pull_request_review_comment:
     types: [created]
-  issues:
-    types: [opened, assigned]
   pull_request_review:
-    types: [submitted]
+    types: [submitted, edited]
+  issues:
+    types: [opened, assigned, labeled]
+  pull_request:
+    types: [opened, edited]
 
 jobs:
   junie:
+    # Let the action decide whether to run based on its inputs and context.
+    # It will set outputs.should_skip = 'true' when no trigger matches.
     if: |
-      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@junie-agent')) ||
-      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@junie-agent')) ||
-      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@junie-agent')) ||
-      (github.event_name == 'issues' && (contains(github.event.issue.body, '@junie-agent') || contains(github.event.issue.title, '@junie-agent')))
+      github.event_name == 'issue_comment' ||
+      github.event_name == 'pull_request_review_comment' ||
+      github.event_name == 'pull_request_review' ||
+      github.event_name == 'issues' ||
+      github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: write
