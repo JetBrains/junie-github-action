@@ -74,12 +74,12 @@ async function getActionToDo(silentMode: boolean): Promise<ActionType> {
         console.log('Silent mode enabled - no git operations will be performed');
         return ActionType.NOTHING;
     }
-
-    const hasChangedFiles = await checkForChangedFiles();
-    const hasUnpushedCommits = await checkForUnpushedCommits();
-    const initCommentId = process.env[OUTPUT_VARS.INIT_COMMENT_ID];
     const isNewBranch = process.env[OUTPUT_VARS.IS_NEW_BRANCH] === 'true';
     const workingBranch = process.env[OUTPUT_VARS.WORKING_BRANCH]!;
+    const baseBranch = process.env[OUTPUT_VARS.BASE_BRANCH]!;
+    const hasChangedFiles = await checkForChangedFiles();
+    const hasUnpushedCommits = await checkForUnpushedCommits(isNewBranch, baseBranch);
+    const initCommentId = process.env[OUTPUT_VARS.INIT_COMMENT_ID];
 
 
     console.log(`Has changed files: ${hasChangedFiles}`);
@@ -92,15 +92,15 @@ async function getActionToDo(silentMode: boolean): Promise<ActionType> {
     if (!hasChangedFiles && !hasUnpushedCommits && initCommentId) {
         console.log('No changes and no unpushed commits but has comment ID - will write comment');
         action = ActionType.WRITE_COMMENT;
-    } else if (!hasChangedFiles && hasUnpushedCommits) {
-        console.log('No changes but has unpushed commits - will push');
-        action = ActionType.PUSH;
-    } else if (hasChangedFiles && isNewBranch) {
+    } else if ((hasChangedFiles || hasUnpushedCommits) && isNewBranch) {
         console.log('Changes found and working in new branch - will create PR');
         action = ActionType.CREATE_PR;
     } else if (hasChangedFiles && !isNewBranch) {
         console.log('Changes found and working in existing branch - will commit directly');
         action = ActionType.COMMIT_CHANGES;
+    } else if (hasUnpushedCommits) {
+        console.log('No changes but has unpushed commits - will push');
+        action = ActionType.PUSH;
     } else {
         console.log('No specific action matched - do nothing');
         action = ActionType.NOTHING;
@@ -127,19 +127,25 @@ async function checkForChangedFiles(): Promise<boolean> {
     }
 }
 
-async function checkForUnpushedCommits(): Promise<boolean> {
+async function checkForUnpushedCommits(isNewBranch: boolean, baseBranch: string): Promise<boolean> {
     try {
         console.log('Checking for unpushed commits...');
-        // Check for unpushed commits (commits that exist locally but not in upstream)
-        const unpushedCommits = execSync('git log @{u}..HEAD --oneline', {encoding: 'utf-8'});
+        if (isNewBranch) {
+            // For a new branch, compare with the remote base branch
+            const unpushedCommits = execSync(`git log origin/${baseBranch}..HEAD --oneline`, {encoding: 'utf-8'});
+            console.log(`Commits ahead of origin/${baseBranch}:`, unpushedCommits);
 
-        console.log('Unpushed commits:', unpushedCommits);
-
-        // If git log returns any output, there are unpushed commits
-        return unpushedCommits.trim().length > 0;
+            return unpushedCommits.trim().length > 0;
+        } else {
+            execSync('git rev-parse --abbrev-ref @{u}', {encoding: 'utf-8', stdio: 'pipe'});
+            // Upstream exists, compare with it
+            const unpushedCommits = execSync('git log @{u}..HEAD --oneline', {encoding: 'utf-8'});
+            console.log('Unpushed commits:', unpushedCommits);
+            return unpushedCommits.trim().length > 0;
+        }
     } catch (error) {
         console.error('Error checking for unpushed commits:', error);
-        // If we can't check (e.g., no upstream branch), assume there are no unpushed commits
+        // If we can't check at all, assume there are no unpushed commits
         return false;
     }
 }

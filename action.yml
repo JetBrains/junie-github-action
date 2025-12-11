@@ -165,6 +165,7 @@ runs:
         PARSED_CONTEXT: ${{ steps.prepare.outputs.PARSED_CONTEXT }}
         INIT_COMMENT_ID: ${{ steps.prepare.outputs.INIT_COMMENT_ID }}
         WORKING_BRANCH: ${{ steps.prepare.outputs.WORKING_BRANCH }}
+        BASE_BRANCH: ${{ steps.prepare.outputs.BASE_BRANCH }}
         IS_NEW_BRANCH: ${{ steps.prepare.outputs.IS_NEW_BRANCH }}
         WORKING_DIR: ${{ inputs.junie_work_dir }}
 
