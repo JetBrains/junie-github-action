@@ -98,24 +98,62 @@ jobs:
 3. Start using Junie:
    - Comment `@junie-agent help me fix this bug` on an issue
    - Mention `@junie-agent review this change` in a PR
-   - Add the `junie` label to trigger automatically
 
-### Using Structured Prompts (Experimental)
+Want to trigger Junie via label or assignee instead of a mention?
+Add these events and remove the job-level `if:` so the action can self‑filter:
 
-For better prompt organization and AI comprehension, you can enable the structured prompt format:
+```yaml
+on:
+  issues:
+    types: [opened, assigned, labeled]
+  pull_request:
+    types: [labeled]
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  junie:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: JetBrains/junie-github-action@v0
+        with:
+          junie_api_key: ${{ secrets.JUNIE_API_KEY }}
+          # Optional trigger customization
+          label_trigger: junie
+          assignee_trigger: junie-agent
+```
+
+### Structured Prompts (default)
+
+Structured prompts are enabled by default for clearer, sectioned context. To use the legacy prompt format instead, disable them:
 
 ```yaml
 - name: Run Junie
   uses: JetBrains/junie-github-action@v0
   with:
     junie_api_key: ${{ secrets.JUNIE_API_KEY }}
-    use_structured_prompt: true  # Enable XML-based structured format
+    use_structured_prompt: false  # Use legacy prompt format
 ```
 
-**Benefits:**
-- Better organized prompt with clear XML sections
+What the structured prompt includes:
+- user_instruction – your exact request or the provided `prompt`
+- repository – repository metadata and important files
+- issue or pull_request – the active entity details (title/body/links)
+- commits – recent relevant commits and diffs
+- timeline – comments and reviews around the event
+- changed_files – file list with stats and hunks when available
+- actor – who requested the action
 
-**Note:** This is an experimental feature. The default legacy format remains stable for production use.
+Note: The structured format is new in v0 and will continue to evolve.
 
 ## Cookbook
 
