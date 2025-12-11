@@ -91,10 +91,7 @@ async function getActionToDo(context: GitHubContext): Promise<ActionType> {
     console.log(`Is resolve conflicts: ${isResolveConflicts}`)
 
     let action: ActionType
-    if (!hasChangedFiles && !hasUnpushedCommits && initCommentId) {
-        console.log('No changes and no unpushed commits but has comment ID - will write comment');
-        action = ActionType.WRITE_COMMENT;
-    } else if (((hasChangedFiles || hasUnpushedCommits) && isNewBranch) || (isResolveConflicts && isNewBranch)) {
+    if (((hasChangedFiles || hasUnpushedCommits) && isNewBranch) || (isResolveConflicts && isNewBranch)) {
         console.log('Changes found and working in new branch - will create PR');
         action = ActionType.CREATE_PR;
     } else if (hasChangedFiles && !isNewBranch) {
@@ -103,6 +100,9 @@ async function getActionToDo(context: GitHubContext): Promise<ActionType> {
     } else if (hasUnpushedCommits || isResolveConflicts) {
         console.log('No changes but has unpushed commits - will push');
         action = ActionType.PUSH;
+    } else if (!hasChangedFiles && !hasUnpushedCommits && initCommentId) {
+        console.log('No changes and no unpushed commits but has comment ID - will write comment');
+        action = ActionType.WRITE_COMMENT;
     } else {
         console.log('No specific action matched - do nothing');
         action = ActionType.NOTHING;
