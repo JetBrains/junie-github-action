@@ -159,6 +159,8 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 | `junie_api_key` | JetBrains Junie API key | Yes |
 | `custom_github_token` | Custom GitHub token (optional) | No |
 
+Note: In action.yml, `junie_api_key` is not marked as a required input to permit automation-only workflows or specialized scenarios; however, for standard Junie operation you must provide this key (via `with: junie_api_key: ${{ secrets.JUNIE_API_KEY }}`), otherwise Junie cannot run tasks.
+
 ### Outputs
 
 | Output | Description |
