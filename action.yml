@@ -209,6 +209,13 @@ runs:
         message: ${{ steps.junie-run-results.outputs.COMMIT_MESSAGE }}
         new_branch: ${{ steps.prepare.outputs.WORKING_BRANCH }}
 
+    - name: Push changes
+      id: push
+      if: steps.prepare.outputs.SHOULD_SKIP != 'true' && inputs.silent_mode != 'true' && (steps.junie-run-results.outputs.ACTION_TO_DO == 'PUSH' || steps.junie-run-results.outputs.ACTION_TO_DO == 'CREATE_PR')
+      shell: bash
+      run: |
+        git push --set-upstream origin HEAD
+
     - name: Make Pull Request for the changes
       if: steps.prepare.outputs.SHOULD_SKIP != 'true' && inputs.silent_mode != 'true' && steps.junie-run-results.outputs.ACTION_TO_DO == 'CREATE_PR'
       id: pull-request
@@ -223,13 +230,6 @@ runs:
         PR_BODY: ${{ steps.junie-run-results.outputs.PR_BODY }}
         BASE_BRANCH: ${{ steps.prepare.outputs.BASE_BRANCH }}
         WORKING_BRANCH: ${{ steps.prepare.outputs.WORKING_BRANCH }}
-
-    - name: Push changes
-      id: push
-      if: steps.prepare.outputs.SHOULD_SKIP != 'true' && inputs.silent_mode != 'true' && steps.junie-run-results.outputs.ACTION_TO_DO == 'PUSH'
-      shell: bash
-      run: |
-        git push --set-upstream origin HEAD
 
     - name: Give feedback and update summary (success)
       if: success() && steps.prepare.outputs.SHOULD_SKIP != 'true'

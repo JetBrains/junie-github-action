@@ -81,24 +81,22 @@ async function getActionToDo(context: GitHubContext): Promise<ActionType> {
     const hasChangedFiles = await checkForChangedFiles();
     const hasUnpushedCommits = await checkForUnpushedCommits(isNewBranch, baseBranch);
     const initCommentId = process.env[OUTPUT_VARS.INIT_COMMENT_ID];
-    const isResolveConflicts = context.inputs.resolveConflicts || isReviewOrCommentHasResolveConflictsTrigger(context)
 
     console.log(`Has changed files: ${hasChangedFiles}`);
     console.log(`Has unpushed commits: ${hasUnpushedCommits}`);
     console.log(`Init comment ID: ${initCommentId}`);
     console.log(`Is new branch: ${isNewBranch}`);
     console.log(`Working branch: ${workingBranch}`);
-    console.log(`Is resolve conflicts: ${isResolveConflicts}`)
 
     let action: ActionType
-    if (hasChangedFiles && isNewBranch) {
-        console.log('Changes found and working in new branch - will create PR');
+    if ((hasChangedFiles || hasUnpushedCommits) && isNewBranch) {
+        console.log('Changes or unpushed commits found in new branch - will create PR');
         action = ActionType.CREATE_PR;
     } else if (hasChangedFiles && !isNewBranch) {
         console.log('Changes found and working in existing branch - will commit directly');
         action = ActionType.COMMIT_CHANGES;
-    } else if (hasUnpushedCommits || isResolveConflicts) {
-        console.log('No changes but has unpushed commits - will push');
+    } else if (hasUnpushedCommits) {
+        console.log('No changes but has unpushed commits in existing branch - will push');
         action = ActionType.PUSH;
     } else if (initCommentId) {
         console.log('No changes and no unpushed commits but has comment ID - will write comment');
