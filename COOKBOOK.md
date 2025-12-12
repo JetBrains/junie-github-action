@@ -105,7 +105,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
       - uses: JetBrains/junie-github-action@v0
         with:
@@ -204,7 +204,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
       - uses: JetBrains/junie-github-action@v0
         with:
@@ -348,7 +348,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2  # Need parent commit for diff
+          fetch-depth: 1
 
       - uses: JetBrains/junie-github-action@v0
         id: junie
