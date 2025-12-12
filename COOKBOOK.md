@@ -460,7 +460,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 0
 
       - name: Run Junie
         id: junie
