@@ -59,7 +59,7 @@ type BaseContext = {
         createNewBranchForPR: boolean;
         silentMode: boolean;
         useSingleComment: boolean;
-        useStructuredPrompt: boolean;
+        attachGithubContextToCustomPrompt: boolean;
         junieWorkingDir: string;
         appToken: string;
         baseBranch?: string;
@@ -121,7 +121,7 @@ export function parseGitHubContext(tokenOwner: TokenOwner): GitHubContext {
             createNewBranchForPR: process.env.CREATE_NEW_BRANCH_FOR_PR == "true",
             silentMode: process.env.SILENT_MODE == "true",
             useSingleComment: process.env.USE_SINGLE_COMMENT == "true",
-            useStructuredPrompt: process.env.USE_STRUCTURED_PROMPT == "true",
+            attachGithubContextToCustomPrompt: process.env.ATTACH_GITHUB_CONTEXT_TO_CUSTOM_PROMPT !== "false",
             junieWorkingDir: process.env.JUNIE_WORKING_DIR!,
             headRef: process.env.GITHUB_HEAD_REF,
             appToken: process.env.APP_TOKEN!,

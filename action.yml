@@ -35,10 +35,10 @@ inputs:
     description: "Use a single comment that gets updated instead of creating new comments for each run(per workflow)"
     required: false
     default: "false"
-  use_structured_prompt:
-    description: "Use the new structured prompt format with XML tags for better organization"
+  attach_github_context_to_custom_prompt:
+    description: "Whether to attach GitHub context (PR/issue info, commits, reviews, etc.) when using custom prompt. Only applies when 'prompt' input is provided."
     required: false
-    default: "true"
+    default: "false"
 
   # Junie configuration
   prompt:
@@ -127,7 +127,7 @@ runs:
         CREATE_NEW_BRANCH_FOR_PR: ${{ inputs.create_new_branch_for_pr }}
         SILENT_MODE: ${{ inputs.silent_mode }}
         USE_SINGLE_COMMENT: ${{ inputs.use_single_comment }}
-        USE_STRUCTURED_PROMPT: ${{ inputs.use_structured_prompt }}
+        ATTACH_GITHUB_CONTEXT_TO_CUSTOM_PROMPT: ${{ inputs.attach_github_context_to_custom_prompt }}
         ALL_INPUTS: ${{ toJson(inputs) }}
 
 

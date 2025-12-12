@@ -112,43 +112,52 @@ jobs:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
           use_single_comment: "true"
           prompt: |
-            Review pr diff for:
-
+            Your task is to:
+            1. Download the Pull Request diff using `gh pr diff junie/issue-46-20164285053`
+            2. Review the downloaded diff according to the criteria below
+            3. Output summary following the template below using `submit` action
+            
+            ## Review Criteria
+            
+            ```
             **Security:**
             - SQL injection, XSS, exposed secrets
-            - Authentication/authorization issues
-            - Input validation vulnerabilities
-
+              - Authentication/authorization issues
+              - Input validation vulnerabilities
+            
             **Performance:**
             - N+1 queries, memory leaks
-            - Inefficient algorithms (nested loops, etc.)
-            - Blocking operations
-
+              - Inefficient algorithms (nested loops, etc.)
+              - Blocking operations
+            
             **Code Quality:**
             - Complexity, duplication, naming
-            - Missing tests for new logic
-            - Undocumented complex logic
-
-            **Provide structured feedback:**
+              - Missing tests for new logic
+              - Undocumented complex logic
+            ```
+            
+            ## Summary template
+            
+            ```
             ## 🎯 Summary
             [2-3 sentences overall assessment]
-
+            
             ## ⚠️ Issues Found
             [Each issue: File:line, Severity (Critical/High/Medium/Low), Description, Suggested fix with code example]
-
+            
             ## ✨ Highlights
             [1-2 things done well]
-
+            
             ## 📋 Checklist
             - [ ] Security: No vulnerabilities
-            - [ ] Tests: Adequate coverage
-            - [ ] Performance: No bottlenecks
-            - [ ] Documentation: Complex logic explained
+              - [ ] Tests: Adequate coverage
+              - [ ] Performance: No bottlenecks
+              - [ ] Documentation: Complex logic explained
 
-            Procedure:
-            Use gh pr diff ${{ github.event.pull_request.head.ref }} to get a diff of the PR. 
-
-            Only provide feedback without modifying files.
+            ## Additional instructions
+            - Strictly follow the plan above (`Your task is to:` section)
+            - You are not expected to explore the repo. Do review solely based on the downloaded diff
+            - You are not expected to run any code or any commands except `gh pr diff`
 ```
 
 </details>

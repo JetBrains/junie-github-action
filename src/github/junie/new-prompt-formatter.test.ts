@@ -21,7 +21,7 @@ describe("NewGitHubPromptFormatter", () => {
             createNewBranchForPR: false,
             silentMode: false,
             useSingleComment: false,
-            useStructuredPrompt: true,
+            attachGithubContextToCustomPrompt: true,
             junieWorkingDir: "/tmp",
             appToken: "token",
             prompt: "",
@@ -287,5 +287,76 @@ describe("NewGitHubPromptFormatter", () => {
         expect(prompt).not.toContain("<reviews>");
         expect(prompt).not.toContain("<changed_files>");
         expect(prompt).not.toContain("<commits>");
+    });
+
+    test("generatePrompt returns only custom prompt when attachGithubContext is false", () => {
+        const context = createMockContext();
+        const fetchedData: FetchedData = {
+            pullRequest: createMockPR()
+        };
+        const customPrompt = "Please fix this specific bug";
+
+        const prompt = formatter.generatePrompt(context, fetchedData, customPrompt, false);
+
+        // Should contain only the custom prompt
+        expect(prompt).toBe("Please fix this specific bug");
+
+        // Should NOT contain any GitHub context
+        expect(prompt).not.toContain("<repository>");
+        expect(prompt).not.toContain("<actor>");
+        expect(prompt).not.toContain("<pull_request_info>");
+        expect(prompt).not.toContain("<commits>");
+        expect(prompt).not.toContain("<changed_files>");
+    });
+
+    test("generatePrompt includes GitHub context when attachGithubContext is true with custom prompt", () => {
+        const context = createMockContext();
+        const fetchedData: FetchedData = {
+            pullRequest: createMockPR()
+        };
+        const customPrompt = "Please review this PR";
+
+        const prompt = formatter.generatePrompt(context, fetchedData, customPrompt, true);
+
+        // Should contain custom prompt
+        expect(prompt).toContain("Please review this PR");
+
+        // Should also contain GitHub context
+        expect(prompt).toContain("<repository>");
+        expect(prompt).toContain("<actor>");
+        expect(prompt).toContain("<pull_request_info>");
+        expect(prompt).toContain("<commits>");
+        expect(prompt).toContain("<changed_files>");
+    });
+
+    test("generatePrompt includes GitHub context when attachGithubContext is true without custom prompt", () => {
+        const context = createMockContext({
+            payload: {
+                repository: {
+                    name: "test-repo",
+                    owner: {login: "test-owner"},
+                    full_name: "test-owner/test-repo"
+                },
+                pull_request: {
+                    number: 1,
+                    title: "Test PR",
+                    body: "PR description from GitHub",
+                    updated_at: "2024-01-01T00:00:00Z"
+                }
+            } as any
+        });
+        const fetchedData: FetchedData = {
+            pullRequest: createMockPR()
+        };
+
+        const prompt = formatter.generatePrompt(context, fetchedData, undefined, true);
+
+        // Should contain PR body as user instruction
+        expect(prompt).toContain("PR description from GitHub");
+
+        // Should contain GitHub context
+        expect(prompt).toContain("<repository>");
+        expect(prompt).toContain("<actor>");
+        expect(prompt).toContain("<pull_request_info>");
     });
 });

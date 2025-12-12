@@ -26,6 +26,9 @@ describe("prepareJunieTask", () => {
             inputs: {
                 resolveConflicts: false,
                 createNewBranchForPR: false,
+                silentMode: false,
+                useSingleComment: false,
+                attachGithubContextToCustomPrompt: true,
                 junieWorkingDir: "/tmp",
                 appToken: "token",
                 prompt: "",
@@ -195,12 +198,41 @@ describe("prepareJunieTask", () => {
     });
 
     describe("with user prompt", () => {
-        test("should set task from inputs.prompt", async () => {
+        test("should set task from inputs.prompt with GitHub context by default", async () => {
             const context = createMockContext({
                 eventName: "workflow_dispatch",
                 inputs: {
                     ...createMockContext().inputs,
                     prompt: "Do something"
+                },
+                payload: {
+                    repository: {
+                        owner: {login: "owner"},
+                        name: "repo",
+                        full_name: "owner/repo"
+                    }
+                } as any
+            });
+            const octokit = createMockOctokit();
+
+            const result = await prepareJunieTask(context, branchInfo, octokit);
+
+            expect(result).toBeDefined();
+            expect(result.task).toBeDefined();
+            expect(result.task).toContain("Do something");
+            expect(result.task).toContain("<repository>");
+            expect(result.task).toContain("<actor>");
+            expect(result.mergeTask).toBeUndefined();
+            expect(core.setOutput).toHaveBeenCalledWith("JUNIE_JSON_TASK", expect.any(String));
+        });
+
+        test("should set task from inputs.prompt without GitHub context when disabled", async () => {
+            const context = createMockContext({
+                eventName: "workflow_dispatch",
+                inputs: {
+                    ...createMockContext().inputs,
+                    prompt: "Do something",
+                    attachGithubContextToCustomPrompt: false
                 },
                 payload: {
                     repository: {
@@ -234,10 +266,10 @@ describe("prepareJunieTask", () => {
             expect(result).toBeDefined();
             expect(result.task).toBeDefined();
             expect(result.mergeTask).toBeUndefined();
-            expect(result.task).toContain("User @commenter mentioned you");
-            expect(result.task).toContain("#123 Test Issue");
+            expect(result.task).toContain("<user_instruction>");
             expect(result.task).toContain("@junie-agent help");
-            expect(result.task).toContain("### ISSUE:");
+            expect(result.task).toContain("<repository>");
+            expect(result.task).toContain("<actor>");
         });
     });
 
@@ -252,7 +284,8 @@ describe("prepareJunieTask", () => {
                         title: "Test Issue",
                         body: "Issue body",
                         state: "open",
-                        user: {login: "author"}
+                        user: {login: "author"},
+                        updated_at: "2024-01-01T00:00:00Z"
                     },
                     repository: {
                         owner: {login: "owner"},
@@ -267,8 +300,9 @@ describe("prepareJunieTask", () => {
             expect(result).toBeDefined();
             expect(result.task).toBeDefined();
             expect(result.mergeTask).toBeUndefined();
-            expect(result.task).toContain("### ISSUE:");
-            expect(result.task).toContain("Test Issue");
+            expect(result.task).toContain("<user_instruction>");
+            expect(result.task).toContain("Issue body");
+            expect(result.task).toContain("<repository>");
         });
     });
 
@@ -277,6 +311,7 @@ describe("prepareJunieTask", () => {
             const context = createMockContext({
                 eventName: "issue_comment",
                 isPR: true,
+                entityNumber: 123,
                 payload: {
                     action: "created",
                     issue: {
@@ -306,10 +341,10 @@ describe("prepareJunieTask", () => {
             expect(result).toBeDefined();
             expect(result.task).toBeDefined();
             expect(result.mergeTask).toBeUndefined();
-            expect(result.task).toContain("User @reviewer mentioned you in the comment on pull request");
+            expect(result.task).toContain("<user_instruction>");
             expect(result.task).toContain("Please fix this");
-            expect(result.task).toContain("### PULL REQUEST CONTEXT:");
-            expect(result.task).toContain("### CHANGED FILES:");
+            expect(result.task).toContain("<repository>");
+            expect(result.task).toContain("<pull_request_info>");
         });
     });
 
@@ -321,7 +356,8 @@ describe("prepareJunieTask", () => {
                     action: "submitted",
                     pull_request: {
                         number: 123,
-                        title: "Test PR"
+                        title: "Test PR",
+                        updated_at: "2024-01-01T00:00:00Z"
                     },
                     review: {
                         id: 456,
@@ -342,7 +378,9 @@ describe("prepareJunieTask", () => {
             expect(result).toBeDefined();
             expect(result.task).toBeDefined();
             expect(result.mergeTask).toBeUndefined();
-            expect(result.task).toContain("User @reviewer mentioned you in the review on pull request");
+            expect(result.task).toContain("<user_instruction>");
+            expect(result.task).toContain("Changes needed");
+            expect(result.task).toContain("<repository>");
         });
     });
 
@@ -354,7 +392,8 @@ describe("prepareJunieTask", () => {
                     action: "created",
                     pull_request: {
                         number: 123,
-                        title: "Test PR"
+                        title: "Test PR",
+                        updated_at: "2024-01-01T00:00:00Z"
                     },
                     comment: {
                         id: 1,
@@ -375,8 +414,9 @@ describe("prepareJunieTask", () => {
             expect(result).toBeDefined();
             expect(result.task).toBeDefined();
             expect(result.mergeTask).toBeUndefined();
-            expect(result.task).toContain("User @reviewer mentioned you in the review comment on pull request");
+            expect(result.task).toContain("<user_instruction>");
             expect(result.task).toContain("Fix this line");
+            expect(result.task).toContain("<repository>");
         });
     });
 
@@ -384,6 +424,8 @@ describe("prepareJunieTask", () => {
         test("should format PR prompt for opened/edited PR", async () => {
             const context = createMockContext({
                 eventName: "pull_request",
+                isPR: true,
+                entityNumber: 123,
                 payload: {
                     action: "opened",
                     pull_request: {
@@ -407,8 +449,10 @@ describe("prepareJunieTask", () => {
             expect(result).toBeDefined();
             expect(result.task).toBeDefined();
             expect(result.mergeTask).toBeUndefined();
-            expect(result.task).toContain("### PULL REQUEST CONTEXT:");
-            expect(result.task).toContain("### PULL REQUEST:");
+            expect(result.task).toContain("<user_instruction>");
+            expect(result.task).toContain("PR description");
+            expect(result.task).toContain("<pull_request_info>");
+            expect(result.task).toContain("<repository>");
         });
     });
 

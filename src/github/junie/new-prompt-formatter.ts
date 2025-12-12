@@ -21,7 +21,12 @@ import {
 
 export class NewGitHubPromptFormatter {
 
-    generatePrompt(context: GitHubContext, fetchedData: FetchedData, userPrompt?: string) {
+    generatePrompt(context: GitHubContext, fetchedData: FetchedData, userPrompt?: string, attachGithubContextToCustomPrompt: boolean = true) {
+        // If user provided custom prompt and doesn't want GitHub context, return only the prompt
+        if (userPrompt && !attachGithubContextToCustomPrompt) {
+            return userPrompt;
+        }
+
         const repositoryInfo = this.getRepositoryInfo(context);
         const actorInfo = this.getActorInfo(context);
         const userInstruction = this.getUserInstruction(context, userPrompt)
@@ -30,7 +35,7 @@ export class NewGitHubPromptFormatter {
         const timelineInfo = this.getTimelineInfo(fetchedData);
         const reviewsInfo = this.getReviewsInfo(fetchedData);
         const changedFilesInfo = this.getChangedFilesInfo(fetchedData);
-        return `You were triggered as a GitHub ai assistant by ${context.eventName} action. Check the request and help.
+        return `You were triggered as a GitHub AI Assistant by ${context.eventName} action. Your task is to:
 
 ${userInstruction ? userInstruction : ""}
 ${repositoryInfo ? repositoryInfo : ""}
