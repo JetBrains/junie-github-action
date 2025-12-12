@@ -130,6 +130,9 @@ async function checkForChangedFiles(): Promise<boolean> {
 async function checkForUnpushedCommits(isNewBranch: boolean, baseBranch: string): Promise<boolean> {
     try {
         console.log('Checking for unpushed commits...');
+        console.log(`Git status after Junie: ${execSync('git status', {encoding: 'utf-8'})}}`)
+        console.log("Recent commits (oneline): ", execSync('git log --oneline -n 10', {encoding: 'utf-8'}))
+
         if (isNewBranch) {
             // For a new branch, compare with the remote base branch
             const unpushedCommits = execSync(`git log origin/${baseBranch}..HEAD --oneline`, {encoding: 'utf-8'});
