@@ -28,6 +28,7 @@ export async function handleResults() {
         }
         const junieJsonOutput = JSON.parse(stringJunieJsonOutput) as any
         const context = JSON.parse(process.env[OUTPUT_VARS.PARSED_CONTEXT]!) as GitHubContext
+        const isResolveConflict = context.inputs.resolveConflicts || isReviewOrCommentHasResolveConflictsTrigger(context)
         const junieErrors = junieJsonOutput.errors
         if (junieErrors && (junieErrors as string[]).length > 0) {
             const errorList = (junieErrors as string[]).map(err => `  • ${err}`).join('\n');
@@ -38,7 +39,7 @@ export async function handleResults() {
             );
         }
         const actionToDo = await getActionToDo(context);
-        const title = junieJsonOutput.taskName
+        const title = junieJsonOutput.taskName || isResolveConflict ? `Resolve conflicts for ${context.entityNumber} PR` : 'Junie finished task successfully'
         const body = junieJsonOutput.result
         let issueId
         if (isEntityContext(context)) {
