@@ -130,14 +130,7 @@ export async function getTokenOwnerInfo(octokit: Octokits, tokenConfig: GitHubTo
 export async function gitAuth(parsedContext: GitHubContext, tokenConfig: GitHubTokenConfig) {
     console.log("Configuring git authentication...");
 
-    // Default token: actions/checkout already configured git, nothing to do
-    if (tokenConfig.isDefaultToken()) {
-        console.log("Using default token for git authentication");
-        return;
-    }
-
     const serverUrl = new URL(GITHUB_SERVER_URL);
-
     let gitUser: GitUser;
     const tokenOwner = parsedContext.tokenOwner;
 
@@ -168,6 +161,7 @@ export async function gitAuth(parsedContext: GitHubContext, tokenConfig: GitHubT
         };
     }
 
+    // Configure git user for commits (required for both default and custom tokens)
     try {
         await $`git config user.name "${gitUser.login}"`;
         await $`git config user.email "${gitUser.email}"`;
@@ -182,6 +176,13 @@ export async function gitAuth(parsedContext: GitHubContext, tokenConfig: GitHubT
         );
     }
 
+    // Default token: actions/checkout already configured remote auth, skip remote URL setup
+    if (tokenConfig.isDefaultToken()) {
+        console.log("Using default token - remote authentication already configured by actions/checkout");
+        return;
+    }
+
+    // For custom tokens: configure remote authentication
     // Remove the authorization header that actions/checkout sets
     console.log("Removing existing git authentication headers...");
     try {
