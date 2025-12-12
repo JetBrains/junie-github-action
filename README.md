@@ -61,7 +61,7 @@ on:
   pull_request_review_comment:
     types: [created]
   issues:
-    types: [opened, assigned]
+    types: [opened, assigned, labeled]
   pull_request_review:
     types: [submitted]
 
@@ -71,7 +71,12 @@ jobs:
       (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@junie-agent')) ||
       (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@junie-agent')) ||
       (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@junie-agent')) ||
-      (github.event_name == 'issues' && (contains(github.event.issue.body, '@junie-agent') || contains(github.event.issue.title, '@junie-agent')))
+      (github.event_name == 'issues' && (
+        github.event.action == 'assigned' ||
+        github.event.action == 'labeled' ||
+        contains(github.event.issue.body, '@junie-agent') ||
+        contains(github.event.issue.title, '@junie-agent')
+      ))
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -120,15 +125,15 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 | Input | Description | Default |
 |-------|-------------|---------|
 | `trigger_phrase` | Phrase to activate Junie in comments/issues | `@junie-agent` |
-| `assignee_trigger` | Username that triggers when assigned | - |
-| `label_trigger` | Label that triggers the action | `junie` |
+| `assignee_trigger` | Username that triggers when an Issue is assigned (e.g. `@junie-agent`) | - |
+| `label_trigger` | Issue label that triggers the action (Issues only) | `junie` |
 
 #### Branch Management
 
 | Input | Description | Default |
 |-------|-------------|---------|
-| `base_branch` | Base branch for creating new branches | `github.base_ref` |
-| `create_new_branch_for_pr` | Create new branch for PR contributors | `false` |
+| `base_branch` | Base branch used when creating the Junie working branch | `github.base_ref` |
+| `create_new_branch_for_pr` | Create a new branch for the PR instead of pushing to the same branch | `false` |
 
 #### Junie Configuration
 
