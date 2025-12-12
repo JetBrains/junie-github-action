@@ -24,7 +24,7 @@ A powerful GitHub Action that integrates [Junie](https://www.jetbrains.com/junie
 - **Interactive Code Assistant**: Responds to @junie-agent mentions in comments, issues, and PRs
 - **Issue Resolution**: Automatically implements solutions for GitHub issues
 - **PR Management**: Reviews code changes and implements requested modifications
-- **Conflict Resolution**: Resolve merge conflicts via `@junie-agent` comment or automatic detection
+- **Conflict Resolution**: Resolve merge conflicts via `@junie-agent resolve conflicts` comment or automatic detection
 - **CI Failure Analysis**: Investigates failed checks and suggests fixes using MCP integration
 - **Flexible Triggers**: Activate via mentions, assignees, labels, or custom prompts
 - **Smart Branch Management**: Context-aware branch creation and management
@@ -151,6 +151,8 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 | `silent_mode` | Run Junie without comments, branch creation, or commits - only prepare data and output results | `false` |
 | `use_single_comment` | Update a single comment for all runs instead of creating new comments each time | `false` |
 | `use_structured_prompt` | Use the new structured prompt format with XML tags for better organization | `true`  |
+
+Tip: You can manually trigger conflict resolution on a PR by commenting `@junie-agent resolve conflicts`. When `resolve_conflicts` is set to `true`, Junie will also attempt to detect and resolve merge conflicts automatically when applicable.
 
 #### Authentication
 
