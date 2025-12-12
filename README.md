@@ -61,17 +61,14 @@ on:
   pull_request_review_comment:
     types: [created]
   issues:
-    types: [opened, assigned]
+    types: [opened, assigned, labeled]
   pull_request_review:
-    types: [submitted]
+    types: [submitted, edited]
+  pull_request:
+    types: [opened, edited]
 
 jobs:
   junie:
-    if: |
-      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@junie-agent')) ||
-      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@junie-agent')) ||
-      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@junie-agent')) ||
-      (github.event_name == 'issues' && (contains(github.event.issue.body, '@junie-agent') || contains(github.event.issue.title, '@junie-agent')))
     runs-on: ubuntu-latest
     permissions:
       contents: write
