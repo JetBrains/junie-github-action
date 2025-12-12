@@ -19,10 +19,6 @@ inputs:
   base_branch:
     description: "The branch to use as the source when creating junie working branch"
     required: false
-  resolve_conflicts:
-    description: "Whether to resolve conflicts automatically"
-    required: false
-    default: "false"
   create_new_branch_for_pr:
     description: "Whether to create a new branch for PR instead of pushing to the same branch"
     required: false
@@ -123,7 +119,7 @@ runs:
         DEFAULT_WORKFLOW_TOKEN: ${{ github.token }}
         JUNIE_WORKING_DIR: ${{ inputs.junie_work_dir }}
         ALLOWED_MCP_SERVERS: ${{ inputs.allowed_mcp_servers }}
-        RESOLVE_CONFLICTS: ${{ inputs.resolve_conflicts }}
+        RESOLVE_CONFLICTS: "false"
         CREATE_NEW_BRANCH_FOR_PR: ${{ inputs.create_new_branch_for_pr }}
         SILENT_MODE: ${{ inputs.silent_mode }}
         USE_SINGLE_COMMENT: ${{ inputs.use_single_comment }}
