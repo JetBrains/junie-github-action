@@ -2,6 +2,7 @@ import { describe, test, expect, beforeEach, afterEach, spyOn } from "bun:test";
 import { checkHumanActor } from "../src/github/validation/actor";
 import { mockIssueCommentContext } from "./mockContext";
 import type { Octokit } from "@octokit/rest";
+import type { UserInitiatedEventContext } from "../src/github/context";
 
 describe("Actor Validation", () => {
   let getUserByUsernameSpy: any;
@@ -27,7 +28,7 @@ describe("Actor Validation", () => {
         data: { type: "User", login: "contributor-user" },
       } as any);
 
-      const result = await checkHumanActor(mockOctokit, mockIssueCommentContext);
+      const result = await checkHumanActor(mockOctokit, mockIssueCommentContext as UserInitiatedEventContext);
       expect(result).toBe(true);
       expect(getUserByUsernameSpy).toHaveBeenCalledWith({
         username: "contributor-user",
@@ -39,7 +40,7 @@ describe("Actor Validation", () => {
         data: { type: "Bot", login: "dependabot[bot]" },
       } as any);
 
-      const context = { ...mockIssueCommentContext, actor: "dependabot[bot]" };
+      const context = { ...mockIssueCommentContext, actor: "dependabot[bot]" } as UserInitiatedEventContext;
 
       const result = await checkHumanActor(mockOctokit, context);
       expect(result).toBe(false);
@@ -50,7 +51,7 @@ describe("Actor Validation", () => {
         data: { type: "Bot", login: "github-actions[bot]" },
       } as any);
 
-      const context = { ...mockIssueCommentContext, actor: "github-actions[bot]" };
+      const context = { ...mockIssueCommentContext, actor: "github-actions[bot]" } as UserInitiatedEventContext;
 
       const result = await checkHumanActor(mockOctokit, context);
       expect(result).toBe(false);
@@ -61,7 +62,7 @@ describe("Actor Validation", () => {
         data: { type: "User", login: "alice" },
       } as any);
 
-      const context = { ...mockIssueCommentContext, actor: "alice" };
+      const context = { ...mockIssueCommentContext, actor: "alice" } as UserInitiatedEventContext;
 
       const result = await checkHumanActor(mockOctokit, context);
 
@@ -77,7 +78,7 @@ describe("Actor Validation", () => {
         new Error("API rate limit exceeded")
       );
 
-      const result = await checkHumanActor(mockOctokit, mockIssueCommentContext);
+      const result = await checkHumanActor(mockOctokit, mockIssueCommentContext as UserInitiatedEventContext);
       expect(result).toBe(false);
     });
 
@@ -87,7 +88,7 @@ describe("Actor Validation", () => {
         message: "Not Found",
       });
 
-      const result = await checkHumanActor(mockOctokit, mockIssueCommentContext);
+      const result = await checkHumanActor(mockOctokit, mockIssueCommentContext as UserInitiatedEventContext);
       expect(result).toBe(false);
     });
 
@@ -99,7 +100,7 @@ describe("Actor Validation", () => {
           data: { type: "User", login: actor },
         } as any);
 
-        const context = { ...mockIssueCommentContext, actor };
+        const context = { ...mockIssueCommentContext, actor } as UserInitiatedEventContext;
         const result = await checkHumanActor(mockOctokit, context);
         expect(result).toBe(true);
 

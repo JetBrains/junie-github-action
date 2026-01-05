@@ -2,16 +2,95 @@
 
 import * as core from "@actions/core";
 import {addJunieMarker, createCommentBody, createJobRunLink, hasJunieMarker} from "./common";
-import {JunieExecutionContext, isPullRequestReviewCommentEvent,} from "../../context";
+import {
+    isIssueCommentEvent,
+    isPullRequestReviewCommentEvent,
+    isPullRequestReviewEvent,
+    JunieExecutionContext,
+} from "../../context";
 import type {Octokit} from "@octokit/rest";
 import {GITHUB_SERVER_URL} from "../../api/config";
 import {OUTPUT_VARS} from "../../../constants/environment";
 import {
     COMMIT_PUSHED_FEEDBACK_COMMENT_TEMPLATE,
-    ERROR_FEEDBACK_COMMENT_TEMPLATE, MANUALLY_PR_CREATE_FEEDBACK_COMMENT_TEMPLATE, PR_CREATED_FEEDBACK_COMMENT_TEMPLATE,
+    ERROR_FEEDBACK_COMMENT_TEMPLATE,
+    MANUALLY_PR_CREATE_FEEDBACK_COMMENT_TEMPLATE,
+    PR_CREATED_FEEDBACK_COMMENT_TEMPLATE,
     SUCCESS_FEEDBACK_COMMENT_WITH_RESULT
 } from "../../../constants/github";
 import type {FailureFeedbackData, FinishFeedbackData, SuccessFeedbackData} from "./types";
+
+/**
+ * Adds a thumbs up reaction to the trigger comment/review that started the workflow.
+ *
+ * @param octokit - Octokit REST client for GitHub API
+ * @param context - GitHub context (contains event payload and entity number)
+ */
+async function addThumbsUpToTriggerComment(
+    octokit: Octokit,
+    context: JunieExecutionContext,
+): Promise<void> {
+    try {
+        const reaction = '+1';
+        const {owner, name} = context.payload.repository;
+        const ownerLogin = owner.login;
+
+        // Handle pull request review event - add reactions to all review comments
+        if (isPullRequestReviewEvent(context)) {
+            const reviewId = context.payload.review.id;
+            console.log(`Pull request review detected - adding thumbs up to all review comments (review ID: ${reviewId})`);
+            // Get all comments from this review
+            const {data: reviewComments} = await octokit.rest.pulls.listCommentsForReview({
+                owner: ownerLogin,
+                repo: name,
+                pull_number: context.entityNumber!,
+                review_id: reviewId,
+            });
+            console.log(`Found ${reviewComments.length} comments in the review`);
+            // Add thumbs up reaction to each review comment
+            for (const comment of reviewComments) {
+                try {
+                    await octokit.rest.reactions.createForPullRequestReviewComment({
+                        owner: ownerLogin,
+                        repo: name,
+                        comment_id: comment.id,
+                        content: reaction,
+                    });
+                    console.log(`✓ Added thumbs up reaction to review comment ${comment.id}`);
+                } catch (commentError) {
+                    console.warn(`Failed to add reaction to review comment ${comment.id}:`, commentError);
+                }
+            }
+            return;
+        } else if (isIssueCommentEvent(context)) {
+            const commentId = context.payload.comment.id;
+            console.log(`Issue comment detected - adding thumbs (comment ID: ${commentId})`);
+            await octokit.rest.reactions.createForIssueComment({
+                owner: ownerLogin,
+                repo: name,
+                comment_id: commentId,
+                content: reaction,
+            });
+            console.log(`✓ Added thumbs up reaction to comment ${commentId}`);
+        } else if (isPullRequestReviewCommentEvent(context)) {
+            const commentId = context.payload.comment.id;
+            console.log(`Pull Request review comment detected - adding thumbs (review comment ID: ${commentId})`);
+            await octokit.rest.reactions.createForPullRequestReviewComment({
+                owner: ownerLogin,
+                repo: name,
+                comment_id: commentId,
+                content: reaction,
+            });
+            console.log(`✓ Added thumbs up reaction to review comment ${commentId}`);
+        } else {
+            console.log('Not a comment/review event - skipping thumbs up reaction');
+            return;
+        }
+    } catch (error) {
+        // Don't fail the workflow if we can't add a reaction
+        console.warn('Failed to add thumbs up reaction to trigger comment:', error);
+    }
+}
 
 /**
  * Finds an existing Junie comment by searching for the hidden marker.
@@ -168,6 +247,9 @@ export async function postJunieWorkingStatusComment(
 
     const jobRunLink = createJobRunLink(ownerLogin, name, context.runId);
     const initialBody = createCommentBody(jobRunLink, context.workflow);
+
+    // Add thumbs up reaction to the trigger comment
+    await addThumbsUpToTriggerComment(octokit, context);
 
     try {
         let initCommentId: number | undefined;

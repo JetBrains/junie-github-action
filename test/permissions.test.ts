@@ -3,7 +3,7 @@ import { verifyRepositoryAccess } from "../src/github/validation/permissions";
 import { mockIssueCommentContext } from "./mockContext";
 import type { Octokit } from "@octokit/rest";
 import * as core from "@actions/core";
-import {UserInitiatedEventContext} from "../src/github/context";
+import type {UserInitiatedEventContext} from "../src/github/context";
 
 describe("Permission Validation", () => {
   let getCollaboratorPermissionLevelSpy: any;
@@ -44,7 +44,7 @@ describe("Permission Validation", () => {
         data: { permission: "admin" },
       } as any);
 
-      const result = await verifyRepositoryAccess(mockOctokit, mockIssueCommentContext);
+      const result = await verifyRepositoryAccess(mockOctokit, mockIssueCommentContext as UserInitiatedEventContext);
 
       expect(result).toBe(true);
       expect(coreInfoSpy).toHaveBeenCalledWith(
@@ -60,7 +60,7 @@ describe("Permission Validation", () => {
         data: { permission: "write" },
       } as any);
 
-      const result = await verifyRepositoryAccess(mockOctokit, mockIssueCommentContext);
+      const result = await verifyRepositoryAccess(mockOctokit, mockIssueCommentContext as UserInitiatedEventContext);
 
       expect(result).toBe(true);
       expect(coreInfoSpy).toHaveBeenCalledWith(
@@ -76,7 +76,7 @@ describe("Permission Validation", () => {
         data: { permission: "read" },
       } as any);
 
-      const result = await verifyRepositoryAccess(mockOctokit, mockIssueCommentContext);
+      const result = await verifyRepositoryAccess(mockOctokit, mockIssueCommentContext as UserInitiatedEventContext);
 
       expect(result).toBe(false);
       expect(coreWarningSpy).toHaveBeenCalledWith(
@@ -92,7 +92,7 @@ describe("Permission Validation", () => {
         data: { permission: "none" },
       } as any);
 
-      const result = await verifyRepositoryAccess(mockOctokit, mockIssueCommentContext);
+      const result = await verifyRepositoryAccess(mockOctokit, mockIssueCommentContext as UserInitiatedEventContext);
 
       expect(result).toBe(false);
       expect(coreWarningSpy).toHaveBeenCalledWith(
@@ -104,7 +104,7 @@ describe("Permission Validation", () => {
       const context = {
         ...mockIssueCommentContext,
         actor: "junie-bot[bot]",
-      };
+      } as UserInitiatedEventContext;
 
       const result = await verifyRepositoryAccess(mockOctokit, context);
 
@@ -122,7 +122,7 @@ describe("Permission Validation", () => {
         data: { permission: "write" },
       } as any);
 
-      await verifyRepositoryAccess(mockOctokit, mockIssueCommentContext);
+      await verifyRepositoryAccess(mockOctokit, mockIssueCommentContext as UserInitiatedEventContext);
 
       expect(getCollaboratorPermissionLevelSpy).toHaveBeenCalledWith({
         owner: "test-owner",
@@ -138,7 +138,7 @@ describe("Permission Validation", () => {
       ).mockRejectedValue(new Error("API Error"));
 
       expect(
-        verifyRepositoryAccess(mockOctokit, mockIssueCommentContext)
+        verifyRepositoryAccess(mockOctokit, mockIssueCommentContext as UserInitiatedEventContext)
       ).rejects.toThrow(/Failed to check permissions for "contributor-user" on test-owner\/test-repo/);
 
       expect(coreErrorSpy).toHaveBeenCalled();
@@ -151,7 +151,7 @@ describe("Permission Validation", () => {
       ).mockRejectedValue(new Error("Network timeout"));
 
       expect(
-        verifyRepositoryAccess(mockOctokit, mockIssueCommentContext)
+        verifyRepositoryAccess(mockOctokit, mockIssueCommentContext as UserInitiatedEventContext)
       ).rejects.toThrow(/Network timeout/);
     });
 
@@ -163,7 +163,7 @@ describe("Permission Validation", () => {
         data: { permission: "admin" },
       } as any);
 
-      await verifyRepositoryAccess(mockOctokit, mockIssueCommentContext);
+      await verifyRepositoryAccess(mockOctokit, mockIssueCommentContext as UserInitiatedEventContext);
 
       expect(coreInfoSpy).toHaveBeenCalledWith(
         "Checking permissions for actor: contributor-user"
@@ -214,7 +214,7 @@ describe("Permission Validation", () => {
         const context = {
           ...mockIssueCommentContext,
           actor: botName,
-        };
+        } as UserInitiatedEventContext;
 
         const result = await verifyRepositoryAccess(mockOctokit, context);
         expect(result).toBe(true);

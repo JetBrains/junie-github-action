@@ -1,6 +1,6 @@
 import {describe, test, expect, mock, beforeEach} from "bun:test";
 import {prepareJunieTask} from "../src/github/junie/junie-tasks";
-import {GitHubContext} from "../src/github/context";
+import {JunieExecutionContext} from "../src/github/context";
 import {BranchInfo} from "../src/github/operations/branch";
 import {Octokits} from "../src/github/api/client";
 import * as core from "@actions/core";
@@ -15,7 +15,7 @@ mock.module("../src/github/junie/attachment-downloader", () => ({
 }));
 
 describe("prepareJunieTask", () => {
-    const createMockContext = (overrides: Partial<GitHubContext> = {}): GitHubContext => {
+    const createMockContext = (overrides: Partial<JunieExecutionContext> = {}): JunieExecutionContext => {
         return {
             eventName: "issue_comment",
             runId: "123",
@@ -59,7 +59,7 @@ describe("prepareJunieTask", () => {
                 }
             } as any,
             ...overrides
-        } as GitHubContext;
+        } as JunieExecutionContext;
     };
 
     const createMockOctokit = (): Octokits => {

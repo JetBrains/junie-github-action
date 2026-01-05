@@ -1,4 +1,4 @@
-import type {ParsedGitHubContext} from "../src/github/context";
+import type {JunieExecutionContext} from "../src/github/context";
 import type {
     IssueCommentEvent,
     IssuesEvent,
@@ -13,6 +13,7 @@ const defaultInputs = {
     createNewBranchForPR: false,
     silentMode: false,
     useSingleComment: false,
+    attachGithubContextToCustomPrompt: true,
     junieWorkingDir: "/tmp/junie-work",
     appToken: "test-token",
     prompt: "",
@@ -98,7 +99,7 @@ export interface MockContextOverrides {
     payload?: any;
 }
 
-export const createMockContext = (overrides: MockContextOverrides = {}): ParsedGitHubContext => {
+export const createMockContext = (overrides: MockContextOverrides = {}): JunieExecutionContext => {
     return {
         runId: "1234567890",
         workflow: "Test Workflow",
@@ -122,7 +123,7 @@ export const createMockContext = (overrides: MockContextOverrides = {}): ParsedG
 };
 
 // Pre-built contexts for common scenarios
-export const mockIssueOpenedContext: ParsedGitHubContext = createMockContext({
+export const mockIssueOpenedContext: JunieExecutionContext = createMockContext({
     eventName: "issues",
     eventAction: "opened",
     entityNumber: 42,
@@ -144,7 +145,7 @@ export const mockIssueOpenedContext: ParsedGitHubContext = createMockContext({
     } as IssuesEvent,
 });
 
-export const mockIssueAssignedContext: ParsedGitHubContext = createMockContext({
+export const mockIssueAssignedContext: JunieExecutionContext = createMockContext({
     eventName: "issues",
     eventAction: "assigned",
     entityNumber: 42,
@@ -170,7 +171,7 @@ export const mockIssueAssignedContext: ParsedGitHubContext = createMockContext({
     } as any,
 });
 
-export const mockIssueLabeledContext: ParsedGitHubContext = createMockContext({
+export const mockIssueLabeledContext: JunieExecutionContext = createMockContext({
     eventName: "issues",
     eventAction: "labeled",
     entityNumber: 42,
@@ -196,7 +197,7 @@ export const mockIssueLabeledContext: ParsedGitHubContext = createMockContext({
     } as any,
 });
 
-export const mockIssueCommentContext: ParsedGitHubContext = createMockContext({
+export const mockIssueCommentContext: JunieExecutionContext = createMockContext({
     eventName: "issue_comment",
     eventAction: "created",
     entityNumber: 55,
@@ -227,7 +228,7 @@ export const mockIssueCommentContext: ParsedGitHubContext = createMockContext({
     } as IssueCommentEvent,
 });
 
-export const mockPullRequestCommentContext: ParsedGitHubContext = createMockContext({
+export const mockPullRequestCommentContext: JunieExecutionContext = createMockContext({
     eventName: "issue_comment",
     eventAction: "created",
     entityNumber: 100,
@@ -261,7 +262,7 @@ export const mockPullRequestCommentContext: ParsedGitHubContext = createMockCont
     } as IssueCommentEvent,
 });
 
-export const mockPullRequestOpenedContext: ParsedGitHubContext = createMockContext({
+export const mockPullRequestOpenedContext: JunieExecutionContext = createMockContext({
     eventName: "pull_request",
     eventAction: "opened",
     entityNumber: 200,
@@ -291,7 +292,7 @@ export const mockPullRequestOpenedContext: ParsedGitHubContext = createMockConte
     } as PullRequestEvent,
 });
 
-export const mockPullRequestReviewContext: ParsedGitHubContext = createMockContext({
+export const mockPullRequestReviewContext: JunieExecutionContext = createMockContext({
     eventName: "pull_request_review",
     eventAction: "submitted",
     entityNumber: 200,
@@ -329,7 +330,7 @@ export const mockPullRequestReviewContext: ParsedGitHubContext = createMockConte
     } as PullRequestReviewEvent,
 });
 
-export const mockPullRequestReviewCommentContext: ParsedGitHubContext = createMockContext({
+export const mockPullRequestReviewCommentContext: JunieExecutionContext = createMockContext({
     eventName: "pull_request_review_comment",
     eventAction: "created",
     entityNumber: 200,
