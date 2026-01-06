@@ -1,22 +1,24 @@
 import {
     FetchedData,
-    GraphQLTimelineItemNode,
-    GraphQLReviewNode,
-    GraphQLFileNode,
     GraphQLCommitNode,
+    GraphQLFileNode,
+    GraphQLReviewNode,
+    GraphQLTimelineItemNode,
+    isCrossReferencedEventNode,
     isIssueCommentNode,
-    isReferencedEventNode,
-    isCrossReferencedEventNode
+    isReferencedEventNode
 } from "../api/queries";
 import {
-    JunieExecutionContext,
-    isTriggeredByUserInteraction,
     isIssueCommentEvent,
     isIssuesEvent,
+    isJiraWorkflowDispatchEvent,
     isPullRequestEvent,
     isPullRequestReviewCommentEvent,
     isPullRequestReviewEvent,
-    isPushEvent
+    isPushEvent,
+    isTriggeredByUserInteraction,
+    JiraIssuePayload,
+    JunieExecutionContext
 } from "../context";
 
 export class NewGitHubPromptFormatter {
@@ -25,6 +27,11 @@ export class NewGitHubPromptFormatter {
         // If user provided custom prompt and doesn't want GitHub context, return only the prompt
         if (userPrompt && !attachGithubContextToCustomPrompt) {
             return userPrompt;
+        }
+
+        // Handle Jira issue integration
+        if (isJiraWorkflowDispatchEvent(context)) {
+            return this.generateJiraPrompt(context);
         }
 
         const repositoryInfo = this.getRepositoryInfo(context);
@@ -48,6 +55,21 @@ ${actorInfo ? actorInfo : ""}
 `
     }
 
+    private generateJiraPrompt(context: JunieExecutionContext): string {
+        const jira = context.payload as JiraIssuePayload;
+
+        return `You were triggered as a GitHub AI Assistant by a Jira issue. Your task is to implement the requested feature or fix based on the Jira issue details below.
+
+<jira_issue>
+Issue Key: ${jira.issueKey}
+Summary: ${jira.issueSummary}
+
+Description:
+${jira.issueDescription}
+</jira_issue>
+`;
+    }
+
     private getUserInstruction(context: JunieExecutionContext, customPrompt?: string): string | undefined {
         let githubUserInstruction
         if (isPullRequestEvent(context)) {
@@ -64,7 +86,8 @@ ${actorInfo ? actorInfo : ""}
         return customPrompt || githubUserInstruction ? `
         <user_instruction>
         ${customPrompt || githubUserInstruction}
-</user_instruction>`: undefined}
+</user_instruction>` : undefined
+    }
 
     private getPrOrIssueInfo(context: JunieExecutionContext, fetchedData: FetchedData): string | undefined {
         if (context.isPR) {
@@ -91,7 +114,7 @@ Head Commit: ${pr.headRefOid}
 Stats: +${pr.additions}/-${pr.deletions} (${pr.changedFiles} files, ${pr.commits.totalCount} commits)`
     }
 
-    private getIssueInfo( fetchedData: FetchedData): string {
+    private getIssueInfo(fetchedData: FetchedData): string {
         const issue = fetchedData.issue;
         if (!issue) return "";
 
@@ -113,7 +136,7 @@ State: ${issue.state}`
     }
 
     private formatCommits(commits: GraphQLCommitNode[]): string {
-        return commits.map(({ commit }) => {
+        return commits.map(({commit}) => {
             const shortHash = commit.oid.substring(0, 7);
             const message = commit.messageHeadline || commit.message || 'No message';
             const date = commit.committedDate || '';

@@ -4,8 +4,10 @@ import * as core from "@actions/core";
 import {addJunieMarker, createCommentBody, createJobRunLink, hasJunieMarker} from "./common";
 import {
     isIssueCommentEvent,
+    isJiraWorkflowDispatchEvent,
     isPullRequestReviewCommentEvent,
     isPullRequestReviewEvent,
+    JiraIssuePayload,
     JunieExecutionContext,
 } from "../../context";
 import type {Octokit} from "@octokit/rest";
@@ -15,10 +17,11 @@ import {
     COMMIT_PUSHED_FEEDBACK_COMMENT_TEMPLATE,
     ERROR_FEEDBACK_COMMENT_TEMPLATE,
     MANUALLY_PR_CREATE_FEEDBACK_COMMENT_TEMPLATE,
-    PR_CREATED_FEEDBACK_COMMENT_TEMPLATE,
+    PR_CREATED_FEEDBACK_COMMENT_TEMPLATE, SUCCESS_FEEDBACK_COMMENT,
     SUCCESS_FEEDBACK_COMMENT_WITH_RESULT
 } from "../../../constants/github";
 import type {FailureFeedbackData, FinishFeedbackData, SuccessFeedbackData} from "./types";
+import {JiraClient} from "../../jira/client";
 
 /**
  * Adds a thumbs up reaction to the trigger comment/review that started the workflow.
@@ -365,11 +368,23 @@ export async function postJunieCompletionComment(
     const repoFullName = `${ownerLogin}/${name}`;
     const workflowName = data.parsedContext.workflow;
 
+    // Check if this is a Jira-triggered workflow
+    if (isJiraWorkflowDispatchEvent(data.parsedContext)) {
+        console.log('Jira workflow detected - posting feedback to Jira');
+        try {
+            await postJiraFeedback(data);
+        } catch (jiraError) {
+            console.warn('Failed to post feedback to Jira:', jiraError);
+            // Don't fail the workflow if Jira update fails
+        }
+        return;
+    }
+
     let feedbackBody: string | undefined;
     if (data.isJobFailed) {
-        feedbackBody = getFailedBody(ownerLogin, name, data.parsedContext.runId, data.failureData!, workflowName)
+        feedbackBody = getFailedBodyWithMarker(ownerLogin, name, data.parsedContext.runId, data.failureData!, workflowName)
     } else {
-        feedbackBody = getSuccessBody(repoFullName, data.successData!, workflowName)
+        feedbackBody = getSuccessBodyWithMarker(repoFullName, data.successData!, workflowName)
     }
 
     if (!feedbackBody) {
@@ -377,7 +392,7 @@ export async function postJunieCompletionComment(
         return;
     }
 
-    const initCommentId = +data.initCommentId;
+    const initCommentId = +data.initCommentId!;
 
     console.log(`Updating feedback comment ${initCommentId}`);
 
@@ -405,14 +420,52 @@ export async function postJunieCompletionComment(
     }
 }
 
-function getFailedBody(owner: string, repoName: string, runId: string, failureData: FailureFeedbackData, workflowName: string): string | undefined {
-    const details = failureData.error || "Check job logs for more details"
-    const jobLink = createJobRunLink(owner, repoName, runId)
-    return addJunieMarker(ERROR_FEEDBACK_COMMENT_TEMPLATE(details, jobLink), workflowName);
+/**
+ * Posts feedback to Jira issue instead of GitHub comment
+ */
+async function postJiraFeedback(data: FinishFeedbackData): Promise<void> {
+    const jiraPayload = data.parsedContext.payload as JiraIssuePayload;
+    const client = new JiraClient();
+    const {owner, name} = data.parsedContext.payload.repository;
+    const ownerLogin = owner.login;
+
+    console.log(`Updating Jira issue ${jiraPayload.issueKey}...`);
+
+    let comment: string;
+
+    if (data.isJobFailed) {
+        console.log(`Add failure comment to Jira issue ${jiraPayload.issueKey}`);
+        comment = getFailedBody(ownerLogin, name, data.parsedContext.runId, data.failureData!);
+    } else {
+        console.log(`Add success comment to Jira issue ${jiraPayload.issueKey}`);
+        const repoFullName = `${ownerLogin}/${name}`;
+        comment = getSuccessBody(repoFullName, data.successData!);
+
+        // Move to "In Review" if PR was created
+        if (data.successData?.actionToDo === 'CREATE_PR' && data.successData.prLink) {
+            console.log(`Move Jira issue ${jiraPayload.issueKey} to "In Review"`);
+            await client.moveIssueToReview(jiraPayload.issueKey);
+        }
+    }
+
+    if (comment) {
+        await client.addComment(jiraPayload.issueKey, comment);
+        console.log(`✓ Successfully updated Jira issue ${jiraPayload.issueKey}`);
+    }
 }
 
-function getSuccessBody(repoFullName: string, successData: SuccessFeedbackData, workflowName: string): string | undefined {
-    let result: string | undefined;
+function getFailedBody(owner: string, repoName: string, runId: string, failureData: FailureFeedbackData) {
+    const details = failureData.error || "Check job logs for more details"
+    const jobLink = createJobRunLink(owner, repoName, runId)
+    return ERROR_FEEDBACK_COMMENT_TEMPLATE(details, jobLink);
+}
+
+function getFailedBodyWithMarker(owner: string, repoName: string, runId: string, failureData: FailureFeedbackData, workflowName: string): string | undefined {
+    return addJunieMarker(getFailedBody(owner, repoName, runId, failureData), workflowName);
+}
+
+function getSuccessBody(repoFullName: string, successData: SuccessFeedbackData) {
+    let result: string = SUCCESS_FEEDBACK_COMMENT;
     switch (successData.actionToDo) {
         case "COMMIT_CHANGES":
             console.log(`Commit pushed to current branch: ${successData.commitSHA}`);
@@ -438,5 +491,10 @@ function getSuccessBody(repoFullName: string, successData: SuccessFeedbackData, 
             break;
     }
 
+    return result;
+}
+
+function getSuccessBodyWithMarker(repoFullName: string, successData: SuccessFeedbackData, workflowName: string): string | undefined {
+    const result = getSuccessBody(repoFullName, successData);
     return result ? addJunieMarker(result, workflowName) : undefined;
 }

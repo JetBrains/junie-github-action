@@ -1,5 +1,11 @@
 import * as core from "@actions/core";
-import {JunieExecutionContext, isTriggeredByUserInteraction, isPushEvent, isWorkflowDispatchEvent} from "../context";
+import {
+    JunieExecutionContext,
+    isTriggeredByUserInteraction,
+    isPushEvent,
+    isJiraWorkflowDispatchEvent,
+    isResolveConflictsWorkflowDispatchEvent
+} from "../context";
 import {checkHumanActor} from "../validation/actor";
 import {postJunieWorkingStatusComment} from "../operations/comments/feedback";
 import {initializeJunieWorkspace} from "../operations/branch";
@@ -13,6 +19,7 @@ import {prepareJunieTask} from "./junie-tasks";
 import {prepareJunieCLIToken} from "./junie-token";
 import {OUTPUT_VARS} from "../../constants/environment";
 import {RESOLVE_CONFLICTS_ACTION} from "../../constants/github";
+import {JiraClient} from "../jira/client";
 
 /**
  * Initializes Junie execution by preparing environment, auth, and workflow context
@@ -37,6 +44,17 @@ export async function initializeJunieExecution({
     await configureGitCredentials(context, tokenConfig)
 
     await postJunieWorkingStatusComment(octokit.rest, context);
+
+    // Start Jira issue if this is a Jira-triggered workflow
+    if (isJiraWorkflowDispatchEvent(context)) {
+        try {
+            const client = new JiraClient();
+            await client.startIssue(context.payload.issueKey);
+        } catch (jiraError) {
+            console.warn('Failed to start Jira issue:', jiraError);
+            // Don't fail the workflow if Jira update fails
+        }
+    }
 
     const branchInfo = await initializeJunieWorkspace(octokit, context);
     const mcpServers = context.inputs.allowedMcpServers ? context.inputs.allowedMcpServers.split(',') : []
@@ -82,11 +100,11 @@ async function shouldHandle(context: JunieExecutionContext, octokit: Octokits): 
 
 async function shouldResolveConflicts(context: JunieExecutionContext, octokit: Octokits): Promise<boolean> {
     console.log('Checking for conflicts...')
-    if (isWorkflowDispatchEvent(context)) {
+    if (isResolveConflictsWorkflowDispatchEvent(context)) {
         return true;
     }
 
-    const {owner, name} = context.payload.repository
+    const {owner, name} =  context.payload.repository
     const prs = []
 
     if (context.isPR && context.entityNumber) {

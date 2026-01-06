@@ -16,8 +16,20 @@ import {
 } from "@octokit/webhooks-types";
 import type {TokenOwner} from "./operations/auth";
 import {OUTPUT_VARS} from "../constants/environment";
-import {DEFAULT_TRIGGER_PHRASE, RESOLVE_CONFLICTS_ACTION} from "../constants/github";
+import {DEFAULT_TRIGGER_PHRASE, JIRA_EVENT_ACTION, RESOLVE_CONFLICTS_ACTION} from "../constants/github";
 
+// Jira integration types
+export type JiraIssuePayload = WorkflowDispatchEvent & {
+    issueKey: string;
+    issueSummary: string;
+    issueDescription: string;
+    action: typeof JIRA_EVENT_ACTION;
+};
+
+// Jira integration types
+export type ResolveConflictsEventPayload = WorkflowDispatchEvent & {
+    action: typeof RESOLVE_CONFLICTS_ACTION;
+};
 
 export type ScheduleEvent = {
     action?: never;
@@ -96,7 +108,9 @@ export type AutomationEventContext = JunieWorkflowContext & {
         | WorkflowDispatchEvent
         | RepositoryDispatchEvent
         | ScheduleEvent
-        | WorkflowRunEvent;
+        | WorkflowRunEvent
+        | JiraIssuePayload
+        | ResolveConflictsEventPayload;
 };
 
 // Union type representing all possible Junie execution contexts
@@ -216,17 +230,29 @@ export function extractJunieWorkflowContext(tokenOwner: TokenOwner): JunieExecut
         }
         case "workflow_dispatch": {
             const payload = context.payload as WorkflowDispatchEvent;
-            let prNumber = undefined
-            let isPR = false
+
             if (payload.inputs?.action == RESOLVE_CONFLICTS_ACTION) {
-                prNumber = payload.inputs?.prNumber as number
-                isPR = true
+                parsedContext = {
+                    ...commonFields,
+                    isPR: true,
+                    entityNumber: payload.inputs?.prNumber as number,
+                    eventName: context.eventName,
+                    payload: {
+                        ...payload,
+                        action: RESOLVE_CONFLICTS_ACTION
+                    },
+                };
+                break
+            }
+
+            // Handle Jira integration event
+            if (payload.inputs?.action == JIRA_EVENT_ACTION) {
+                parsedContext = extractJiraEventData(payload, commonFields)
+                break;
             }
 
             parsedContext = {
                 ...commonFields,
-                isPR,
-                entityNumber: prNumber,
                 eventName: context.eventName,
                 payload: context.payload as unknown as WorkflowDispatchEvent,
             };
@@ -269,13 +295,42 @@ export function extractJunieWorkflowContext(tokenOwner: TokenOwner): JunieExecut
     return parsedContext;
 }
 
-// Type guard functions for checking event types
+function extractJiraEventData(workflowPayload: WorkflowDispatchEvent, context: JunieWorkflowContext): JunieExecutionContext {
+    const issueKey = workflowPayload.inputs?.issue_key as string;
+    const issueSummary = workflowPayload.inputs?.issue_summary as string;
+    const issueDescription = workflowPayload.inputs?.issue_description as string;
 
-export function isWorkflowDispatchEvent(context: JunieExecutionContext): context is AutomationEventContext & { payload: WorkflowDispatchEvent } {
-    return context.eventName === "workflow_dispatch";
+    if (!issueKey || !issueSummary) {
+        throw new Error(`Missing Jira issue data in workflow payload: ${JSON.stringify(workflowPayload)}`);
+    }
+
+    console.log(`✓ Jira issue detected: ${issueKey} - ${issueSummary}`);
+
+    // Return Jira-specific context with JiraWorkflowDispatchEvent payload
+    return {
+        ...context,
+        eventName: "workflow_dispatch",
+        payload: {
+            ...workflowPayload,
+            issueKey,
+            issueSummary,
+            issueDescription: issueDescription || '',
+            action: JIRA_EVENT_ACTION,
+        },
+    };
 }
 
-export function isCheckSuiteEvent(context: JunieExecutionContext): context is AutomationEventContext & { payload: CheckSuiteEvent } {
+export function isJiraWorkflowDispatchEvent(context: JunieExecutionContext): context is AutomationEventContext & { payload: JiraIssuePayload } {
+    return context.eventName === "workflow_dispatch" && 'action' in context.payload && context.payload.action === JIRA_EVENT_ACTION;
+}
+
+export function isResolveConflictsWorkflowDispatchEvent(context: JunieExecutionContext): context is AutomationEventContext & { payload: ResolveConflictsEventPayload }  {
+    return context.eventName === "workflow_dispatch" && 'action' in context.payload && context.payload.action === RESOLVE_CONFLICTS_ACTION;
+}
+
+export function isCheckSuiteEvent(context: JunieExecutionContext): context is AutomationEventContext & {
+    payload: CheckSuiteEvent
+} {
     return context.eventName === "check_suite";
 }
 
@@ -328,17 +383,6 @@ export function isTriggeredByUserInteraction(
     context: JunieExecutionContext,
 ): context is UserInitiatedEventContext {
     return USER_TRIGGERED_EVENTS.includes(context.eventName as UserTriggeredEventName);
-}
-
-/**
- * Checks if the context is triggered by automation/scheduler
- */
-export function isTriggeredByScheduler(
-    context: JunieExecutionContext,
-): context is AutomationEventContext {
-    return SYSTEM_TRIGGERED_EVENTS.includes(
-        context.eventName as SystemTriggeredEventName,
-    );
 }
 
 function getActorEmail(): string {

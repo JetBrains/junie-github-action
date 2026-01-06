@@ -13,6 +13,7 @@
     "@modelcontextprotocol/sdk": "^1.21.0",
     "@octokit/rest": "^22.0.1",
     "@octokit/webhooks-types": "^7.6.1",
+    "jira.js": "^5.2.2",
     "p-retry": "^7.1.0"
   },
   "devDependencies": {
