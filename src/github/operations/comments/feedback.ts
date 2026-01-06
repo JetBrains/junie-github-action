@@ -377,6 +377,11 @@ export async function postJunieCompletionComment(
         return;
     }
 
+    if (!data.initCommentId) {
+        console.log('No initial comment ID - skipping feedback');
+        return;
+    }
+
     const initCommentId = +data.initCommentId;
 
     console.log(`Updating feedback comment ${initCommentId}`);

@@ -209,6 +209,16 @@ permissions:
   issues: read
 ```
 
+#### Repository Settings for PR Creation
+
+If you're using the default `github.token` and want Junie to create pull requests, you must enable this in your repository settings:
+
+1. Go to **Settings** → **Actions** → **General**
+2. Scroll to the **Workflow permissions** section
+3. Check **"Allow GitHub Actions to create and approve pull requests"**
+
+Without this setting enabled, the action will fail when attempting to create PRs, even with correct `pull-requests: write` permissions in the workflow.
+
 ### GitHub Token Considerations
 
 #### Default Token Limitation
@@ -258,9 +268,7 @@ GitHub App tokens
 
 **Setup steps:**
 
-a. **Install Your App:**
-   - Click "Install App" in the sidebar
-   - Select your repository
+a. **Install Your App to the Repository:**
 
 b. **Add secrets to repository:**
    - Go to repository Settings → Secrets and variables → Actions
