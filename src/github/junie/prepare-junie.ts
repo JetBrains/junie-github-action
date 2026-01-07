@@ -94,6 +94,10 @@ async function shouldHandle(context: JunieExecutionContext, octokit: Octokits): 
         return await shouldResolveConflicts(context, octokit)
     }
 
+    if (isJiraWorkflowDispatchEvent(context)) {
+        return true;
+    }
+
     return isTriggeredByUserInteraction(context) && detectJunieTriggerPhrase(context) && checkHumanActor(octokit.rest, context);
 }
 
