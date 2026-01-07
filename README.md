@@ -14,6 +14,7 @@ A powerful GitHub Action that integrates [Junie](https://www.jetbrains.com/junie
   - [Outputs](#outputs)
   - [Required Permissions](#required-permissions)
   - [GitHub Token Considerations](#github-token-considerations)
+- [Jira Integration](#jira-integration)
 - [How It Works](#how-it-works)
 - [Security Considerations](#security-considerations)
 - [Troubleshooting](#troubleshooting)
@@ -152,6 +153,19 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 | `use_single_comment` | Update a single comment for all runs instead of creating new comments each time | `false` |
 | `attach_github_context_to_custom_prompt` | Attach GitHub context (PR/issue info, commits, reviews, etc.) when using custom prompt | `false` |
 
+#### Jira Integration
+
+These inputs are only required when you use the Jira integration via a workflow_dispatch event.
+
+| Input | Description | Default |
+|-------|-------------|---------|
+| `jira_base_url` | Jira instance base URL (e.g. https://your-company.atlassian.net) | - |
+| `jira_email` | Jira account email for API authentication | - |
+| `jira_api_token` | Jira API token for authentication | - |
+| `jira_transition_in_progress` | Jira transition ID for "In Progress" status | `"21"` |
+| `jira_transition_in_review` | Jira transition ID for "In Review" status | `"31"` |
+| `jira_transition_done` | Jira transition ID for "Done" status | `"41"` |
+
 #### Authentication
 
 | Input | Description | Required |
@@ -208,6 +222,76 @@ permissions:
   pull-requests: read
   issues: read
 ```
+
+## Jira Integration
+
+Junie can be triggered from Jira by dispatching a GitHub workflow with Jira issue context. When used this way, Junie will:
+
+- Start the Jira issue by transitioning it to "In Progress" at the beginning of the run
+- Work on the requested changes in your GitHub repository
+- Post the result back to the Jira issue as a comment
+- If a PR was created, transition the Jira issue to "In Review"
+
+Jira credentials and options are provided via action inputs (see Configuration → Jira Integration). The action expects the workflow to be triggered with specific inputs carrying Jira data.
+
+### Example workflow for Jira-triggered runs
+
+```yaml
+name: Junie (Jira)
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Action type"
+        required: true
+        default: jira_event
+      issue_key:
+        description: "Jira issue key (e.g. PROJ-123)"
+        required: true
+      issue_summary:
+        description: "Jira issue summary"
+        required: true
+      issue_description:
+        description: "Jira issue description"
+        required: false
+      issue_comments:
+        description: "JSON array of Jira comments [{\"author\":\"...\",\"body\":\"...\",\"created\":\"ISO_DATE\"}]"
+        required: false
+      issue_attachments:
+        description: "JSON array of Jira attachments [{\"filename\":\"file.png\",\"mimeType\":\"image/png\",\"size\":123,\"content\":\"https://.../attachment/content/10000\"}]"
+        required: false
+
+jobs:
+  junie:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run Junie (Jira)
+        uses: JetBrains/junie-github-action@v0
+        with:
+          junie_api_key: ${{ secrets.JUNIE_API_KEY }}
+          # Jira credentials for API access
+          jira_base_url: ${{ secrets.JIRA_BASE_URL }}
+          jira_email: ${{ secrets.JIRA_EMAIL }}
+          jira_api_token: ${{ secrets.JIRA_API_TOKEN }}
+          # Optional: override transition IDs if your Jira uses custom workflow IDs
+          # jira_transition_in_progress: "21"
+          # jira_transition_in_review: "31"
+          # jira_transition_done: "41"
+```
+
+Notes:
+- The workflow_dispatch inputs must include `action: jira_event` so the action treats it as a Jira-triggered run.
+- `issue_comments` and `issue_attachments` should be JSON-encoded strings. Attachments must include a direct `content` URL and `filename`.
+- Jira wiki markup for attachments in descriptions or comments (for example: `!design.png!`) is supported and will be downloaded to the runner so Junie can access the files.
 
 #### Repository Settings for PR Creation
 
