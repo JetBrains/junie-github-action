@@ -11,7 +11,7 @@ import {handleStepError} from "../utils/error-handler";
 /**
  * Writes feedback comment to GitHub issue/PR if initCommentId is available
  */
-async function writeFeedbackComment(isJobFailed: boolean, initCommentId: string): Promise<void> {
+async function writeFeedbackComment(isJobFailed: boolean, initCommentId?: string): Promise<void> {
     const data: FinishFeedbackData = {
         initCommentId: initCommentId,
         isJobFailed: isJobFailed,
@@ -91,10 +91,7 @@ export async function giveFeedback() {
         const isJobFailed = process.env[ENV_VARS.IS_JOB_FAILED] === "true";
         const initCommentId = process.env[OUTPUT_VARS.INIT_COMMENT_ID];
 
-        // Write feedback comment if initCommentId is available
-        if (initCommentId) {
-            await writeFeedbackComment(isJobFailed, initCommentId);
-        }
+        await writeFeedbackComment(isJobFailed, initCommentId);
 
         // Generate GitHub Actions Job Summary (always)
         try {

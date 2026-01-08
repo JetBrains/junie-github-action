@@ -2,7 +2,7 @@ import {JunieExecutionContext} from "../../context";
 import {ActionType} from "../../../entrypoints/handle-results";
 
 export interface FinishFeedbackData {
-    initCommentId: string;
+    initCommentId?: string;
     isJobFailed: boolean;
     parsedContext: JunieExecutionContext;
     successData?: SuccessFeedbackData;

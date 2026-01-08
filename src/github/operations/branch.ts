@@ -215,7 +215,7 @@ async function prepareWorkingBranchForJunie(context: JunieExecutionContext, octo
 
     if (!context.inputs.silentMode) {
         const entityType = isPR ? "pr" : entityNumber ? "issue" : "run";
-        const branchName = `${WORKING_BRANCH_PREFIX}${entityType}-${entityNumber}-${context.runId}`;
+        const branchName = `${WORKING_BRANCH_PREFIX}${entityType}${entityNumber ? `-${entityNumber}` : ""}-${context.runId}`;
 
         return await createNewBranch(baseBranch, branchName, prBaseBranch)
     }

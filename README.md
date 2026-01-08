@@ -8,6 +8,7 @@ A powerful GitHub Action that integrates [Junie](https://www.jetbrains.com/junie
 - [Quickstart](#quickstart)
   - [Prerequisites](#prerequisites)
   - [Basic Setup](#basic-setup)
+- [Jira Integration](#jira-integration)
 - [Cookbook](#cookbook)
 - [Configuration](#configuration)
   - [Input Parameters](#input-parameters)
@@ -99,6 +100,10 @@ jobs:
    - Comment `@junie-agent help me fix this bug` on an issue
    - Mention `@junie-agent review this change` in a PR
 
+## Jira Integration
+
+🔗 **Want to trigger Junie from Jira?** Check out the [Jira Integration Guide](docs/JIRA_INTEGRATION.md) to automatically implement features and fixes based on Jira issues.
+
 ## Cookbook
 
 📚 **Looking for practical examples?** Check out the [Cookbook](COOKBOOK.md) for real-world recipes including:
@@ -151,6 +156,18 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 | `silent_mode` | Run Junie without comments, branch creation, or commits - only prepare data and output results | `false` |
 | `use_single_comment` | Update a single comment for all runs instead of creating new comments each time | `false` |
 | `attach_github_context_to_custom_prompt` | Attach GitHub context (PR/issue info, commits, reviews, etc.) when using custom prompt | `false` |
+
+#### Jira Integration
+
+| Input | Description | Default |
+|-------|-------------|---------|
+| `jira_base_url` | Jira instance base URL (e.g., `https://your-company.atlassian.net`) | - |
+| `jira_email` | Jira account email for API authentication | - |
+| `jira_api_token` | Jira API token for authentication | - |
+| `jira_transition_in_progress` | Jira transition ID for "In Progress" status | `21` |
+| `jira_transition_in_review` | Jira transition ID for "In Review" status | `31` |
+
+For detailed setup instructions, see the [Jira Integration Guide](docs/JIRA_INTEGRATION.md).
 
 #### Authentication
 

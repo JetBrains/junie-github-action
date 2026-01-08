@@ -101,11 +101,11 @@ describe("NewGitHubPromptFormatter", () => {
         }
     });
 
-    test("generatePrompt includes repository info", () => {
+    test("generatePrompt includes repository info", async () => {
         const context = createMockContext();
         const fetchedData: FetchedData = {};
 
-        const prompt = formatter.generatePrompt(context, fetchedData);
+        const prompt = await formatter.generatePrompt(context, fetchedData);
 
         expect(prompt).toContain("<repository>");
         expect(prompt).toContain("Repository: test-owner/test-repo");
@@ -113,11 +113,11 @@ describe("NewGitHubPromptFormatter", () => {
         expect(prompt).toContain("</repository>");
     });
 
-    test("generatePrompt includes actor info", () => {
+    test("generatePrompt includes actor info", async () => {
         const context = createMockContext();
         const fetchedData: FetchedData = {};
 
-        const prompt = formatter.generatePrompt(context, fetchedData);
+        const prompt = await formatter.generatePrompt(context, fetchedData);
 
         expect(prompt).toContain("<actor>");
         expect(prompt).toContain("Triggered by: @test-user");
@@ -125,13 +125,13 @@ describe("NewGitHubPromptFormatter", () => {
         expect(prompt).toContain("</actor>");
     });
 
-    test("generatePrompt includes PR info when available", () => {
+    test("generatePrompt includes PR info when available", async () => {
         const context = createMockContext();
         const fetchedData: FetchedData = {
             pullRequest: createMockPR()
         };
 
-        const prompt = formatter.generatePrompt(context, fetchedData);
+        const prompt = await formatter.generatePrompt(context, fetchedData);
 
         expect(prompt).toContain("<pull_request_info>");
         expect(prompt).toContain("Number: #1");
@@ -142,13 +142,13 @@ describe("NewGitHubPromptFormatter", () => {
         expect(prompt).toContain("</pull_request_info>");
     });
 
-    test("generatePrompt includes commits info", () => {
+    test("generatePrompt includes commits info", async () => {
         const context = createMockContext();
         const fetchedData: FetchedData = {
             pullRequest: createMockPR()
         };
 
-        const prompt = formatter.generatePrompt(context, fetchedData);
+        const prompt = await formatter.generatePrompt(context, fetchedData);
 
         expect(prompt).toContain("<commits>");
         expect(prompt).toContain("abc123");
@@ -158,13 +158,13 @@ describe("NewGitHubPromptFormatter", () => {
         expect(prompt).toContain("</commits>");
     });
 
-    test("generatePrompt includes changed files info", () => {
+    test("generatePrompt includes changed files info", async () => {
         const context = createMockContext();
         const fetchedData: FetchedData = {
             pullRequest: createMockPR()
         };
 
-        const prompt = formatter.generatePrompt(context, fetchedData);
+        const prompt = await formatter.generatePrompt(context, fetchedData);
 
         expect(prompt).toContain("<changed_files>");
         expect(prompt).toContain("file1.ts (modified) +5/-2");
@@ -172,7 +172,7 @@ describe("NewGitHubPromptFormatter", () => {
         expect(prompt).toContain("</changed_files>");
     });
 
-    test("generatePrompt includes issue info when not a PR", () => {
+    test("generatePrompt includes issue info when not a PR", async () => {
         const mockIssue = createMockIssue();
         const context = createMockContext({
             eventName: "issues",
@@ -195,7 +195,7 @@ describe("NewGitHubPromptFormatter", () => {
             issue: mockIssue
         };
 
-        const prompt = formatter.generatePrompt(context, fetchedData);
+        const prompt = await formatter.generatePrompt(context, fetchedData);
 
         expect(prompt).toContain("<issue_info>");
         expect(prompt).toContain("Number: #1");
@@ -204,19 +204,19 @@ describe("NewGitHubPromptFormatter", () => {
         expect(prompt).toContain("</issue_info>");
     });
 
-    test("generatePrompt includes custom prompt", () => {
+    test("generatePrompt includes custom prompt", async () => {
         const context = createMockContext();
         const fetchedData: FetchedData = {};
         const customPrompt = "Please fix this bug";
 
-        const prompt = formatter.generatePrompt(context, fetchedData, customPrompt);
+        const prompt = await formatter.generatePrompt(context, fetchedData, customPrompt);
 
         expect(prompt).toContain("<user_instruction>");
         expect(prompt).toContain("Please fix this bug");
         expect(prompt).toContain("</user_instruction>");
     });
 
-    test("generatePrompt handles timeline comments", () => {
+    test("generatePrompt handles timeline comments", async () => {
         const context = createMockContext();
         const fetchedData: FetchedData = {
             pullRequest: {
@@ -238,7 +238,7 @@ describe("NewGitHubPromptFormatter", () => {
             }
         };
 
-        const prompt = formatter.generatePrompt(context, fetchedData);
+        const prompt = await formatter.generatePrompt(context, fetchedData);
 
         expect(prompt).toContain("<timeline>");
         expect(prompt).toContain("Comment by @commenter");
@@ -246,7 +246,7 @@ describe("NewGitHubPromptFormatter", () => {
         expect(prompt).toContain("</timeline>");
     });
 
-    test("generatePrompt handles reviews", () => {
+    test("generatePrompt handles reviews", async () => {
         const context = createMockContext();
         const fetchedData: FetchedData = {
             pullRequest: {
@@ -269,7 +269,7 @@ describe("NewGitHubPromptFormatter", () => {
             }
         };
 
-        const prompt = formatter.generatePrompt(context, fetchedData);
+        const prompt = await formatter.generatePrompt(context, fetchedData);
 
         expect(prompt).toContain("<reviews>");
         expect(prompt).toContain("Review by @reviewer (APPROVED)");
@@ -277,11 +277,11 @@ describe("NewGitHubPromptFormatter", () => {
         expect(prompt).toContain("</reviews>");
     });
 
-    test("generatePrompt omits empty sections", () => {
+    test("generatePrompt omits empty sections", async () => {
         const context = createMockContext();
         const fetchedData: FetchedData = {};
 
-        const prompt = formatter.generatePrompt(context, fetchedData);
+        const prompt = await formatter.generatePrompt(context, fetchedData);
 
         expect(prompt).not.toContain("<timeline>");
         expect(prompt).not.toContain("<reviews>");
@@ -289,14 +289,14 @@ describe("NewGitHubPromptFormatter", () => {
         expect(prompt).not.toContain("<commits>");
     });
 
-    test("generatePrompt returns only custom prompt when attachGithubContext is false", () => {
+    test("generatePrompt returns only custom prompt when attachGithubContext is false", async () => {
         const context = createMockContext();
         const fetchedData: FetchedData = {
             pullRequest: createMockPR()
         };
         const customPrompt = "Please fix this specific bug";
 
-        const prompt = formatter.generatePrompt(context, fetchedData, customPrompt, false);
+        const prompt = await formatter.generatePrompt(context, fetchedData, customPrompt, false);
 
         // Should contain only the custom prompt
         expect(prompt).toBe("Please fix this specific bug");
@@ -309,14 +309,14 @@ describe("NewGitHubPromptFormatter", () => {
         expect(prompt).not.toContain("<changed_files>");
     });
 
-    test("generatePrompt includes GitHub context when attachGithubContext is true with custom prompt", () => {
+    test("generatePrompt includes GitHub context when attachGithubContext is true with custom prompt", async () => {
         const context = createMockContext();
         const fetchedData: FetchedData = {
             pullRequest: createMockPR()
         };
         const customPrompt = "Please review this PR";
 
-        const prompt = formatter.generatePrompt(context, fetchedData, customPrompt, true);
+        const prompt = await formatter.generatePrompt(context, fetchedData, customPrompt, true);
 
         // Should contain custom prompt
         expect(prompt).toContain("Please review this PR");
@@ -329,7 +329,7 @@ describe("NewGitHubPromptFormatter", () => {
         expect(prompt).toContain("<changed_files>");
     });
 
-    test("generatePrompt includes GitHub context when attachGithubContext is true without custom prompt", () => {
+    test("generatePrompt includes GitHub context when attachGithubContext is true without custom prompt", async () => {
         const context = createMockContext({
             payload: {
                 repository: {
@@ -349,7 +349,7 @@ describe("NewGitHubPromptFormatter", () => {
             pullRequest: createMockPR()
         };
 
-        const prompt = formatter.generatePrompt(context, fetchedData, undefined, true);
+        const prompt = await formatter.generatePrompt(context, fetchedData, undefined, true);
 
         // Should contain PR body as user instruction
         expect(prompt).toContain("PR description from GitHub");

@@ -66,7 +66,7 @@ export async function prepareJunieTask(
         }
 
         // Generate prompt using formatter
-        const promptText = formatter.generatePrompt(context, fetchedData, customPrompt, context.inputs.attachGithubContextToCustomPrompt);
+        const promptText = await formatter.generatePrompt(context, fetchedData, customPrompt, context.inputs.attachGithubContextToCustomPrompt);
         junieCLITask.task = await getValidatedTextTask(promptText, "task");
     }
 

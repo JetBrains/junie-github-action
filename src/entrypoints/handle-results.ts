@@ -1,5 +1,5 @@
 import {COMMIT_MESSAGE_TEMPLATE, PR_BODY_TEMPLATE, PR_TITLE_TEMPLATE} from "../constants/github";
-import {JunieExecutionContext, isTriggeredByUserInteraction} from "../github/context";
+import {JunieExecutionContext, isTriggeredByUserInteraction, isJiraWorkflowDispatchEvent} from "../github/context";
 import {execSync} from 'child_process';
 import * as core from "@actions/core";
 import {ENV_VARS, OUTPUT_VARS} from "../constants/environment";
@@ -81,12 +81,14 @@ async function getActionToDo(context: JunieExecutionContext): Promise<ActionType
     const baseBranch = process.env[OUTPUT_VARS.BASE_BRANCH]!;
     const hasChangedFiles = await checkForChangedFiles();
     const hasUnpushedCommits = await checkForUnpushedCommits(isNewBranch, baseBranch);
+    const isExternalIntegration = isJiraWorkflowDispatchEvent(context)
     const initCommentId = process.env[OUTPUT_VARS.INIT_COMMENT_ID];
 
     console.log(`Has changed files: ${hasChangedFiles}`);
     console.log(`Has unpushed commits: ${hasUnpushedCommits}`);
     console.log(`Init comment ID: ${initCommentId}`);
     console.log(`Is new branch: ${isNewBranch}`);
+    console.log(`Is external integration: ${isExternalIntegration}`)
     console.log(`Working branch: ${workingBranch}`);
 
     let action: ActionType
@@ -99,8 +101,8 @@ async function getActionToDo(context: JunieExecutionContext): Promise<ActionType
     } else if (hasUnpushedCommits) {
         console.log('No changes but has unpushed commits in existing branch - will push');
         action = ActionType.PUSH;
-    } else if (initCommentId) {
-        console.log('No changes and no unpushed commits but has comment ID - will write comment');
+    } else if (initCommentId || isExternalIntegration) {
+        console.log('No changes and no unpushed commits but has comment ID or it`s an external integration - will write comment');
         action = ActionType.WRITE_COMMENT;
     } else {
         console.log('No specific action matched - do nothing');

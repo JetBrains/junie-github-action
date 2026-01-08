@@ -61,6 +61,25 @@ inputs:
     description: "Comma-separated list of github MCP servers to use. Allowed server names: mcp_github_checks_server"
     required: false
 
+  # Jira integration configuration (for workflow_dispatch events)
+  jira_base_url:
+    description: "Jira instance base URL (e.g. https://your-company.atlassian.net)"
+    required: false
+  jira_email:
+    description: "Jira account email for API authentication (required for Jira integration)"
+    required: false
+  jira_api_token:
+    description: "Jira API token for authentication (required for Jira integration)"
+    required: false
+  jira_transition_in_progress:
+    description: "Jira transition ID for 'In Progress' status (default: 21)"
+    required: false
+    default: "21"
+  jira_transition_in_review:
+    description: "Jira transition ID for 'In Review' status (default: 31)"
+    required: false
+    default: "31"
+
   # Auth configuration
   junie_api_key:
     description: "Junie API key"
@@ -128,6 +147,11 @@ runs:
         SILENT_MODE: ${{ inputs.silent_mode }}
         USE_SINGLE_COMMENT: ${{ inputs.use_single_comment }}
         ATTACH_GITHUB_CONTEXT_TO_CUSTOM_PROMPT: ${{ inputs.attach_github_context_to_custom_prompt }}
+        JIRA_BASE_URL: ${{ inputs.jira_base_url }}
+        JIRA_EMAIL: ${{ inputs.jira_email }}
+        JIRA_API_TOKEN: ${{ inputs.jira_api_token }}
+        JIRA_TRANSITION_IN_PROGRESS: ${{ inputs.jira_transition_in_progress }}
+        JIRA_TRANSITION_IN_REVIEW: ${{ inputs.jira_transition_in_review }}
         ALL_INPUTS: ${{ toJson(inputs) }}
 
 
@@ -250,6 +274,11 @@ runs:
         JUNIE_TITLE: ${{ steps.junie-run-results.outputs.JUNIE_TITLE }}
         JUNIE_SUMMARY: ${{ steps.junie-run-results.outputs.JUNIE_SUMMARY }}
         JSON_JUNIE_OUTPUT: ${{ steps.junie-run.outputs.json_output }}
+        JIRA_BASE_URL: ${{ inputs.jira_base_url }}
+        JIRA_EMAIL: ${{ inputs.jira_email }}
+        JIRA_API_TOKEN: ${{ inputs.jira_api_token }}
+        JIRA_TRANSITION_IN_PROGRESS: ${{ inputs.jira_transition_in_progress }}
+        JIRA_TRANSITION_IN_REVIEW: ${{ inputs.jira_transition_in_review }}
 
     - name: Give feedback and update summary (failure)
       if: failure() && steps.prepare.outputs.SHOULD_SKIP != 'true'
@@ -269,4 +298,9 @@ runs:
         JUNIE_TITLE: ${{ steps.junie-run-results.outputs.JUNIE_TITLE }}
         JUNIE_SUMMARY: ${{ steps.junie-run-results.outputs.JUNIE_SUMMARY }}
         JSON_JUNIE_OUTPUT: ${{ steps.junie-run.outputs.json_output }}
+        JIRA_BASE_URL: ${{ inputs.jira_base_url }}
+        JIRA_EMAIL: ${{ inputs.jira_email }}
+        JIRA_API_TOKEN: ${{ inputs.jira_api_token }}
+        JIRA_TRANSITION_IN_PROGRESS: ${{ inputs.jira_transition_in_progress }}
+        JIRA_TRANSITION_IN_REVIEW: ${{ inputs.jira_transition_in_review }}
         ERROR: ${{ steps.prepare.outputs.EXCEPTION || steps.junie-run-results.outputs.EXCEPTION }}

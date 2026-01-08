@@ -1,30 +1,38 @@
 import {
     FetchedData,
-    GraphQLTimelineItemNode,
-    GraphQLReviewNode,
-    GraphQLFileNode,
     GraphQLCommitNode,
+    GraphQLFileNode,
+    GraphQLReviewNode,
+    GraphQLTimelineItemNode,
+    isCrossReferencedEventNode,
     isIssueCommentNode,
-    isReferencedEventNode,
-    isCrossReferencedEventNode
+    isReferencedEventNode
 } from "../api/queries";
 import {
-    JunieExecutionContext,
-    isTriggeredByUserInteraction,
     isIssueCommentEvent,
     isIssuesEvent,
+    isJiraWorkflowDispatchEvent,
     isPullRequestEvent,
     isPullRequestReviewCommentEvent,
     isPullRequestReviewEvent,
-    isPushEvent
+    isPushEvent,
+    isTriggeredByUserInteraction,
+    JiraIssuePayload,
+    JunieExecutionContext
 } from "../context";
+import {downloadJiraAttachmentsAndRewriteText} from "./attachment-downloader";
 
 export class NewGitHubPromptFormatter {
 
-    generatePrompt(context: JunieExecutionContext, fetchedData: FetchedData, userPrompt?: string, attachGithubContextToCustomPrompt: boolean = true) {
+    async generatePrompt(context: JunieExecutionContext, fetchedData: FetchedData, userPrompt?: string, attachGithubContextToCustomPrompt: boolean = true) {
         // If user provided custom prompt and doesn't want GitHub context, return only the prompt
         if (userPrompt && !attachGithubContextToCustomPrompt) {
             return userPrompt;
+        }
+
+        // Handle Jira issue integration
+        if (isJiraWorkflowDispatchEvent(context)) {
+            return await this.generateJiraPrompt(context);
         }
 
         const repositoryInfo = this.getRepositoryInfo(context);
@@ -48,6 +56,38 @@ ${actorInfo ? actorInfo : ""}
 `
     }
 
+    private async generateJiraPrompt(context: JunieExecutionContext): Promise<string> {
+        const jira = context.payload as JiraIssuePayload;
+
+        // Format comments
+        const commentsInfo = jira.comments.length > 0
+            ? '\n\nComments:\n' + jira.comments.map(comment => {
+                const date = new Date(comment.created).toLocaleString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                return `[${date}] ${comment.author}:\n${comment.body}`;
+            }).join('\n\n')
+            : '';
+
+        // Form the complete prompt text first
+        const promptText = `You were triggered as a GitHub AI Assistant by a Jira issue. Your task is to implement the requested feature or fix based on the Jira issue details below.
+
+<jira_issue>
+Issue Key: ${jira.issueKey}
+Summary: ${jira.issueSummary}
+
+Description: ${jira.issueDescription}${commentsInfo}
+</jira_issue>
+`;
+
+        // Download all attachments referenced in text (single pass)
+        return await downloadJiraAttachmentsAndRewriteText(promptText, jira.attachments);
+    }
+
     private getUserInstruction(context: JunieExecutionContext, customPrompt?: string): string | undefined {
         let githubUserInstruction
         if (isPullRequestEvent(context)) {
@@ -64,7 +104,8 @@ ${actorInfo ? actorInfo : ""}
         return customPrompt || githubUserInstruction ? `
         <user_instruction>
         ${customPrompt || githubUserInstruction}
-</user_instruction>`: undefined}
+</user_instruction>` : undefined
+    }
 
     private getPrOrIssueInfo(context: JunieExecutionContext, fetchedData: FetchedData): string | undefined {
         if (context.isPR) {
@@ -91,7 +132,7 @@ Head Commit: ${pr.headRefOid}
 Stats: +${pr.additions}/-${pr.deletions} (${pr.changedFiles} files, ${pr.commits.totalCount} commits)`
     }
 
-    private getIssueInfo( fetchedData: FetchedData): string {
+    private getIssueInfo(fetchedData: FetchedData): string {
         const issue = fetchedData.issue;
         if (!issue) return "";
 
@@ -113,7 +154,7 @@ State: ${issue.state}`
     }
 
     private formatCommits(commits: GraphQLCommitNode[]): string {
-        return commits.map(({ commit }) => {
+        return commits.map(({commit}) => {
             const shortHash = commit.oid.substring(0, 7);
             const message = commit.messageHeadline || commit.message || 'No message';
             const date = commit.committedDate || '';
