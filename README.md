@@ -33,6 +33,7 @@ A powerful GitHub Action that integrates [Junie](https://www.jetbrains.com/junie
 - **Single Comment Mode**: Update a single comment instead of creating multiple comments for each run (per workflow)
 - **Comprehensive Feedback**: Real-time updates via GitHub comments with links to PRs and commits
 - **Rich Job Summaries**: Beautiful markdown reports in GitHub Actions with execution details
+- **Attachment Support**: Automatically downloads and processes images and files attached to issues and PRs (GitHub and Jira)
 - **MCP Extensibility**: Integrate custom Model Context Protocol servers for enhanced capabilities
 - **Runs on Your Infrastructure**: Executes entirely on your GitHub runners
 
@@ -139,11 +140,11 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 
 | Input | Description | Default |
 |-------|-------------|---------|
-| `prompt` | Custom instructions for Junie | - |
+| `prompt` | Instructions for Junie (can be a direct prompt or custom template) | - |
 | `junie_version` | Junie CLI version to install | `576.1` |
 | `junie_work_dir` | Working directory for Junie files | `/tmp/junie-work` |
 | `junie_guidelines_filename` | Filename of the guidelines file (should be in `<project-root>/.junie` dir) | `guidelines.md` |
-| `allowed_mcp_servers` | MCP servers to enable (comma-separated) | - |
+| `allowed_mcp_servers` | Comma-separated list of GitHub MCP servers to enable | - |
 
 **Available MCP Servers**:
 - `mcp_github_checks_server`: Analyze failed GitHub Actions checks
