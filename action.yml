@@ -32,7 +32,7 @@ inputs:
     required: false
     default: "false"
   use_single_comment:
-    description: "Use a single comment that gets updated instead of creating new comments for each run(per workflow)"
+    description: "Use a single comment that gets updated instead of creating new comments for each run (per workflow)"
     required: false
     default: "false"
   attach_github_context_to_custom_prompt:
