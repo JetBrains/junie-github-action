@@ -20,7 +20,7 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_branch }}
 
-      - uses: JetBrains/junie-github-action@main
+      - uses: JetBrains/junie-github-action@nikita.barkov/debug-mcp
         with:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
           allowed_mcp_servers: mcp_github_checks_server
