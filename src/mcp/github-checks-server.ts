@@ -224,55 +224,69 @@ function clearTimestampFromGhLogs(logLines: string[]): string[] {
     });
 }
 
+/**
+ * Extracts relevant error information from test logs.
+ *
+ * Simple approach: find lines with error keywords and extract context around them.
+ * Works universally across all test frameworks and languages.
+ */
 function extractRelevantInfo(logLines: string[]): string {
-    const relevantLines: string[] = [];
-    let insideFailedTask = false;
+    // Universal error keywords (case-insensitive)
+    const ERROR_KEYWORDS = [
+        'error', 'fail', 'failed', 'failure', 'exception',
+        'assert', 'expected', 'actual', 'received',
+        'panic', 'fatal', 'critical', 'traceback'
+    ];
 
-    for (const line of logLines) {
+    const CONTEXT_BEFORE = 10; // Lines to capture before error
+    const CONTEXT_AFTER = 50;  // Lines to capture after error
 
-        // --- 1) Maven failures ---
-        if (line.startsWith("[ERROR]")) {
-            relevantLines.push(line);
-            continue;
-        }
+    // Find all lines with error keywords
+    const errorRanges = logLines
+        .map((line, i) => {
+            const lowerLine = line.toLowerCase();
+            const hasErrorKeyword = ERROR_KEYWORDS.some(keyword => lowerLine.includes(keyword));
 
-        // --- 2) Kotlin compiler errors ---
-        if (line.startsWith("e:")) {
-            relevantLines.push(line);
-            continue;
-        }
-
-        // --- 3) Gradle "Task :xxx FAILED" ---
-        if (/Task\s+:[\w:-]+.*FAILED/.test(line)) {
-            insideFailedTask = true;
-            relevantLines.push(line);
-            continue;
-        }
-
-        if (insideFailedTask) {
-            relevantLines.push(line);
-            if (line.includes("FAILURE:")) {
-                insideFailedTask = false;
+            if (hasErrorKeyword) {
+                return {
+                    start: Math.max(0, i - CONTEXT_BEFORE),
+                    end: Math.min(logLines.length, i + CONTEXT_AFTER + 1)
+                };
             }
-            continue;
-        }
+            return null;
+        })
+        .filter((range): range is {start: number, end: number} => range !== null);
 
-        // --- 4) GitHub Actions "##[error]" ---
-        if (line.includes("##[error]")) {
-            relevantLines.push(line);
-            continue;
-        }
+    // No errors found
+    if (errorRanges.length === 0) {
+        return '';
+    }
 
-        // --- 5) Test framework failures ---
-        if (
-            line.includes("FAILED") ||
-            line.includes("Assertion error") ||
-            /Assertion.*failed/i.test(line) ||
-            line.startsWith("Error:") ||
-            line.includes("exit code 1")
-        ) {
-            relevantLines.push(line);
+    // Merge overlapping ranges
+    const mergedRanges: Array<{start: number, end: number}> = [];
+    errorRanges.forEach(range => {
+        if (mergedRanges.length === 0) {
+            mergedRanges.push(range);
+        } else {
+            const last = mergedRanges[mergedRanges.length - 1];
+            // Merge if ranges overlap or are adjacent
+            if (range.start <= last.end) {
+                last.end = Math.max(last.end, range.end);
+            } else {
+                mergedRanges.push(range);
+            }
         }
+    });
+
+    // Extract lines from merged ranges
+    const relevantLines: string[] = [];
+    for (const range of mergedRanges) {
+        if (relevantLines.length > 0) {
+            relevantLines.push('');
+            relevantLines.push('--- (continuing in different section) ---');
+            relevantLines.push('');
+        }
+        relevantLines.push(...logLines.slice(range.start, range.end));
     }
 
     return relevantLines.join("\n").trim();
