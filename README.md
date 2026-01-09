@@ -26,7 +26,7 @@ A powerful GitHub Action that integrates [Junie](https://www.jetbrains.com/junie
 - **Issue Resolution**: Automatically implements solutions for GitHub issues
 - **PR Management**: Reviews code changes and implements requested modifications
 - **Conflict Resolution**: Resolve merge conflicts via `@junie-agent` comment or automatic detection
-- **CI Failure Analysis**: Investigates failed checks and suggests fixes using MCP integration
+- **CI Failure Analysis**: Universal investigation of failed checks across all test frameworks and languages using MCP integration
 - **Flexible Triggers**: Activate via mentions, assignees, labels, or custom prompts
 - **Smart Branch Management**: Context-aware branch creation and management
 - **Silent Mode**: Run analysis-only workflows without comments or git operations
@@ -146,7 +146,7 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 | `allowed_mcp_servers` | MCP servers to enable (comma-separated) | - |
 
 **Available MCP Servers**:
-- `mcp_github_checks_server`: Analyze failed GitHub Actions checks
+- `mcp_github_checks_server`: Universal CI failure analysis that automatically extracts relevant error context from logs across all test frameworks and languages
 
 #### Advanced Features
 
