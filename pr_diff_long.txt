@@ -1,0 +1,3476 @@
+diff --git a/.github/workflows/readme-check.yml b/.github/workflows/readme-check.yml
+index 0f117f8..fd69fb6 100644
+--- a/.github/workflows/readme-check.yml
++++ b/.github/workflows/readme-check.yml
+@@ -17,11 +17,13 @@ on:
+ jobs:
+   check-readme:
+     runs-on: ubuntu-latest
+-    permissions:
+-      contents: write
+-      pull-requests: write
+-      issues: write
+     steps:
++      - uses: actions/create-github-app-token@v1
++        id: app-token
++        with:
++          app-id: ${{ secrets.JUNIE_ACTIONS_APP_ID }}
++          private-key: ${{ secrets.JUNIE_ACTIONS_APP_SECRET }}
++
+       - uses: actions/checkout@v4
+         with:
+           ref: ${{ github.event.pull_request.head.ref || github.ref }}
+@@ -30,6 +32,7 @@ jobs:
+       - uses: JetBrains/junie-github-action@main
+         with:
+           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
++          custom_github_token: ${{ steps.app-token.outputs.token }}
+           use_single_comment: true
+           create_new_branch_for_pr: true
+           prompt: |
+diff --git a/README.md b/README.md
+index 439656c..cba4857 100644
+--- a/README.md
++++ b/README.md
+@@ -8,6 +8,7 @@ A powerful GitHub Action that integrates [Junie](https://www.jetbrains.com/junie
+ - [Quickstart](#quickstart)
+   - [Prerequisites](#prerequisites)
+   - [Basic Setup](#basic-setup)
++- [Jira Integration](#jira-integration)
+ - [Cookbook](#cookbook)
+ - [Configuration](#configuration)
+   - [Input Parameters](#input-parameters)
+@@ -99,6 +100,10 @@ jobs:
+    - Comment `@junie-agent help me fix this bug` on an issue
+    - Mention `@junie-agent review this change` in a PR
+ 
++## Jira Integration
++
++🔗 **Want to trigger Junie from Jira?** Check out the [Jira Integration Guide](docs/JIRA_INTEGRATION.md) to automatically implement features and fixes based on Jira issues.
++
+ ## Cookbook
+ 
+ 📚 **Looking for practical examples?** Check out the [Cookbook](COOKBOOK.md) for real-world recipes including:
+@@ -135,7 +140,7 @@ Each recipe includes complete workflows, prompts, and configuration examples you
+ | Input | Description | Default |
+ |-------|-------------|---------|
+ | `prompt` | Custom instructions for Junie | - |
+-| `junie_version` | Junie CLI version to install | `561.1.0` |
++| `junie_version` | Junie CLI version to install | `576.1` |
+ | `junie_work_dir` | Working directory for Junie files | `/tmp/junie-work` |
+ | `junie_guidelines_filename` | Filename of the guidelines file (should be in `<project-root>/.junie` dir) | `guidelines.md` |
+ | `allowed_mcp_servers` | MCP servers to enable (comma-separated) | - |
+@@ -152,6 +157,18 @@ Each recipe includes complete workflows, prompts, and configuration examples you
+ | `use_single_comment` | Update a single comment for all runs instead of creating new comments each time | `false` |
+ | `attach_github_context_to_custom_prompt` | Attach GitHub context (PR/issue info, commits, reviews, etc.) when using custom prompt | `false` |
+ 
++#### Jira Integration
++
++| Input | Description | Default |
++|-------|-------------|---------|
++| `jira_base_url` | Jira instance base URL (e.g., `https://your-company.atlassian.net`) | - |
++| `jira_email` | Jira account email for API authentication | - |
++| `jira_api_token` | Jira API token for authentication | - |
++| `jira_transition_in_progress` | Jira transition ID for "In Progress" status | `21` |
++| `jira_transition_in_review` | Jira transition ID for "In Review" status | `31` |
++
++For detailed setup instructions, see the [Jira Integration Guide](docs/JIRA_INTEGRATION.md).
++
+ #### Authentication
+ 
+ | Input | Description | Required |
+@@ -209,6 +226,16 @@ permissions:
+   issues: read
+ ```
+ 
++#### Repository Settings for PR Creation
++
++If you're using the default `github.token` and want Junie to create pull requests, you must enable this in your repository settings:
++
++1. Go to **Settings** → **Actions** → **General**
++2. Scroll to the **Workflow permissions** section
++3. Check **"Allow GitHub Actions to create and approve pull requests"**
++
++Without this setting enabled, the action will fail when attempting to create PRs, even with correct `pull-requests: write` permissions in the workflow.
++
+ ### GitHub Token Considerations
+ 
+ #### Default Token Limitation
+@@ -258,9 +285,7 @@ GitHub App tokens
+ 
+ **Setup steps:**
+ 
+-a. **Install Your App:**
+-   - Click "Install App" in the sidebar
+-   - Select your repository
++a. **Install Your App to the Repository:**
+ 
+ b. **Add secrets to repository:**
+    - Go to repository Settings → Secrets and variables → Actions
+diff --git a/action.yml b/action.yml
+index 95cc1ed..7304abe 100644
+--- a/action.yml
++++ b/action.yml
+@@ -48,7 +48,7 @@ inputs:
+   junie_version:
+     description: "Version of Junie to use"
+     required: false
+-    default: "561.1.0"
++    default: "576.1"
+   junie_work_dir:
+     description: "Directory to use for Junie working files"
+     required: false
+@@ -61,6 +61,25 @@ inputs:
+     description: "Comma-separated list of github MCP servers to use. Allowed server names: mcp_github_checks_server"
+     required: false
+ 
++  # Jira integration configuration (for workflow_dispatch events)
++  jira_base_url:
++    description: "Jira instance base URL (e.g. https://your-company.atlassian.net)"
++    required: false
++  jira_email:
++    description: "Jira account email for API authentication (required for Jira integration)"
++    required: false
++  jira_api_token:
++    description: "Jira API token for authentication (required for Jira integration)"
++    required: false
++  jira_transition_in_progress:
++    description: "Jira transition ID for 'In Progress' status (default: 21)"
++    required: false
++    default: "21"
++  jira_transition_in_review:
++    description: "Jira transition ID for 'In Review' status (default: 31)"
++    required: false
++    default: "31"
++
+   # Auth configuration
+   junie_api_key:
+     description: "Junie API key"
+@@ -128,6 +147,11 @@ runs:
+         SILENT_MODE: ${{ inputs.silent_mode }}
+         USE_SINGLE_COMMENT: ${{ inputs.use_single_comment }}
+         ATTACH_GITHUB_CONTEXT_TO_CUSTOM_PROMPT: ${{ inputs.attach_github_context_to_custom_prompt }}
++        JIRA_BASE_URL: ${{ inputs.jira_base_url }}
++        JIRA_EMAIL: ${{ inputs.jira_email }}
++        JIRA_API_TOKEN: ${{ inputs.jira_api_token }}
++        JIRA_TRANSITION_IN_PROGRESS: ${{ inputs.jira_transition_in_progress }}
++        JIRA_TRANSITION_IN_REVIEW: ${{ inputs.jira_transition_in_review }}
+         ALL_INPUTS: ${{ toJson(inputs) }}
+ 
+ 
+@@ -145,6 +169,7 @@ runs:
+         CLI_TOKEN: ${{ steps.prepare.outputs.EJ_CLI_TOKEN }}
+         JUNIE_JSON_TASK: ${{ steps.prepare.outputs.JUNIE_JSON_TASK }}
+         EJ_AUTH_GITHUB_TOKEN: ${{ steps.prepare.outputs.EJ_AUTH_GITHUB_TOKEN  }}
++        GH_TOKEN: ${{ steps.prepare.outputs.EJ_AUTH_GITHUB_TOKEN }}
+         MULTI_RUNS: true
+         MATTERHORN_DEBUG_LOG: false
+         WORKING_DIR: ${{ inputs.junie_work_dir }}
+@@ -249,6 +274,11 @@ runs:
+         JUNIE_TITLE: ${{ steps.junie-run-results.outputs.JUNIE_TITLE }}
+         JUNIE_SUMMARY: ${{ steps.junie-run-results.outputs.JUNIE_SUMMARY }}
+         JSON_JUNIE_OUTPUT: ${{ steps.junie-run.outputs.json_output }}
++        JIRA_BASE_URL: ${{ inputs.jira_base_url }}
++        JIRA_EMAIL: ${{ inputs.jira_email }}
++        JIRA_API_TOKEN: ${{ inputs.jira_api_token }}
++        JIRA_TRANSITION_IN_PROGRESS: ${{ inputs.jira_transition_in_progress }}
++        JIRA_TRANSITION_IN_REVIEW: ${{ inputs.jira_transition_in_review }}
+ 
+     - name: Give feedback and update summary (failure)
+       if: failure() && steps.prepare.outputs.SHOULD_SKIP != 'true'
+@@ -268,4 +298,9 @@ runs:
+         JUNIE_TITLE: ${{ steps.junie-run-results.outputs.JUNIE_TITLE }}
+         JUNIE_SUMMARY: ${{ steps.junie-run-results.outputs.JUNIE_SUMMARY }}
+         JSON_JUNIE_OUTPUT: ${{ steps.junie-run.outputs.json_output }}
++        JIRA_BASE_URL: ${{ inputs.jira_base_url }}
++        JIRA_EMAIL: ${{ inputs.jira_email }}
++        JIRA_API_TOKEN: ${{ inputs.jira_api_token }}
++        JIRA_TRANSITION_IN_PROGRESS: ${{ inputs.jira_transition_in_progress }}
++        JIRA_TRANSITION_IN_REVIEW: ${{ inputs.jira_transition_in_review }}
+         ERROR: ${{ steps.prepare.outputs.EXCEPTION || steps.junie-run-results.outputs.EXCEPTION }}
+\ No newline at end of file
+diff --git a/bun.lock b/bun.lock
+index 0c23d5f..7655335 100644
+--- a/bun.lock
++++ b/bun.lock
+@@ -6,13 +6,17 @@
+       "dependencies": {
+         "@actions/core": "^1.11.1",
+         "@actions/github": "^6.0.1",
+-        "@modelcontextprotocol/sdk": "^1.21.0",
++        "@modelcontextprotocol/sdk": "^1.25.2",
+         "@octokit/rest": "^22.0.1",
+         "@octokit/webhooks-types": "^7.6.1",
++        "jira.js": "^5.2.2",
++        "marklassian": "^1.1.0",
++        "mime-types": "^3.0.2",
+         "p-retry": "^7.1.0",
+       },
+       "devDependencies": {
+         "@types/bun": "latest",
++        "@types/mime-types": "^3.0.1",
+         "typescript": "^5.5.3",
+       },
+     },
+@@ -30,7 +34,9 @@
+ 
+     "@fastify/busboy": ["@fastify/busboy@2.1.1", "", {}, "sha512-vBZP4NlzfOlerQTnba4aqZoMhE/a9HY7HRqoOPaETQcSQuWEIyZMHGfVu6w9wGtGK5fED5qRs2DteVCjOH60sA=="],
+ 
+-    "@modelcontextprotocol/sdk": ["@modelcontextprotocol/sdk@1.21.0", "", { "dependencies": { "ajv": "^8.17.1", "ajv-formats": "^3.0.1", "content-type": "^1.0.5", "cors": "^2.8.5", "cross-spawn": "^7.0.5", "eventsource": "^3.0.2", "eventsource-parser": "^3.0.0", "express": "^5.0.1", "express-rate-limit": "^7.5.0", "pkce-challenge": "^5.0.0", "raw-body": "^3.0.0", "zod": "^3.23.8", "zod-to-json-schema": "^3.24.1" }, "peerDependencies": { "@cfworker/json-schema": "^4.1.1" }, "optionalPeers": ["@cfworker/json-schema"] }, "sha512-YFBsXJMFCyI1zP98u7gezMFKX4lgu/XpoZJk7ufI6UlFKXLj2hAMUuRlQX/nrmIPOmhRrG6tw2OQ2ZA/ZlXYpQ=="],
++    "@hono/node-server": ["@hono/node-server@1.19.7", "", { "peerDependencies": { "hono": "^4" } }, "sha512-vUcD0uauS7EU2caukW8z5lJKtoGMokxNbJtBiwHgpqxEXokaHCBkQUmCHhjFB1VUTWdqj25QoMkMKzgjq+uhrw=="],
++
++    "@modelcontextprotocol/sdk": ["@modelcontextprotocol/sdk@1.25.2", "", { "dependencies": { "@hono/node-server": "^1.19.7", "ajv": "^8.17.1", "ajv-formats": "^3.0.1", "content-type": "^1.0.5", "cors": "^2.8.5", "cross-spawn": "^7.0.5", "eventsource": "^3.0.2", "eventsource-parser": "^3.0.0", "express": "^5.0.1", "express-rate-limit": "^7.5.0", "jose": "^6.1.1", "json-schema-typed": "^8.0.2", "pkce-challenge": "^5.0.0", "raw-body": "^3.0.0", "zod": "^3.25 || ^4.0", "zod-to-json-schema": "^3.25.0" }, "peerDependencies": { "@cfworker/json-schema": "^4.1.1" }, "optionalPeers": ["@cfworker/json-schema"] }, "sha512-LZFeo4F9M5qOhC/Uc1aQSrBHxMrvxett+9KLHt7OhcExtoiRN9DKgbZffMP/nxjutWDQpfMDfP3nkHI4X9ijww=="],
+ 
+     "@octokit/auth-token": ["@octokit/auth-token@4.0.0", "", {}, "sha512-tY/msAuJo6ARbK6SPIxZrPBms3xPbfwBrulZe0Wtr/DIY9lje2HeV1uoebShn6mx7SjCHif6EjMvoREj+gZ+SA=="],
+ 
+@@ -60,6 +66,8 @@
+ 
+     "@types/bun": ["@types/bun@1.3.0", "", { "dependencies": { "bun-types": "1.3.0" } }, "sha512-+lAGCYjXjip2qY375xX/scJeVRmZ5cY0wyHYyCYxNcdEXrQ4AOe3gACgd4iQ8ksOslJtW4VNxBJ8llUwc3a6AA=="],
+ 
++    "@types/mime-types": ["@types/mime-types@3.0.1", "", {}, "sha512-xRMsfuQbnRq1Ef+C+RKaENOxXX87Ygl38W1vDfPHRku02TgQr+Qd8iivLtAMcR0KF5/29xlnFihkTlbqFrGOVQ=="],
++
+     "@types/node": ["@types/node@24.8.1", "", { "dependencies": { "undici-types": "~7.14.0" } }, "sha512-alv65KGRadQVfVcG69MuB4IzdYVpRwMG/mq8KWOaoOdyY617P5ivaDiMCGOFDWD2sAn5Q0mR3mRtUOgm99hL9Q=="],
+ 
+     "@types/react": ["@types/react@19.2.2", "", { "dependencies": { "csstype": "^3.0.2" } }, "sha512-6mDvHUFSjyT2B2yeNx2nUgMxh9LtOWvkhIU3uePn2I2oyNymUAX1NIsdgviM4CH+JSrp2D2hsMvJOkxY+0wNRA=="],
+@@ -70,6 +78,10 @@
+ 
+     "ajv-formats": ["ajv-formats@3.0.1", "", { "dependencies": { "ajv": "^8.0.0" } }, "sha512-8iUql50EUR+uUcdRQ3HDqa6EVyo3docL8g5WJ3FNcWmu62IbkGUue/pEyLBW8VGKKucTPgqeks4fIU1DA4yowQ=="],
+ 
++    "asynckit": ["asynckit@0.4.0", "", {}, "sha512-Oei9OH4tRh0YqU3GxhX79dM/mwVgvbZJaSNaRk+bshkj0S5cfHcgYakreBjrHwatXKbz+IoIdYLxrKim2MjW0Q=="],
++
++    "axios": ["axios@1.13.2", "", { "dependencies": { "follow-redirects": "^1.15.6", "form-data": "^4.0.4", "proxy-from-env": "^1.1.0" } }, "sha512-VPk9ebNqPcy5lRGuSlKx752IlDatOjT9paPlm8A7yOuW2Fbvp4X3JznJtT4f0GzGLLiWE9W8onz51SqLYwzGaA=="],
++
+     "before-after-hook": ["before-after-hook@2.2.3", "", {}, "sha512-NzUnlZexiaH/46WDhANlyR2bXRopNg4F/zuSA3OpZnllCUgRaOF2znDioDWrmbNVsuZk6l9pMquQB38cfBZwkQ=="],
+ 
+     "body-parser": ["body-parser@2.2.0", "", { "dependencies": { "bytes": "^3.1.2", "content-type": "^1.0.5", "debug": "^4.4.0", "http-errors": "^2.0.0", "iconv-lite": "^0.6.3", "on-finished": "^2.4.1", "qs": "^6.14.0", "raw-body": "^3.0.0", "type-is": "^2.0.0" } }, "sha512-02qvAaxv8tp7fBa/mw1ga98OGm+eCbqzJOKoRt70sLmfEEi+jyBYVTDGfCL/k06/4EMk/z01gCe7HoCH/f2LTg=="],
+@@ -82,6 +94,8 @@
+ 
+     "call-bound": ["call-bound@1.0.4", "", { "dependencies": { "call-bind-apply-helpers": "^1.0.2", "get-intrinsic": "^1.3.0" } }, "sha512-+ys997U96po4Kx/ABpBCqhA9EuxJaQWDQg7295H4hBphv3IZg0boBKuwYpt4YXp6MZ5AmZQnU/tyMTlRpaSejg=="],
+ 
++    "combined-stream": ["combined-stream@1.0.8", "", { "dependencies": { "delayed-stream": "~1.0.0" } }, "sha512-FQN4MRfuJeHf7cBbBMJFXhKSDq+2kAArBlmRBvcvFE5BB1HZKXtSFASDhdlz9zOYwxh8lDdnvmMOe/+5cdoEdg=="],
++
+     "content-disposition": ["content-disposition@1.0.0", "", { "dependencies": { "safe-buffer": "5.2.1" } }, "sha512-Au9nRL8VNUut/XSzbQA38+M78dzP4D+eqg3gfJHMIHHYa3bg067xj1KxMUWj+VULbiZMowKngFFbKczUrNJ1mg=="],
+ 
+     "content-type": ["content-type@1.0.5", "", {}, "sha512-nTjqfcBFEipKdXCv4YDQWCfmcLZKm81ldF0pAopTvyrFGVbcR6P/VAAd5G7N+0tTr8QqiU0tFadD6FK4NtJwOA=="],
+@@ -98,6 +112,8 @@
+ 
+     "debug": ["debug@4.4.3", "", { "dependencies": { "ms": "^2.1.3" } }, "sha512-RGwwWnwQvkVfavKVt22FGLw+xYSdzARwm0ru6DhTVA3umU5hZc28V3kO4stgYryrTlLpuvgI9GiijltAjNbcqA=="],
+ 
++    "delayed-stream": ["delayed-stream@1.0.0", "", {}, "sha512-ZySD7Nf91aLB0RxL4KGrKHBXl7Eds1DAmEdcoVawXnLD7SDhpNgtuII2aAkg7a7QS41jxPSZ17p4VdGnMHk3MQ=="],
++
+     "depd": ["depd@2.0.0", "", {}, "sha512-g7nH6P6dyDioJogAAGprGpCtVImJhpPk/roCzdb3fIh61/s/nPsfR6onyMwkCAR/OlC3yBC0lESvUoQEAssIrw=="],
+ 
+     "deprecation": ["deprecation@2.3.1", "", {}, "sha512-xmHIy4F3scKVwMsQ4WnVaS8bHOx0DmVwRywosKhaILI0ywMDWPtBSku2HNxRvF7jtwDRsoEwYQSfbxj8b7RlJQ=="],
+@@ -114,6 +130,8 @@
+ 
+     "es-object-atoms": ["es-object-atoms@1.1.1", "", { "dependencies": { "es-errors": "^1.3.0" } }, "sha512-FGgH2h8zKNim9ljj7dankFPcICIK9Cp5bm+c2gQSYePhpaG5+esrLODihIorn+Pe6FGJzWhXQotPv73jTaldXA=="],
+ 
++    "es-set-tostringtag": ["es-set-tostringtag@2.1.0", "", { "dependencies": { "es-errors": "^1.3.0", "get-intrinsic": "^1.2.6", "has-tostringtag": "^1.0.2", "hasown": "^2.0.2" } }, "sha512-j6vWzfrGVfyXxge+O0x5sh6cvxAog0a/4Rdd2K36zCMV5eJ+/+tOAngRO8cODMNWbVRdVlmGZQL2YS3yR8bIUA=="],
++
+     "escape-html": ["escape-html@1.0.3", "", {}, "sha512-NiSupZ4OeuGwr68lGIeym/ksIZMJodUGOSCZ/FSnTxcrekbvqrgdUxlJOMpijaKZVjAJrWrGs/6Jy8OMuyj9ow=="],
+ 
+     "etag": ["etag@1.8.1", "", {}, "sha512-aIL5Fx7mawVa300al2BnEE4iNvo1qETxLrPI/o05L7z6go7fCw1J6EQmbK4FmJ2AS7kgVF/KEZWufBfdClMcPg=="],
+@@ -134,6 +152,10 @@
+ 
+     "finalhandler": ["finalhandler@2.1.0", "", { "dependencies": { "debug": "^4.4.0", "encodeurl": "^2.0.0", "escape-html": "^1.0.3", "on-finished": "^2.4.1", "parseurl": "^1.3.3", "statuses": "^2.0.1" } }, "sha512-/t88Ty3d5JWQbWYgaOGCCYfXRwV1+be02WqYYlL6h0lEiUAMPM8o8qKGO01YIkOHzka2up08wvgYD0mDiI+q3Q=="],
+ 
++    "follow-redirects": ["follow-redirects@1.15.11", "", {}, "sha512-deG2P0JfjrTxl50XGCDyfI97ZGVCxIpfKYmfyrQ54n5FO/0gfIES8C/Psl6kWVDolizcaaxZJnTS0QSMxvnsBQ=="],
++
++    "form-data": ["form-data@4.0.5", "", { "dependencies": { "asynckit": "^0.4.0", "combined-stream": "^1.0.8", "es-set-tostringtag": "^2.1.0", "hasown": "^2.0.2", "mime-types": "^2.1.12" } }, "sha512-8RipRLol37bNs2bhoV67fiTEvdTrbMUYcFTiy3+wuuOnUog2QBHCZWXDRijWQfAkhBj2Uf5UnVaiWwA5vdd82w=="],
++
+     "forwarded": ["forwarded@0.2.0", "", {}, "sha512-buRG0fpBtRHSTCOASe6hD258tEubFoRLb4ZNA6NxMVHNw2gOcwHo9wyablzMzOA5z9xA9L1KNjk/Nt6MT9aYow=="],
+ 
+     "fresh": ["fresh@2.0.0", "", {}, "sha512-Rx/WycZ60HOaqLKAi6cHRKKI7zxWbJ31MhntmtwMoaTeF7XFH9hhBp8vITaMidfljRQ6eYWCKkaTK+ykVJHP2A=="],
+@@ -148,8 +170,12 @@
+ 
+     "has-symbols": ["has-symbols@1.1.0", "", {}, "sha512-1cDNdwJ2Jaohmb3sg4OmKaMBwuC48sYni5HUw2DvsC8LjGTLK9h+eb1X6RyuOHe4hT0ULCW68iomhjUoKUqlPQ=="],
+ 
++    "has-tostringtag": ["has-tostringtag@1.0.2", "", { "dependencies": { "has-symbols": "^1.0.3" } }, "sha512-NqADB8VjPFLM2V0VvHUewwwsw0ZWBaIdgo+ieHtK3hasLz4qeCRjYcqfB6AQrBggRKppKF8L52/VqdVsO47Dlw=="],
++
+     "hasown": ["hasown@2.0.2", "", { "dependencies": { "function-bind": "^1.1.2" } }, "sha512-0hJU9SCPvmMzIBdZFqNPXWa6dqh7WdH0cII9y+CyS8rG3nL48Bclra9HmKhVVUHyPWNH5Y7xDwAB7bfgSjkUMQ=="],
+ 
++    "hono": ["hono@4.11.3", "", {}, "sha512-PmQi306+M/ct/m5s66Hrg+adPnkD5jiO6IjA7WhWw0gSBSo1EcRegwuI1deZ+wd5pzCGynCcn2DprnE4/yEV4w=="],
++
+     "http-errors": ["http-errors@2.0.0", "", { "dependencies": { "depd": "2.0.0", "inherits": "2.0.4", "setprototypeof": "1.2.0", "statuses": "2.0.1", "toidentifier": "1.0.1" } }, "sha512-FtwrG/euBzaEjYeRqOgly7G0qviiXoJWnvEH2Z1plBdXgbyjv34pHTSb9zoeHMyDy33+DWy5Wt9Wo+TURtOYSQ=="],
+ 
+     "iconv-lite": ["iconv-lite@0.7.0", "", { "dependencies": { "safer-buffer": ">= 2.1.2 < 3.0.0" } }, "sha512-cf6L2Ds3h57VVmkZe+Pn+5APsT7FpqJtEhhieDCvrE2MK5Qk9MyffgQyuxQTm6BChfeZNtcOLHp9IcWRVcIcBQ=="],
+@@ -164,17 +190,29 @@
+ 
+     "isexe": ["isexe@2.0.0", "", {}, "sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw=="],
+ 
++    "jira.js": ["jira.js@5.2.2", "", { "dependencies": { "axios": "^1.10.0", "mime": "^4.0.7", "zod": "^3.25.76" } }, "sha512-iduKEC+MpQSq46cMbv310CZPn70xaUhbDRMlZIGJ4YKhn+GZsSjlogRPFyrNEfoqergGYi8+EZ1YcY09w+Efkw=="],
++
++    "jose": ["jose@6.1.3", "", {}, "sha512-0TpaTfihd4QMNwrz/ob2Bp7X04yuxJkjRGi4aKmOqwhov54i6u79oCv7T+C7lo70MKH6BesI3vscD1yb/yzKXQ=="],
++
+     "json-schema-traverse": ["json-schema-traverse@1.0.0", "", {}, "sha512-NM8/P9n3XjXhIZn1lLhkFaACTOURQXjWhV4BA/RnOv8xvgqtqpAX9IO4mRQxSx1Rlo4tqzeqb0sOlruaOy3dug=="],
+ 
++    "json-schema-typed": ["json-schema-typed@8.0.2", "", {}, "sha512-fQhoXdcvc3V28x7C7BMs4P5+kNlgUURe2jmUT1T//oBRMDrqy1QPelJimwZGo7Hg9VPV3EQV5Bnq4hbFy2vetA=="],
++
++    "marked": ["marked@16.4.2", "", { "bin": { "marked": "bin/marked.js" } }, "sha512-TI3V8YYWvkVf3KJe1dRkpnjs68JUPyEa5vjKrp1XEEJUAOaQc+Qj+L1qWbPd0SJuAdQkFU0h73sXXqwDYxsiDA=="],
++
++    "marklassian": ["marklassian@1.1.0", "", { "dependencies": { "marked": "^15.0.6 || ^16.0.0" } }, "sha512-aR3o6Ig3GM5+iwZFTKBlAHy2Bcdd7auwra8RLWmcmygVq8AeQQKusdhzJ5s9AL1Xeu85Ax7mpuTmTorvKMByMA=="],
++
+     "math-intrinsics": ["math-intrinsics@1.1.0", "", {}, "sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g=="],
+ 
+     "media-typer": ["media-typer@1.1.0", "", {}, "sha512-aisnrDP4GNe06UcKFnV5bfMNPBUw4jsLGaWwWfnH3v02GnBuXX2MCVn5RbrWo0j3pczUilYblq7fQ7Nw2t5XKw=="],
+ 
+     "merge-descriptors": ["merge-descriptors@2.0.0", "", {}, "sha512-Snk314V5ayFLhp3fkUREub6WtjBfPdCPY1Ln8/8munuLuiYhsABgBVWsozAG+MWMbVEvcdcpbi9R7ww22l9Q3g=="],
+ 
++    "mime": ["mime@4.1.0", "", { "bin": { "mime": "bin/cli.js" } }, "sha512-X5ju04+cAzsojXKes0B/S4tcYtFAJ6tTMuSPBEn9CPGlrWr8Fiw7qYeLT0XyH80HSoAoqWCaz+MWKh22P7G1cw=="],
++
+     "mime-db": ["mime-db@1.54.0", "", {}, "sha512-aU5EJuIN2WDemCcAp2vFBfp/m4EAhWJnUNSSw0ixs7/kXbd6Pg64EmwJkNdFhB8aWt1sH2CTXrLxo/iAGV3oPQ=="],
+ 
+-    "mime-types": ["mime-types@3.0.1", "", { "dependencies": { "mime-db": "^1.54.0" } }, "sha512-xRc4oEhT6eaBpU1XF7AjpOFD+xQmXNB5OVKwp4tqCuBpHLS/ZbBDrc07mYTDqVMg6PfxUjjNp85O6Cd2Z/5HWA=="],
++    "mime-types": ["mime-types@3.0.2", "", { "dependencies": { "mime-db": "^1.54.0" } }, "sha512-Lbgzdk0h4juoQ9fCKXW4by0UJqj+nOOrI9MJ1sSj4nI8aI2eo1qmvQEie4VD1glsS250n15LsWsYtCugiStS5A=="],
+ 
+     "ms": ["ms@2.1.3", "", {}, "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA=="],
+ 
+@@ -200,6 +238,8 @@
+ 
+     "proxy-addr": ["proxy-addr@2.0.7", "", { "dependencies": { "forwarded": "0.2.0", "ipaddr.js": "1.9.1" } }, "sha512-llQsMLSUDUPT44jdrU/O37qlnifitDP+ZwrmmZcoSKyLKvtZxpyV0n2/bD/N4tBAAZ/gJEdZU7KMraoK1+XYAg=="],
+ 
++    "proxy-from-env": ["proxy-from-env@1.1.0", "", {}, "sha512-D+zkORCbA9f1tdWRK0RaCR3GPv50cMxcrz4X8k5LTSUD1Dkw47mKJEZQNunItRTkWwgtaUSo1RVFRIG9ZXiFYg=="],
++
+     "qs": ["qs@6.14.0", "", { "dependencies": { "side-channel": "^1.1.0" } }, "sha512-YWWTjgABSKcvs/nWBi9PycY/JiPJqOD4JA6o9Sej2AtvSGarXxKC3OQSk4pAarbdQlKAh5D4FCQkJNkW+GAn3w=="],
+ 
+     "range-parser": ["range-parser@1.2.1", "", {}, "sha512-Hrgsx+orqoygnmhFbKaHE6c296J+HTAQXoxEF6gNupROmmGJRoyzfG3ccAveqCBrwr/2yxQ5BVd/GTl5agOwSg=="],
+@@ -258,7 +298,7 @@
+ 
+     "zod": ["zod@3.25.76", "", {}, "sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ=="],
+ 
+-    "zod-to-json-schema": ["zod-to-json-schema@3.24.6", "", { "peerDependencies": { "zod": "^3.24.1" } }, "sha512-h/z3PKvcTcTetyjl1fkj79MHNEjm+HpD6NXheWjzOekY7kV+lwDYnHw+ivHkijnCSMz1yJaWBD9vu/Fcmk+vEg=="],
++    "zod-to-json-schema": ["zod-to-json-schema@3.25.1", "", { "peerDependencies": { "zod": "^3.25 || ^4" } }, "sha512-pM/SU9d3YAggzi6MtR4h7ruuQlqKtad8e9S0fmxcMi+ueAK5Korys/aWcV9LIIHTVbj01NdzxcnXSN+O74ZIVA=="],
+ 
+     "@octokit/plugin-paginate-rest/@octokit/types": ["@octokit/types@12.6.0", "", { "dependencies": { "@octokit/openapi-types": "^20.0.0" } }, "sha512-1rhSOfRa6H9w4YwK0yrf5faDaDTb+yLyBUKOCV4xtCDB5VmIPqd/v9yr9o6SAzOAlRxMiRiCic6JVM1/kunVkw=="],
+ 
+@@ -272,10 +312,20 @@
+ 
+     "@octokit/rest/@octokit/plugin-rest-endpoint-methods": ["@octokit/plugin-rest-endpoint-methods@17.0.0", "", { "dependencies": { "@octokit/types": "^16.0.0" }, "peerDependencies": { "@octokit/core": ">=6" } }, "sha512-B5yCyIlOJFPqUUeiD0cnBJwWJO8lkJs5d8+ze9QDP6SvfiXSz1BF+91+0MeI1d2yxgOhU/O+CvtiZ9jSkHhFAw=="],
+ 
++    "accepts/mime-types": ["mime-types@3.0.1", "", { "dependencies": { "mime-db": "^1.54.0" } }, "sha512-xRc4oEhT6eaBpU1XF7AjpOFD+xQmXNB5OVKwp4tqCuBpHLS/ZbBDrc07mYTDqVMg6PfxUjjNp85O6Cd2Z/5HWA=="],
++
+     "body-parser/iconv-lite": ["iconv-lite@0.6.3", "", { "dependencies": { "safer-buffer": ">= 2.1.2 < 3.0.0" } }, "sha512-4fCk79wshMdzMp2rH06qWrJE4iolqLhCUH+OiuIgU++RB0+94NlDL81atO7GX55uUKueo0txHNtvEyI6D7WdMw=="],
+ 
++    "express/mime-types": ["mime-types@3.0.1", "", { "dependencies": { "mime-db": "^1.54.0" } }, "sha512-xRc4oEhT6eaBpU1XF7AjpOFD+xQmXNB5OVKwp4tqCuBpHLS/ZbBDrc07mYTDqVMg6PfxUjjNp85O6Cd2Z/5HWA=="],
++
++    "form-data/mime-types": ["mime-types@2.1.35", "", { "dependencies": { "mime-db": "1.52.0" } }, "sha512-ZDY+bPm5zTTF+YpCrAU9nK0UgICYPT0QtT1NZWFv4s++TNkcgVaT0g6+4R2uI4MjQjzysHB1zxuWL50hzaeXiw=="],
++
+     "http-errors/statuses": ["statuses@2.0.1", "", {}, "sha512-RwNA9Z/7PrK06rYLIzFMlaF+l73iwpzsqRIFgbMLbTcLD6cOao82TaWefPXQvB2fOC4AjuYSEndS7N/mTCbkdQ=="],
+ 
++    "send/mime-types": ["mime-types@3.0.1", "", { "dependencies": { "mime-db": "^1.54.0" } }, "sha512-xRc4oEhT6eaBpU1XF7AjpOFD+xQmXNB5OVKwp4tqCuBpHLS/ZbBDrc07mYTDqVMg6PfxUjjNp85O6Cd2Z/5HWA=="],
++
++    "type-is/mime-types": ["mime-types@3.0.1", "", { "dependencies": { "mime-db": "^1.54.0" } }, "sha512-xRc4oEhT6eaBpU1XF7AjpOFD+xQmXNB5OVKwp4tqCuBpHLS/ZbBDrc07mYTDqVMg6PfxUjjNp85O6Cd2Z/5HWA=="],
++
+     "@octokit/plugin-paginate-rest/@octokit/types/@octokit/openapi-types": ["@octokit/openapi-types@20.0.0", "", {}, "sha512-EtqRBEjp1dL/15V7WiX5LJMIxxkdiGJnabzYx5Apx4FkQIFgAfKumXeYAqqJCj1s+BMX4cPFIFC4OLCR6stlnA=="],
+ 
+     "@octokit/plugin-request-log/@octokit/core/@octokit/auth-token": ["@octokit/auth-token@6.0.0", "", {}, "sha512-P4YJBPdPSpWTQ1NU4XYdvHvXJJDxM6YwpS0FZHRgP7YFkdVxsWcpWGy/NVqlAA7PcPCnMacXlRm1y2PFZRWL/w=="],
+@@ -312,6 +362,8 @@
+ 
+     "@octokit/rest/@octokit/plugin-rest-endpoint-methods/@octokit/types": ["@octokit/types@16.0.0", "", { "dependencies": { "@octokit/openapi-types": "^27.0.0" } }, "sha512-sKq+9r1Mm4efXW1FCk7hFSeJo4QKreL/tTbR0rz/qx/r1Oa2VV83LTA/H/MuCOX7uCIJmQVRKBcbmWoySjAnSg=="],
+ 
++    "form-data/mime-types/mime-db": ["mime-db@1.52.0", "", {}, "sha512-sPU4uV7dYlvtWJxwwxHD0PuihVNiE7TyAbQ5SWxDCB9mUYvOgroQOwYQQOKPJ8CIbE+1ETVlOoK1UC2nU3gYvg=="],
++
+     "@octokit/plugin-request-log/@octokit/core/@octokit/request/@octokit/endpoint": ["@octokit/endpoint@11.0.1", "", { "dependencies": { "@octokit/types": "^15.0.0", "universal-user-agent": "^7.0.2" } }, "sha512-7P1dRAZxuWAOPI7kXfio88trNi/MegQ0IJD3vfgC3b+LZo1Qe6gRJc2v0mz2USWWJOKrB2h5spXCzGbw+fAdqA=="],
+ 
+     "@octokit/plugin-request-log/@octokit/core/@octokit/types/@octokit/openapi-types": ["@octokit/openapi-types@26.0.0", "", {}, "sha512-7AtcfKtpo77j7Ts73b4OWhOZHTKo/gGY8bB3bNBQz4H+GRSWqx2yvj8TXRsbdTE0eRmYmXOEY66jM7mJ7LzfsA=="],
+diff --git a/docs/JIRA_INTEGRATION.md b/docs/JIRA_INTEGRATION.md
+new file mode 100644
+index 0000000..e74c5a8
+--- /dev/null
++++ b/docs/JIRA_INTEGRATION.md
+@@ -0,0 +1,151 @@
++# Jira Integration for Junie GitHub Action
++
++This integration allows Junie to automatically implement features and fixes based on Jira issues
++
++## How It Works
++
++When a Jira issue is created or updated with a specific trigger (e.g., adding a label), Jira automation triggers a GitHub Actions workflow via `workflow_dispatch`. Junie then:
++
++1. **Receives the Jira issue** details (key, summary, description)
++2. **Transitions the issue to "In Progress"** automatically
++3. **Implements the changes** based on the issue description
++4. **Creates a pull request** with the changes
++5. **Transitions the issue to "In Review"**
++6. **Adds a comment** to the Jira issue with the PR link
++
++## Setup
++
++### 1. Configure Jira API Access
++
++Create a Jira API token:
++
++1. Go to [Atlassian Account Settings](https://id.atlassian.com/manage-profile/security/api-tokens)
++2. Click "Create API token"
++3. Give it a name (e.g., "Junie GitHub Integration")
++4. Copy the generated token
++
++### 2. Add GitHub Secrets
++
++Add the following secrets to your GitHub repository:
++
++- `JIRA_EMAIL`: Your Jira account email
++- `JIRA_API_TOKEN`: The API token you created
++- `JIRA_BASE_URL`: Your Jira instance URL (e.g., `https://your-company.atlassian.net`)
++
++### 3. Configure Jira Transition IDs (Optional)
++
++By default, the integration uses these transition IDs:
++- **In Progress**: `21`
++- **In Review**: `31`
++
++These IDs may vary depending on your Jira workflow. To find your transition IDs:
++
++```bash
++curl -u EMAIL:API_TOKEN \
++  "https://your-company.atlassian.net/rest/api/3/issue/YOUR-ISSUE-KEY/transitions" \
++  | jq '.transitions[] | {id, name}'
++```
++
++Add custom transition IDs as GitHub secrets if needed:
++- `JIRA_TRANSITION_IN_PROGRESS`
++- `JIRA_TRANSITION_IN_REVIEW`
++
++### 4. Create GitHub Workflow
++
++Create `.github/workflows/junie-jira.yml`:
++
++```yaml
++name: Junie Jira Integration
++
++on:
++  workflow_dispatch:
++    inputs:
++      action:
++        description: 'Action type'
++        default: 'jira_event'
++        required: true
++        type: string
++      issue_key:
++        description: 'Jira issue key (e.g., TEST-1)'
++        required: true
++        type: string
++      issue_summary:
++        description: 'Jira issue summary/title'
++        required: true
++        type: string
++      issue_description:
++        description: 'Jira issue description'
++        required: false
++        type: string
++      issue_comments:
++        description: 'Jira issue comments'
++        required: false
++      issue_attachments:
++        description: 'Jira issue attachments'
++        required: false
++
++jobs:
++  junie:
++    runs-on: ubuntu-latest
++    permissions:
++      contents: write
++      pull-requests: write
++      issues: write
++    if: ${{ inputs.action == 'jira_event' }}
++
++    steps:
++      - name: Checkout repository
++        uses: actions/checkout@v4
++        with:
++          fetch-depth: 1
++
++      - name: Run Junie
++        id: junie
++        uses: JetBrains/junie-github-action@v0
++        with:
++          junie_api_key: ${{ secrets.JUNIE_API_KEY }}
++          jira_base_url: ${{ secrets.JIRA_BASE_URL }}
++          jira_email: ${{ secrets.JIRA_EMAIL }}
++          jira_api_token: ${{ secrets.JIRA_API_TOKEN }}
++#          optional
++#          jira_transition_in_progress: your value
++#          jira_transition_in_review: your value
++```
++
++### 5. Configure Jira Automation
++
++In Jira, create an automation rule:
++
++1. **Trigger**: Issue created/updated, or Label added (e.g., "junie-agent")
++2. **Action**: Send web request
++
++**Web Request Configuration:**
++
++- **URL**: `https://api.github.com/repos/{owner}/{repo}/actions/workflows/junie-jira.yml/dispatches`
++- **Method**: POST
++- **Headers**:
++  ```
++  Authorization: Bearer {{secrets.GITHUB_TOKEN}}
++  Content-Type: application/json
++  ```
++- **Body** (Custom data):
++  ```json
++  {
++    "ref": "main",
++    "inputs": {
++      "action": "jira_event",
++      "issue_key": "{{issue.key}}",
++      "issue_summary": "{{issue.summary.jsonEncode}}",
++      "issue_description": "{{issue.description.jsonEncode}}",
++      "issue_comments": "[{{#issue.comments}}{\"author\":\"{{author.displayName.jsonEncode}}\",\"body\":\"{{body.jsonEncode}}\",\"created\":\"{{created}}\"}{{^last}},{{/}}{{/}}]",
++      "issue_attachments": "[{{#attachment}}{\"filename\":\"{{filename.jsonEncode}}\",\"mimeType\":\"{{mimeType}}\",\"size\":{{size}},\"content\":\"{{content}}\"}{{^last}},{{/}}{{/}}]"
++    }
++  }
++  ```
++
++### Comments and Attachments Support
++
++Junie will receive all comments and attachments from the Jira issue. This allows the AI to:
++- Read user discussions and clarifications in comments
++- Access screenshots, diagrams, and other files attached to the issue
++- Better understand the context and requirements
+\ No newline at end of file
+diff --git a/package.json b/package.json
+index 3d1f2a7..d5be0ad 100644
+--- a/package.json
++++ b/package.json
+@@ -10,13 +10,17 @@
+   "dependencies": {
+     "@actions/core": "^1.11.1",
+     "@actions/github": "^6.0.1",
+-    "@modelcontextprotocol/sdk": "^1.21.0",
++    "@modelcontextprotocol/sdk": "^1.25.2",
+     "@octokit/rest": "^22.0.1",
+     "@octokit/webhooks-types": "^7.6.1",
++    "jira.js": "^5.2.2",
++    "marklassian": "^1.1.0",
++    "mime-types": "^3.0.2",
+     "p-retry": "^7.1.0"
+   },
+   "devDependencies": {
+     "@types/bun": "latest",
++    "@types/mime-types": "^3.0.1",
+     "typescript": "^5.5.3"
+   },
+   "private": true
+diff --git a/src/constants/github.ts b/src/constants/github.ts
+index 938ca3c..4c77598 100644
+--- a/src/constants/github.ts
++++ b/src/constants/github.ts
+@@ -18,6 +18,8 @@ export const RESOLVE_CONFLICTS_TRIGGER_PHRASE = "resolve conflicts"
+ 
+ export const RESOLVE_CONFLICTS_TRIGGER_PHRASE_REGEXP = new RegExp(RESOLVE_CONFLICTS_TRIGGER_PHRASE, 'i')
+ 
++export const JIRA_EVENT_ACTION = "jira_event";
++
+ export const WORKING_BRANCH_PREFIX = "junie/";
+ 
+ export const DEFAULT_TRIGGER_PHRASE = "@junie-agent";
+@@ -67,7 +69,7 @@ export const COMMIT_MESSAGE_TEMPLATE = (junieTitle: string, issueId?: number) =>
+ // Feedback Comments
+ // ============================================================================
+ 
+-export const SUCCESS_FEEDBACK_COMMENT = "Junie is successful finished!"
++export const SUCCESS_FEEDBACK_COMMENT = "Junie successfully finished!"
+ 
+ export const ERROR_FEEDBACK_COMMENT_TEMPLATE = (details: string, jobLink: string) => `Junie is failed!
+ 
+@@ -76,7 +78,7 @@ Details: ${details}
+ ${jobLink}
+ `
+ 
+-export const PR_CREATED_FEEDBACK_COMMENT_TEMPLATE = (prLink: string) => `${SUCCESS_FEEDBACK_COMMENT}\n PR link: ${prLink}`
++export const PR_CREATED_FEEDBACK_COMMENT_TEMPLATE = (prLink: string) => `${SUCCESS_FEEDBACK_COMMENT}\n PR link: [${prLink}](${prLink})`
+ 
+ export const MANUALLY_PR_CREATE_FEEDBACK_COMMENT_TEMPLATE = (createPRLink: string) => `${SUCCESS_FEEDBACK_COMMENT}\n\nYou can create a PR manually: [Create Pull Request](${createPRLink})`
+ 
+diff --git a/src/entrypoints/create-pr.ts b/src/entrypoints/create-pr.ts
+index a8d57ae..e364f89 100644
+--- a/src/entrypoints/create-pr.ts
++++ b/src/entrypoints/create-pr.ts
+@@ -2,14 +2,14 @@
+ 
+ import * as core from "@actions/core";
+ import { Octokit } from "@octokit/rest";
+-import { GitHubContext } from "../github/context";
++import { JunieExecutionContext } from "../github/context";
+ import { ENV_VARS, OUTPUT_VARS } from "../constants/environment";
+ import { handleStepError } from "../utils/error-handler";
+ 
+ export async function createPullRequest() {
+     try {
+         const githubToken = process.env[ENV_VARS.GITHUB_TOKEN]!;
+-        const context = JSON.parse(process.env[OUTPUT_VARS.PARSED_CONTEXT]!) as GitHubContext;
++        const context = JSON.parse(process.env[OUTPUT_VARS.PARSED_CONTEXT]!) as JunieExecutionContext;
+         const prTitle = process.env[OUTPUT_VARS.PR_TITLE]!;
+         const prBody = process.env[OUTPUT_VARS.PR_BODY]!;
+         const baseBranch = process.env[OUTPUT_VARS.BASE_BRANCH]!;
+diff --git a/src/entrypoints/give-feedback.ts b/src/entrypoints/give-feedback.ts
+index 471b14c..f91cc4f 100644
+--- a/src/entrypoints/give-feedback.ts
++++ b/src/entrypoints/give-feedback.ts
+@@ -1,22 +1,21 @@
+-import * as core from "@actions/core";
+-import {writeFinishFeedbackComment} from "../github/operations/comments/feedback";
++import {postJunieCompletionComment} from "../github/operations/comments/feedback";
+ import type {FinishFeedbackData} from "../github/operations/comments/types";
+-import {GitHubContext} from "../github/context";
++import {JunieExecutionContext} from "../github/context";
+ import {ActionType} from "./handle-results";
+ import {ENV_VARS, OUTPUT_VARS} from "../constants/environment";
+ import {formatJunieSummary} from "./format-summary";
+ import {appendFileSync} from "fs";
+-import {createOctokit} from "../github/api/client";
++import {buildGitHubApiClient} from "../github/api/client";
+ import {handleStepError} from "../utils/error-handler";
+ 
+ /**
+  * Writes feedback comment to GitHub issue/PR if initCommentId is available
+  */
+-async function writeFeedbackComment(isJobFailed: boolean, initCommentId: string): Promise<void> {
++async function writeFeedbackComment(isJobFailed: boolean, initCommentId?: string): Promise<void> {
+     const data: FinishFeedbackData = {
+         initCommentId: initCommentId,
+         isJobFailed: isJobFailed,
+-        parsedContext: JSON.parse(process.env[OUTPUT_VARS.PARSED_CONTEXT]!) as GitHubContext
++        parsedContext: JSON.parse(process.env[OUTPUT_VARS.PARSED_CONTEXT]!) as JunieExecutionContext
+     }
+ 
+     if (data.isJobFailed) {
+@@ -33,8 +32,8 @@ async function writeFeedbackComment(isJobFailed: boolean, initCommentId: string)
+         }
+     }
+ 
+-    const octokits = createOctokit(process.env[ENV_VARS.GITHUB_TOKEN]!);
+-    await writeFinishFeedbackComment(octokits.rest, data)
++    const octokits = buildGitHubApiClient(process.env[ENV_VARS.GITHUB_TOKEN]!);
++    await postJunieCompletionComment(octokits.rest, data)
+ }
+ 
+ /**
+@@ -92,10 +91,7 @@ export async function giveFeedback() {
+         const isJobFailed = process.env[ENV_VARS.IS_JOB_FAILED] === "true";
+         const initCommentId = process.env[OUTPUT_VARS.INIT_COMMENT_ID];
+ 
+-        // Write feedback comment if initCommentId is available
+-        if (initCommentId) {
+-            await writeFeedbackComment(isJobFailed, initCommentId);
+-        }
++        await writeFeedbackComment(isJobFailed, initCommentId);
+ 
+         // Generate GitHub Actions Job Summary (always)
+         try {
+diff --git a/src/entrypoints/handle-results.ts b/src/entrypoints/handle-results.ts
+index 01f1188..c295e4a 100644
+--- a/src/entrypoints/handle-results.ts
++++ b/src/entrypoints/handle-results.ts
+@@ -1,5 +1,5 @@
+ import {COMMIT_MESSAGE_TEMPLATE, PR_BODY_TEMPLATE, PR_TITLE_TEMPLATE} from "../constants/github";
+-import {GitHubContext, isEntityContext} from "../github/context";
++import {JunieExecutionContext, isTriggeredByUserInteraction, isJiraWorkflowDispatchEvent} from "../github/context";
+ import {execSync} from 'child_process';
+ import * as core from "@actions/core";
+ import {ENV_VARS, OUTPUT_VARS} from "../constants/environment";
+@@ -27,7 +27,7 @@ export async function handleResults() {
+             );
+         }
+         const junieJsonOutput = JSON.parse(stringJunieJsonOutput) as any
+-        const context = JSON.parse(process.env[OUTPUT_VARS.PARSED_CONTEXT]!) as GitHubContext
++        const context = JSON.parse(process.env[OUTPUT_VARS.PARSED_CONTEXT]!) as JunieExecutionContext
+         const isResolveConflict = context.inputs.resolveConflicts || isReviewOrCommentHasResolveConflictsTrigger(context)
+         const junieErrors = junieJsonOutput.errors
+         if (junieErrors && (junieErrors as string[]).length > 0) {
+@@ -42,7 +42,7 @@ export async function handleResults() {
+         const title = junieJsonOutput.taskName || (isResolveConflict ? `Resolve conflicts for ${context.entityNumber} PR` : 'Junie finished task successfully')
+         const body = junieJsonOutput.result
+         let issueId
+-        if (isEntityContext(context)) {
++        if (isTriggeredByUserInteraction(context)) {
+             issueId = context.entityNumber
+         }
+         const commitMessage = COMMIT_MESSAGE_TEMPLATE(title, issueId)
+@@ -71,7 +71,7 @@ export async function handleResults() {
+     }
+ }
+ 
+-async function getActionToDo(context: GitHubContext): Promise<ActionType> {
++async function getActionToDo(context: JunieExecutionContext): Promise<ActionType> {
+     if (context.inputs.silentMode) {
+         console.log('Silent mode enabled - no git operations will be performed');
+         return ActionType.NOTHING;
+@@ -81,12 +81,14 @@ async function getActionToDo(context: GitHubContext): Promise<ActionType> {
+     const baseBranch = process.env[OUTPUT_VARS.BASE_BRANCH]!;
+     const hasChangedFiles = await checkForChangedFiles();
+     const hasUnpushedCommits = await checkForUnpushedCommits(isNewBranch, baseBranch);
++    const isExternalIntegration = isJiraWorkflowDispatchEvent(context)
+     const initCommentId = process.env[OUTPUT_VARS.INIT_COMMENT_ID];
+ 
+     console.log(`Has changed files: ${hasChangedFiles}`);
+     console.log(`Has unpushed commits: ${hasUnpushedCommits}`);
+     console.log(`Init comment ID: ${initCommentId}`);
+     console.log(`Is new branch: ${isNewBranch}`);
++    console.log(`Is external integration: ${isExternalIntegration}`)
+     console.log(`Working branch: ${workingBranch}`);
+ 
+     let action: ActionType
+@@ -99,8 +101,8 @@ async function getActionToDo(context: GitHubContext): Promise<ActionType> {
+     } else if (hasUnpushedCommits) {
+         console.log('No changes but has unpushed commits in existing branch - will push');
+         action = ActionType.PUSH;
+-    } else if (initCommentId) {
+-        console.log('No changes and no unpushed commits but has comment ID - will write comment');
++    } else if (initCommentId || isExternalIntegration) {
++        console.log('No changes and no unpushed commits but has comment ID or it`s an external integration - will write comment');
+         action = ActionType.WRITE_COMMENT;
+     } else {
+         console.log('No specific action matched - do nothing');
+diff --git a/src/entrypoints/prepare.ts b/src/entrypoints/prepare.ts
+index 0d4b716..acac748 100644
+--- a/src/entrypoints/prepare.ts
++++ b/src/entrypoints/prepare.ts
+@@ -1,21 +1,20 @@
+ #!/usr/bin/env bun
+ 
+-import * as core from "@actions/core";
+-import {setupGitHubToken} from "../github/token";
+-import {createOctokit} from "../github/api/client";
+-import {parseGitHubContext} from "../github/context";
+-import {prepare} from "../github/junie/prepare-junie";
+-import {getTokenOwnerInfo} from "../github/operations/auth";
++import {acquireGitHubAuthentication} from "../github/token";
++import {buildGitHubApiClient} from "../github/api/client";
++import {extractJunieWorkflowContext} from "../github/context";
++import {fetchGitHubTokenOwnerDetails} from "../github/operations/auth";
+ import {handleStepError} from "../utils/error-handler";
++import {initializeJunieExecution} from "../github/junie/prepare-junie";
+ 
+ async function run() {
+     try {
+-        const tokenConfig = await setupGitHubToken();
+-        const octokit = createOctokit(tokenConfig.workingToken);
+-        const tokenOwner = await getTokenOwnerInfo(octokit, tokenConfig);
+-        const context = parseGitHubContext(tokenOwner);
++        const tokenConfig = await acquireGitHubAuthentication();
++        const octokit = buildGitHubApiClient(tokenConfig.workingToken);
++        const tokenOwner = await fetchGitHubTokenOwnerDetails(octokit, tokenConfig);
++        const context = extractJunieWorkflowContext(tokenOwner);
+ 
+-        await prepare({
++        await initializeJunieExecution({
+             context,
+             octokit,
+             tokenConfig
+diff --git a/src/github/api/client.ts b/src/github/api/client.ts
+index 52632bc..44ec459 100644
+--- a/src/github/api/client.ts
++++ b/src/github/api/client.ts
+@@ -7,7 +7,12 @@ export type Octokits = {
+     graphql: typeof graphql;
+ };
+ 
+-export function createOctokit(token: string): Octokits {
++/**
++ * Builds configured GitHub API client with REST and GraphQL interfaces
++ * @param token - GitHub authentication token
++ * @returns Octokits instance with REST and GraphQL clients
++ */
++export function buildGitHubApiClient(token: string): Octokits {
+     return {
+         rest: new Octokit({
+             auth: token,
+diff --git a/src/github/context.ts b/src/github/context.ts
+index 59dc303..59dd27f 100644
+--- a/src/github/context.ts
++++ b/src/github/context.ts
+@@ -16,8 +16,35 @@ import {
+ } from "@octokit/webhooks-types";
+ import type {TokenOwner} from "./operations/auth";
+ import {OUTPUT_VARS} from "../constants/environment";
+-import {DEFAULT_TRIGGER_PHRASE, RESOLVE_CONFLICTS_ACTION} from "../constants/github";
++import {DEFAULT_TRIGGER_PHRASE, JIRA_EVENT_ACTION, RESOLVE_CONFLICTS_ACTION} from "../constants/github";
+ 
++// Jira integration types
++export type JiraComment = {
++    author: string;
++    body: string;
++    created: string;
++};
++
++export type JiraAttachment = {
++    filename: string;
++    mimeType: string;
++    size: number;
++    content: string;  // URL to download the attachment
++};
++
++export type JiraIssuePayload = WorkflowDispatchEvent & {
++    issueKey: string;
++    issueSummary: string;
++    issueDescription: string;
++    comments: JiraComment[];
++    attachments: JiraAttachment[];
++    action: typeof JIRA_EVENT_ACTION;
++};
++
++// Jira integration types
++export type ResolveConflictsEventPayload = WorkflowDispatchEvent & {
++    action: typeof RESOLVE_CONFLICTS_ACTION;
++};
+ 
+ export type ScheduleEvent = {
+     action?: never;
+@@ -25,7 +52,8 @@ export type ScheduleEvent = {
+     repository: Repository;
+ };
+ 
+-const ENTITY_EVENT_NAMES = [
++// Events triggered by user interactions (comments, issues, PRs)
++const USER_TRIGGERED_EVENTS = [
+     "push",
+     "issues",
+     "issue_comment",
+@@ -34,7 +62,8 @@ const ENTITY_EVENT_NAMES = [
+     "pull_request_review_comment",
+ ] as const;
+ 
+-const AUTOMATION_EVENT_NAMES = [
++// Events triggered by automation/schedules
++const SYSTEM_TRIGGERED_EVENTS = [
+     "workflow_dispatch",
+     "repository_dispatch",
+     "schedule",
+@@ -42,10 +71,11 @@ const AUTOMATION_EVENT_NAMES = [
+     "check_suite",
+ ] as const;
+ 
+-type EntityEventName = (typeof ENTITY_EVENT_NAMES)[number];
+-type AutomationEventName = (typeof AUTOMATION_EVENT_NAMES)[number];
++type UserTriggeredEventName = (typeof USER_TRIGGERED_EVENTS)[number];
++type SystemTriggeredEventName = (typeof SYSTEM_TRIGGERED_EVENTS)[number];
+ 
+-type BaseContext = {
++// Base workflow context shared by all Junie executions
++type JunieWorkflowContext = {
+     runId: string;
+     workflow: string;
+     eventAction?: string;
+@@ -73,19 +103,9 @@ type BaseContext = {
+     };
+ };
+ 
+-export type AutomationEntityGitHubContext = BaseContext & {
+-    eventName: EntityEventName;
+-    payload:
+-        | IssuesEvent
+-        | IssueCommentEvent
+-        | PullRequestEvent
+-        | PullRequestReviewEvent
+-        | PullRequestReviewCommentEvent;
+-    isPR: boolean;
+-};
+-
+-export type ParsedGitHubContext = BaseContext & {
+-    eventName: EntityEventName;
++// Context for user-initiated events that we track
++export type UserInitiatedEventContext = JunieWorkflowContext & {
++    eventName: UserTriggeredEventName;
+     payload:
+         | PushEvent
+         | IssuesEvent
+@@ -95,19 +115,28 @@ export type ParsedGitHubContext = BaseContext & {
+         | PullRequestReviewCommentEvent;
+ };
+ 
+-export type AutomationContext = BaseContext & {
+-    eventName: AutomationEventName;
++// Context for automated workflow events (workflow_dispatch, schedule, etc.)
++export type AutomationEventContext = JunieWorkflowContext & {
++    eventName: SystemTriggeredEventName;
+     payload:
+         | CheckSuiteEvent
+         | WorkflowDispatchEvent
+         | RepositoryDispatchEvent
+         | ScheduleEvent
+-        | WorkflowRunEvent;
++        | WorkflowRunEvent
++        | JiraIssuePayload
++        | ResolveConflictsEventPayload;
+ };
+ 
+-export type GitHubContext = ParsedGitHubContext | AutomationContext;
++// Union type representing all possible Junie execution contexts
++export type JunieExecutionContext = UserInitiatedEventContext | AutomationEventContext;
+ 
+-export function parseGitHubContext(tokenOwner: TokenOwner): GitHubContext {
++/**
++ * Extracts and builds Junie workflow context from GitHub event data
++ * @param tokenOwner - Information about the token owner (user or app)
++ * @returns Junie execution context with event-specific data
++ */
++export function extractJunieWorkflowContext(tokenOwner: TokenOwner): JunieExecutionContext {
+     const context = github.context;
+     const commonFields = {
+         runId: process.env.GITHUB_RUN_ID!,
+@@ -135,7 +164,7 @@ export function parseGitHubContext(tokenOwner: TokenOwner): GitHubContext {
+         },
+     };
+ 
+-    let parsedContext: GitHubContext;
++    let parsedContext: JunieExecutionContext;
+     switch (context.eventName) {
+         case "issues": {
+             const payload = context.payload as IssuesEvent;
+@@ -216,17 +245,29 @@ export function parseGitHubContext(tokenOwner: TokenOwner): GitHubContext {
+         }
+         case "workflow_dispatch": {
+             const payload = context.payload as WorkflowDispatchEvent;
+-            let prNumber = undefined
+-            let isPR = false
++
+             if (payload.inputs?.action == RESOLVE_CONFLICTS_ACTION) {
+-                prNumber = payload.inputs?.prNumber as number
+-                isPR = true
++                parsedContext = {
++                    ...commonFields,
++                    isPR: true,
++                    entityNumber: payload.inputs?.prNumber as number,
++                    eventName: context.eventName,
++                    payload: {
++                        ...payload,
++                        action: RESOLVE_CONFLICTS_ACTION
++                    },
++                };
++                break
++            }
++
++            // Handle Jira integration event
++            if (payload.inputs?.action == JIRA_EVENT_ACTION) {
++                parsedContext = extractJiraEventData(payload, commonFields)
++                break;
+             }
+ 
+             parsedContext = {
+                 ...commonFields,
+-                isPR,
+-                entityNumber: prNumber,
+                 eventName: context.eventName,
+                 payload: context.payload as unknown as WorkflowDispatchEvent,
+             };
+@@ -269,69 +310,113 @@ export function parseGitHubContext(tokenOwner: TokenOwner): GitHubContext {
+     return parsedContext;
+ }
+ 
+-export function isWorkflowDispatchEvent(context: GitHubContext): context is AutomationContext & { payload: WorkflowDispatchEvent } {
+-    return context.eventName === "workflow_dispatch";
++function extractJiraEventData(workflowPayload: WorkflowDispatchEvent, context: JunieWorkflowContext): JunieExecutionContext {
++    const issueKey = workflowPayload.inputs?.issue_key as string;
++    const issueSummary = workflowPayload.inputs?.issue_summary as string;
++    const issueDescription = workflowPayload.inputs?.issue_description as string;
++
++    if (!issueKey || !issueSummary) {
++        throw new Error(`Missing Jira issue data in workflow payload: ${JSON.stringify(workflowPayload)}`);
++    }
++
++    // Parse comments and attachments JSON arrays (default to empty arrays)
++    const comments = workflowPayload.inputs?.issue_comments
++        ? JSON.parse(workflowPayload.inputs.issue_comments as string)
++        : [];
++
++    const attachments = workflowPayload.inputs?.issue_attachments
++        ? JSON.parse(workflowPayload.inputs.issue_attachments as string)
++        : [];
++
++    if (comments.length > 0) {
++        console.log(`✓ Parsed ${comments.length} comment(s) from Jira issue`);
++    }
++
++    if (attachments.length > 0) {
++        console.log(`✓ Parsed ${attachments.length} attachment(s) from Jira issue`);
++    }
++
++    console.log(`✓ Jira issue detected: ${issueKey} - ${issueSummary}`);
++
++    // Return Jira-specific context with JiraWorkflowDispatchEvent payload
++    return {
++        ...context,
++        eventName: "workflow_dispatch",
++        payload: {
++            ...workflowPayload,
++            issueKey,
++            issueSummary,
++            issueDescription: issueDescription || '',
++            comments,
++            attachments,
++            action: JIRA_EVENT_ACTION,
++        },
++    };
+ }
+ 
+-export function isCheckSuiteEvent(context: GitHubContext): context is AutomationContext & { payload: CheckSuiteEvent } {
++export function isJiraWorkflowDispatchEvent(context: JunieExecutionContext): context is AutomationEventContext & { payload: JiraIssuePayload } {
++    return context.eventName === "workflow_dispatch" && 'action' in context.payload && context.payload.action === JIRA_EVENT_ACTION;
++}
++
++export function isResolveConflictsWorkflowDispatchEvent(context: JunieExecutionContext): context is AutomationEventContext & { payload: ResolveConflictsEventPayload }  {
++    return context.eventName === "workflow_dispatch" && 'action' in context.payload && context.payload.action === RESOLVE_CONFLICTS_ACTION;
++}
++
++export function isCheckSuiteEvent(context: JunieExecutionContext): context is AutomationEventContext & {
++    payload: CheckSuiteEvent
++} {
+     return context.eventName === "check_suite";
+ }
+ 
+ export function isPushEvent(
+-    context: GitHubContext,
+-): context is ParsedGitHubContext & { payload: PushEvent } {
++    context: JunieExecutionContext,
++): context is UserInitiatedEventContext & { payload: PushEvent } {
+     return context.eventName === "push";
+ }
+ 
+ export function isIssuesEvent(
+-    context: GitHubContext,
+-): context is ParsedGitHubContext & { payload: IssuesEvent } {
++    context: JunieExecutionContext,
++): context is UserInitiatedEventContext & { payload: IssuesEvent } {
+     return context.eventName === "issues";
+ }
+ 
+ export function isIssueCommentEvent(
+-    context: GitHubContext,
+-): context is ParsedGitHubContext & { payload: IssueCommentEvent } {
++    context: JunieExecutionContext,
++): context is UserInitiatedEventContext & { payload: IssueCommentEvent } {
+     return context.eventName === "issue_comment";
+ }
+ 
+ export function isPullRequestEvent(
+-    context: GitHubContext,
+-): context is ParsedGitHubContext & { payload: PullRequestEvent } {
++    context: JunieExecutionContext,
++): context is UserInitiatedEventContext & { payload: PullRequestEvent } {
+     return context.eventName === "pull_request";
+ }
+ 
+ export function isPullRequestReviewEvent(
+-    context: GitHubContext,
+-): context is ParsedGitHubContext & { payload: PullRequestReviewEvent } {
++    context: JunieExecutionContext,
++): context is UserInitiatedEventContext & { payload: PullRequestReviewEvent } {
+     return context.eventName === "pull_request_review";
+ }
+ 
+ export function isPullRequestReviewCommentEvent(
+-    context: GitHubContext,
+-): context is ParsedGitHubContext & { payload: PullRequestReviewCommentEvent } {
++    context: JunieExecutionContext,
++): context is UserInitiatedEventContext & { payload: PullRequestReviewCommentEvent } {
+     return context.eventName === "pull_request_review_comment";
+ }
+ 
+ export function isIssuesAssignedEvent(
+-    context: GitHubContext,
+-): context is ParsedGitHubContext & { payload: IssuesAssignedEvent } {
++    context: JunieExecutionContext,
++): context is UserInitiatedEventContext & { payload: IssuesAssignedEvent } {
+     return isIssuesEvent(context) && context.eventAction === "assigned";
+ }
+ 
+-export function isEntityContext(
+-    context: GitHubContext,
+-): context is ParsedGitHubContext {
+-    return ENTITY_EVENT_NAMES.includes(context.eventName as EntityEventName);
+-}
+-
+-
+-export function isAutomationContext(
+-    context: GitHubContext,
+-): context is AutomationContext {
+-    return AUTOMATION_EVENT_NAMES.includes(
+-        context.eventName as AutomationEventName,
+-    );
++/**
++ * Checks if the context is triggered by user interaction (comments, PR/issue events)
++ */
++export function isTriggeredByUserInteraction(
++    context: JunieExecutionContext,
++): context is UserInitiatedEventContext {
++    return USER_TRIGGERED_EVENTS.includes(context.eventName as UserTriggeredEventName);
+ }
+ 
+ function getActorEmail(): string {
+diff --git a/src/github/jira/client.ts b/src/github/jira/client.ts
+new file mode 100644
+index 0000000..2626615
+--- /dev/null
++++ b/src/github/jira/client.ts
+@@ -0,0 +1,147 @@
++#!/usr/bin/env bun
++
++import {Version3Client} from 'jira.js';
++
++/**
++ * Jira transition IDs (may vary by Jira instance/project)
++ * These should be configurable via environment variables
++ */
++export const JIRA_TRANSITIONS = {
++    IN_PROGRESS: process.env.JIRA_TRANSITION_IN_PROGRESS || "21",
++    IN_REVIEW: process.env.JIRA_TRANSITION_IN_REVIEW || "31",
++} as const;
++
++/**
++ * Jira API client wrapper
++ */
++class JiraClient {
++
++    private readonly client: Version3Client;
++    private readonly email = process.env.JIRA_EMAIL;
++    private readonly apiToken = process.env.JIRA_API_TOKEN;
++
++    constructor() {
++        this.client = this.createClient();
++    }
++
++    private createClient(): Version3Client {
++        const jiraBaseUrl = process.env.JIRA_BASE_URL;
++
++        if (!this.email || !this.apiToken || !jiraBaseUrl) {
++            throw new Error('⚠️ Jira credentials not found. Set JIRA_EMAIL, JIRA_API_TOKEN, and JIRA_BASE_URL to enable Jira integration.');
++        }
++
++        return new Version3Client({
++            host: jiraBaseUrl,
++            authentication: {
++                basic: {
++                    email: this.email,
++                    apiToken: this.apiToken,
++                },
++            },
++        });
++    }
++
++    /**
++     * Transitions a Jira issue to a new status
++     *
++     * @param issueKey - Jira issue key (e.g., PROJ-123)
++     * @param transitionId - ID of the transition to perform
++     * @returns true if successful, false otherwise
++     */
++    async transitionIssue(issueKey: string, transitionId: string): Promise<boolean> {
++        try {
++            console.log(`Transitioning Jira issue ${issueKey} with transition ID ${transitionId}`);
++
++            await this.client.issues.doTransition({
++                issueIdOrKey: issueKey,
++                transition: {
++                    id: transitionId,
++                },
++            });
++
++            console.log(`✓ Successfully transitioned Jira issue ${issueKey}`);
++            return true;
++        } catch (error) {
++            console.error(`Error transitioning Jira issue ${issueKey}:`, error);
++            return false;
++        }
++    }
++
++    /**
++     * Adds a comment to a Jira issue
++     *
++     * @param issueKey - Jira issue key (e.g., PROJ-123)
++     * @param adfDocument - Comment in Atlassian Document Format (ADF)
++     * @returns true if successful, false otherwise
++     */
++    async addComment(issueKey: string, adfDocument: any): Promise<boolean> {
++        try {
++            console.log(`Adding comment to Jira issue ${issueKey}`);
++
++            await this.client.issueComments.addComment({
++                issueIdOrKey: issueKey,
++                comment: adfDocument,
++            });
++
++            console.log(`✓ Successfully added comment to Jira issue ${issueKey}`);
++            return true;
++        } catch (error) {
++            console.error(`Error adding comment to Jira issue ${issueKey}:`, error);
++            return false;
++        }
++    }
++
++    /**
++     * Starts work on a Jira issue (transitions to "In Progress")
++     */
++    async startIssue(issueKey: string): Promise<boolean> {
++        return await this.transitionIssue(issueKey, JIRA_TRANSITIONS.IN_PROGRESS);
++    }
++
++    /**
++     * Moves Jira issue to review (transitions to "In Review")
++     */
++    async moveIssueToReview(issueKey: string): Promise<boolean> {
++        return await this.transitionIssue(issueKey, JIRA_TRANSITIONS.IN_REVIEW);
++    }
++
++    /**
++     * Downloads an attachment from Jira
++     *
++     * @param url - Full URL to the attachment (e.g., https://domain.atlassian.net/rest/api/2/attachment/content/10000)
++     * @returns Buffer containing the file data
++     */
++    async downloadAttachment(url: string): Promise<Buffer> {
++        console.log(`Downloading attachment from ${url}`);
++
++        const auth = Buffer.from(`${this.email}:${this.apiToken}`).toString('base64');
++
++        const response = await fetch(url, {
++            headers: {
++                'Authorization': `Basic ${auth}`
++            }
++        });
++
++        if (!response.ok) {
++            throw new Error(`Failed to download attachment from ${url}: ${response.status} ${response.statusText}`);
++        }
++
++        const arrayBuffer = await response.arrayBuffer();
++        return Buffer.from(arrayBuffer);
++    }
++}
++
++// Singleton instance
++let jiraClientInstance: JiraClient | null = null;
++
++/**
++ * Get the singleton instance of JiraClient
++ * @returns JiraClient instance
++ */
++export function getJiraClient(): JiraClient {
++    if (!jiraClientInstance) {
++        jiraClientInstance = new JiraClient();
++    }
++    return jiraClientInstance;
++}
+diff --git a/src/github/jira/markdown-to-jira.test.ts b/src/github/jira/markdown-to-jira.test.ts
+new file mode 100644
+index 0000000..ba6769f
+--- /dev/null
++++ b/src/github/jira/markdown-to-jira.test.ts
+@@ -0,0 +1,78 @@
++import {describe, test, expect} from "bun:test";
++import {convertMarkdownToADF} from "./markdown-to-jira";
++
++describe("convertMarkdownToADF", () => {
++    test("returns valid ADF document structure", () => {
++        const markdown = "Simple text";
++        const result = convertMarkdownToADF(markdown);
++
++        expect(result).toHaveProperty("type", "doc");
++        expect(result).toHaveProperty("version", 1);
++        expect(result).toHaveProperty("content");
++        expect(Array.isArray(result.content)).toBe(true);
++    });
++
++    test("converts simple text to paragraph", () => {
++        const markdown = "Simple text";
++        const result = convertMarkdownToADF(markdown);
++
++        expect(result.content).toHaveLength(1);
++        expect(result.content[0].type).toBe("paragraph");
++        expect(result.content[0].content).toBeDefined();
++    });
++
++    test("converts headers", () => {
++        const markdown = "# H1\n## H2\n### H3";
++        const result = convertMarkdownToADF(markdown);
++
++        expect(result.type).toBe("doc");
++        expect(result.content.length).toBeGreaterThan(0);
++        expect(result.content.some((node: any) => node.type === "heading")).toBe(true);
++    });
++
++    test("converts bold text", () => {
++        const markdown = "This is **bold** text";
++        const result = convertMarkdownToADF(markdown);
++
++        expect(result.type).toBe("doc");
++        expect(JSON.stringify(result)).toContain("strong");
++    });
++
++    test("converts inline code", () => {
++        const markdown = "Use `console.log()` for debugging";
++        const result = convertMarkdownToADF(markdown);
++
++        expect(result.type).toBe("doc");
++        expect(JSON.stringify(result)).toContain("code");
++    });
++
++    test("converts links", () => {
++        const markdown = "[GitHub](https://github.com)";
++        const result = convertMarkdownToADF(markdown);
++
++        expect(result.type).toBe("doc");
++        expect(JSON.stringify(result)).toContain("https://github.com");
++    });
++
++    test("converts complex example", () => {
++        const markdown = `Result: Add Update User Route
++
++### Summary
++- Reviewed the project
++- Located the target file at \`src/routes/users.ts\`
++
++### Details
++Check the [PR link](https://github.com/owner/repo/pull/123)`;
++
++        const result = convertMarkdownToADF(markdown);
++
++        expect(result.type).toBe("doc");
++        expect(result.version).toBe(1);
++        expect(Array.isArray(result.content)).toBe(true);
++        expect(result.content.length).toBeGreaterThan(0);
++
++        // Check that it contains expected content types
++        const types = result.content.map((node: any) => node.type);
++        expect(types).toContain("paragraph");
++    });
++});
+diff --git a/src/github/jira/markdown-to-jira.ts b/src/github/jira/markdown-to-jira.ts
+new file mode 100644
+index 0000000..7b50b98
+--- /dev/null
++++ b/src/github/jira/markdown-to-jira.ts
+@@ -0,0 +1,11 @@
++import { markdownToAdf } from 'marklassian';
++
++/**
++ * Converts GitHub Markdown to Atlassian Document Format (ADF) using marklassian library
++ *
++ * @param markdown - Text in GitHub Markdown format
++ * @returns ADF document object
++ */
++export function convertMarkdownToADF(markdown: string): any {
++    return markdownToAdf(markdown);
++}
+diff --git a/src/github/junie/attachment-downloader.ts b/src/github/junie/attachment-downloader.ts
+index b882ef4..0aa8da6 100644
+--- a/src/github/junie/attachment-downloader.ts
++++ b/src/github/junie/attachment-downloader.ts
+@@ -1,7 +1,11 @@
+ import {writeFile, mkdir} from "fs/promises";
+ import {join} from "path";
++import mime from "mime-types";
++import {JiraAttachment} from "../context";
++import {getJiraClient} from "../jira/client";
+ 
+ const DOWNLOAD_DIR = "/tmp/github-attachments";
++const JIRA_DOWNLOAD_DIR = "/tmp/jira-attachments";
+ 
+ // Export regex patterns for testing
+ export const ATTACHMENT_PATTERNS = {
+@@ -22,7 +26,19 @@ async function downloadFile(url: string): Promise<string> {
+ 
+     await mkdir(DOWNLOAD_DIR, {recursive: true});
+ 
+-    const filename = url.split('/').pop() || `attachment-${Date.now()}`;
++    let filename = url.split('/').pop() || `attachment-${Date.now()}`;
++
++    // If filename doesn't have extension, try to get it from Content-Type
++    if (!filename.includes('.')) {
++        const contentType = response.headers.get('content-type');
++        if (contentType) {
++            const ext = mime.extension(contentType);
++            if (ext) {
++                filename = `${filename}.${ext}`;
++            }
++        }
++    }
++
+     const localPath = join(DOWNLOAD_DIR, filename);
+ 
+     await writeFile(localPath, buffer);
+@@ -92,3 +108,72 @@ export async function downloadAttachmentsAndRewriteText(text: string): Promise<s
+ 
+     return updatedText;
+ }
++
++/**
++ * Jira Wiki Markup pattern for attachments: !filename.ext! or !filename.ext|parameters!
++ */
++export const JIRA_ATTACHMENT_PATTERN = /!([^!|\s]+\.[a-zA-Z0-9]+)(?:\|[^!]*)?!/g;
++
++/**
++ * Download a Jira attachment using JiraClient
++ */
++async function downloadJiraAttachment(url: string, filename: string): Promise<string> {
++    const client = getJiraClient();
++
++    const buffer = await client.downloadAttachment(url);
++
++    await mkdir(JIRA_DOWNLOAD_DIR, {recursive: true});
++
++    const localPath = join(JIRA_DOWNLOAD_DIR, filename);
++
++    await writeFile(localPath, buffer);
++    console.log(`✓ Downloaded Jira attachment: ${filename} -> ${localPath}`);
++
++    return localPath;
++}
++
++/**
++ * Downloads Jira attachments referenced in text and replaces wiki markup with local paths.
++ *
++ * Handles Jira wiki markup: !filename.jpg! or !filename.jpg|width=100,alt="text"!
++ *
++ * @param text - Text containing Jira wiki markup references
++ * @param attachments - Array of Jira attachments with filename and content URL
++ * @returns Text with wiki markup replaced by local file paths
++ */
++export async function downloadJiraAttachmentsAndRewriteText(
++    text: string,
++    attachments: Array<JiraAttachment>
++): Promise<string> {
++    if (attachments.length === 0) {
++        return text;
++    }
++
++    let updatedText = text;
++
++    // Find all Jira wiki markup references: !filename.ext! or !filename.ext|params!
++    const matches = [...text.matchAll(JIRA_ATTACHMENT_PATTERN)];
++
++    for (const match of matches) {
++        const fullMatch = match[0]; // Full match: !filename.jpg|width=100!
++        const filename = match[1];  // Captured filename: filename.jpg
++
++        // Find the attachment by filename
++        const attachment = attachments.find(att => att.filename === filename);
++
++        if (attachment) {
++            try {
++                const localPath = await downloadJiraAttachment(attachment.content, filename);
++                // Replace the entire wiki markup with just the local path
++                updatedText = updatedText.replace(fullMatch, localPath);
++            } catch (error) {
++                console.error(`Failed to download Jira attachment: ${filename}`, error);
++                // Keep the original markup if download fails
++            }
++        } else {
++            console.warn(`Jira attachment not found: ${filename}`);
++        }
++    }
++
++    return updatedText;
++}
+diff --git a/src/github/junie/junie-tasks.ts b/src/github/junie/junie-tasks.ts
+index 9a606c5..e77429d 100644
+--- a/src/github/junie/junie-tasks.ts
++++ b/src/github/junie/junie-tasks.ts
+@@ -1,5 +1,5 @@
+ import {
+-    GitHubContext,
++    JunieExecutionContext,
+     isIssueCommentEvent,
+     isIssuesEvent,
+     isPullRequestEvent,
+@@ -25,7 +25,7 @@ async function getValidatedTextTask(text: string, taskType: string): Promise<str
+     return textWithLocalAttachments
+ }
+ 
+-function getTriggerTime(context: GitHubContext): string | undefined {
++function getTriggerTime(context: JunieExecutionContext): string | undefined {
+     if (isIssueCommentEvent(context)) {
+         return context.payload.comment.created_at;
+     } else if (isIssuesEvent(context)) {
+@@ -41,7 +41,7 @@ function getTriggerTime(context: GitHubContext): string | undefined {
+ }
+ 
+ export async function prepareJunieTask(
+-    context: GitHubContext,
++    context: JunieExecutionContext,
+     branchInfo: BranchInfo,
+     octokit: Octokits
+ ) {
+@@ -66,7 +66,7 @@ export async function prepareJunieTask(
+         }
+ 
+         // Generate prompt using formatter
+-        const promptText = formatter.generatePrompt(context, fetchedData, customPrompt, context.inputs.attachGithubContextToCustomPrompt);
++        const promptText = await formatter.generatePrompt(context, fetchedData, customPrompt, context.inputs.attachGithubContextToCustomPrompt);
+         junieCLITask.task = await getValidatedTextTask(promptText, "task");
+     }
+ 
+diff --git a/src/github/junie/junie-token.ts b/src/github/junie/junie-token.ts
+index 1713560..02fadae 100644
+--- a/src/github/junie/junie-token.ts
++++ b/src/github/junie/junie-token.ts
+@@ -1,8 +1,8 @@
+-import {GitHubContext} from "../context";
++import {JunieExecutionContext} from "../context";
+ import * as core from "@actions/core";
+ import {OUTPUT_VARS} from "../../constants/environment";
+ 
+-export async function prepareJunieCLIToken(context: GitHubContext) {
++export async function prepareJunieCLIToken(context: JunieExecutionContext) {
+     const token = context.inputs.appToken
+     if (!token || token.trim().length === 0) {
+         throw new Error("Missing required input: JUNIE_API_TOKEN");
+diff --git a/src/github/junie/new-prompt-formatter.ts b/src/github/junie/new-prompt-formatter.ts
+index e011c20..2ff84f7 100644
+--- a/src/github/junie/new-prompt-formatter.ts
++++ b/src/github/junie/new-prompt-formatter.ts
+@@ -1,32 +1,40 @@
+ import {
+     FetchedData,
+-    GraphQLTimelineItemNode,
+-    GraphQLReviewNode,
+-    GraphQLFileNode,
+     GraphQLCommitNode,
++    GraphQLFileNode,
++    GraphQLReviewNode,
++    GraphQLTimelineItemNode,
++    isCrossReferencedEventNode,
+     isIssueCommentNode,
+-    isReferencedEventNode,
+-    isCrossReferencedEventNode
++    isReferencedEventNode
+ } from "../api/queries";
+ import {
+-    GitHubContext,
+-    isEntityContext,
+     isIssueCommentEvent,
+     isIssuesEvent,
++    isJiraWorkflowDispatchEvent,
+     isPullRequestEvent,
+     isPullRequestReviewCommentEvent,
+     isPullRequestReviewEvent,
+-    isPushEvent
++    isPushEvent,
++    isTriggeredByUserInteraction,
++    JiraIssuePayload,
++    JunieExecutionContext
+ } from "../context";
++import {downloadJiraAttachmentsAndRewriteText} from "./attachment-downloader";
+ 
+ export class NewGitHubPromptFormatter {
+ 
+-    generatePrompt(context: GitHubContext, fetchedData: FetchedData, userPrompt?: string, attachGithubContextToCustomPrompt: boolean = true) {
++    async generatePrompt(context: JunieExecutionContext, fetchedData: FetchedData, userPrompt?: string, attachGithubContextToCustomPrompt: boolean = true) {
+         // If user provided custom prompt and doesn't want GitHub context, return only the prompt
+         if (userPrompt && !attachGithubContextToCustomPrompt) {
+             return userPrompt;
+         }
+ 
++        // Handle Jira issue integration
++        if (isJiraWorkflowDispatchEvent(context)) {
++            return await this.generateJiraPrompt(context);
++        }
++
+         const repositoryInfo = this.getRepositoryInfo(context);
+         const actorInfo = this.getActorInfo(context);
+         const userInstruction = this.getUserInstruction(context, userPrompt)
+@@ -48,7 +56,39 @@ ${actorInfo ? actorInfo : ""}
+ `
+     }
+ 
+-    private getUserInstruction(context: GitHubContext, customPrompt?: string): string | undefined {
++    private async generateJiraPrompt(context: JunieExecutionContext): Promise<string> {
++        const jira = context.payload as JiraIssuePayload;
++
++        // Format comments
++        const commentsInfo = jira.comments.length > 0
++            ? '\n\nComments:\n' + jira.comments.map(comment => {
++                const date = new Date(comment.created).toLocaleString('en-US', {
++                    year: 'numeric',
++                    month: 'short',
++                    day: 'numeric',
++                    hour: '2-digit',
++                    minute: '2-digit'
++                });
++                return `[${date}] ${comment.author}:\n${comment.body}`;
++            }).join('\n\n')
++            : '';
++
++        // Form the complete prompt text first
++        const promptText = `You were triggered as a GitHub AI Assistant by a Jira issue. Your task is to implement the requested feature or fix based on the Jira issue details below.
++
++<jira_issue>
++Issue Key: ${jira.issueKey}
++Summary: ${jira.issueSummary}
++
++Description: ${jira.issueDescription}${commentsInfo}
++</jira_issue>
++`;
++
++        // Download all attachments referenced in text (single pass)
++        return await downloadJiraAttachmentsAndRewriteText(promptText, jira.attachments);
++    }
++
++    private getUserInstruction(context: JunieExecutionContext, customPrompt?: string): string | undefined {
+         let githubUserInstruction
+         if (isPullRequestEvent(context)) {
+             githubUserInstruction = context.payload.pull_request.body
+@@ -64,13 +104,14 @@ ${actorInfo ? actorInfo : ""}
+         return customPrompt || githubUserInstruction ? `
+         <user_instruction>
+         ${customPrompt || githubUserInstruction}
+-</user_instruction>`: undefined}
++</user_instruction>` : undefined
++    }
+ 
+-    private getPrOrIssueInfo(context: GitHubContext, fetchedData: FetchedData): string | undefined {
++    private getPrOrIssueInfo(context: JunieExecutionContext, fetchedData: FetchedData): string | undefined {
+         if (context.isPR) {
+             const prInfo = this.getPrInfo(fetchedData);
+             return prInfo ? `<pull_request_info>\n${prInfo}\n</pull_request_info>` : undefined;
+-        } else if (isEntityContext(context) && !isPushEvent(context)) {
++        } else if (isTriggeredByUserInteraction(context) && !isPushEvent(context)) {
+             const issueInfo = this.getIssueInfo(fetchedData);
+             return issueInfo ? `<issue_info>\n${issueInfo}\n</issue_info>` : undefined;
+         }
+@@ -91,7 +132,7 @@ Head Commit: ${pr.headRefOid}
+ Stats: +${pr.additions}/-${pr.deletions} (${pr.changedFiles} files, ${pr.commits.totalCount} commits)`
+     }
+ 
+-    private getIssueInfo( fetchedData: FetchedData): string {
++    private getIssueInfo(fetchedData: FetchedData): string {
+         const issue = fetchedData.issue;
+         if (!issue) return "";
+ 
+@@ -113,7 +154,7 @@ State: ${issue.state}`
+     }
+ 
+     private formatCommits(commits: GraphQLCommitNode[]): string {
+-        return commits.map(({ commit }) => {
++        return commits.map(({commit}) => {
+             const shortHash = commit.oid.substring(0, 7);
+             const message = commit.messageHeadline || commit.message || 'No message';
+             const date = commit.committedDate || '';
+@@ -254,7 +295,7 @@ ${body}`;
+         }).join('\n');
+     }
+ 
+-    private getRepositoryInfo(context: GitHubContext) {
++    private getRepositoryInfo(context: JunieExecutionContext) {
+         const repo = context.payload.repository;
+         return `<repository>
+ Repository: ${repo.full_name}
+@@ -262,7 +303,7 @@ Owner: ${repo.owner.login}
+ </repository>`
+     }
+ 
+-    private getActorInfo(context: GitHubContext) {
++    private getActorInfo(context: JunieExecutionContext) {
+         return `<actor>
+ Triggered by: @${context.actor}
+ Event: ${context.eventName}${context.eventAction ? ` (${context.eventAction})` : ""}
+diff --git a/src/github/junie/prepare-junie.ts b/src/github/junie/prepare-junie.ts
+index a4771bd..8fac0b3 100644
+--- a/src/github/junie/prepare-junie.ts
++++ b/src/github/junie/prepare-junie.ts
+@@ -1,21 +1,30 @@
+ import * as core from "@actions/core";
+-import {GitHubContext, isEntityContext, isPushEvent, isWorkflowDispatchEvent} from "../context";
++import {
++    JunieExecutionContext,
++    isTriggeredByUserInteraction,
++    isPushEvent,
++    isJiraWorkflowDispatchEvent,
++    isResolveConflictsWorkflowDispatchEvent
++} from "../context";
+ import {checkHumanActor} from "../validation/actor";
+-import {writeInitialFeedbackComment} from "../operations/comments/feedback";
+-import {setupBranch} from "../operations/branch";
++import {postJunieWorkingStatusComment} from "../operations/comments/feedback";
++import {initializeJunieWorkspace} from "../operations/branch";
+ import {PrepareJunieOptions} from "./types/junie";
+-import {checkContainsTrigger} from "../validation/trigger";
+-import {gitAuth} from "../operations/auth";
++import {detectJunieTriggerPhrase} from "../validation/trigger";
++import {configureGitCredentials} from "../operations/auth";
+ import {prepareMcpConfig} from "../../mcp/prepare-mcp-config";
+-import {checkWritePermissions} from "../validation/permissions";
++import {verifyRepositoryAccess} from "../validation/permissions";
+ import {Octokits} from "../api/client";
+ import {prepareJunieTask} from "./junie-tasks";
+ import {prepareJunieCLIToken} from "./junie-token";
+ import {OUTPUT_VARS} from "../../constants/environment";
+ import {RESOLVE_CONFLICTS_ACTION} from "../../constants/github";
++import {getJiraClient} from "../jira/client";
+ 
+-
+-export async function prepare({
++/**
++ * Initializes Junie execution by preparing environment, auth, and workflow context
++ */
++export async function initializeJunieExecution({
+                                   context,
+                                   octokit,
+                                   tokenConfig,
+@@ -32,11 +41,22 @@ export async function prepare({
+ 
+     await prepareJunieCLIToken(context)
+ 
+-    await gitAuth(context, tokenConfig)
++    await configureGitCredentials(context, tokenConfig)
++
++    await postJunieWorkingStatusComment(octokit.rest, context);
+ 
+-    await writeInitialFeedbackComment(octokit.rest, context);
++    // Start Jira issue if this is a Jira-triggered workflow
++    if (isJiraWorkflowDispatchEvent(context)) {
++        try {
++            const client = getJiraClient();
++            await client.startIssue(context.payload.issueKey);
++        } catch (jiraError) {
++            console.warn('Failed to start Jira issue:', jiraError);
++            // Don't fail the workflow if Jira update fails
++        }
++    }
+ 
+-    const branchInfo = await setupBranch(octokit, context);
++    const branchInfo = await initializeJunieWorkspace(octokit, context);
+     const mcpServers = context.inputs.allowedMcpServers ? context.inputs.allowedMcpServers.split(',') : []
+     console.log(`MCP Servers: ${mcpServers}`)
+ 
+@@ -54,9 +74,9 @@ export async function prepare({
+     await prepareJunieTask(context, branchInfo, octokit)
+ }
+ 
+-async function shouldHandle(context: GitHubContext, octokit: Octokits): Promise<boolean> {
+-    if (isEntityContext(context)) {
+-        const hasWritePermissions = await checkWritePermissions(
++async function shouldHandle(context: JunieExecutionContext, octokit: Octokits): Promise<boolean> {
++    if (isTriggeredByUserInteraction(context)) {
++        const hasWritePermissions = await verifyRepositoryAccess(
+             octokit.rest,
+             context,
+         );
+@@ -74,17 +94,21 @@ async function shouldHandle(context: GitHubContext, octokit: Octokits): Promise<
+         return await shouldResolveConflicts(context, octokit)
+     }
+ 
+-    return isEntityContext(context) && checkContainsTrigger(context) && checkHumanActor(octokit.rest, context);
++    if (isJiraWorkflowDispatchEvent(context)) {
++        return true;
++    }
++
++    return isTriggeredByUserInteraction(context) && detectJunieTriggerPhrase(context) && checkHumanActor(octokit.rest, context);
+ }
+ 
+ 
+-async function shouldResolveConflicts(context: GitHubContext, octokit: Octokits): Promise<boolean> {
++async function shouldResolveConflicts(context: JunieExecutionContext, octokit: Octokits): Promise<boolean> {
+     console.log('Checking for conflicts...')
+-    if (isWorkflowDispatchEvent(context)) {
++    if (isResolveConflictsWorkflowDispatchEvent(context)) {
+         return true;
+     }
+ 
+-    const {owner, name} = context.payload.repository
++    const {owner, name} =  context.payload.repository
+     const prs = []
+ 
+     if (context.isPR && context.entityNumber) {
+@@ -122,7 +146,7 @@ async function shouldResolveConflicts(context: GitHubContext, octokit: Octokits)
+     return false
+ }
+ 
+-async function handlePr(context: GitHubContext, octokit: Octokits, pr: any) {
++async function handlePr(context: JunieExecutionContext, octokit: Octokits, pr: any) {
+     const maxAttempts = 10
+     const delay = 6000
+     const {owner, name} = context.payload.repository
+diff --git a/src/github/junie/types/junie.ts b/src/github/junie/types/junie.ts
+index e023aee..37b3203 100644
+--- a/src/github/junie/types/junie.ts
++++ b/src/github/junie/types/junie.ts
+@@ -1,10 +1,10 @@
+-import {GitHubContext} from "../../context";
++import {JunieExecutionContext} from "../../context";
+ import {Octokits} from "../../api/client";
+ import type {GitHubTokenConfig} from "../../token";
+ 
+ 
+ export type PrepareJunieOptions = {
+-    context: GitHubContext;
++    context: JunieExecutionContext;
+     octokit: Octokits;
+     tokenConfig: GitHubTokenConfig;
+ };
+diff --git a/src/github/operations/auth.ts b/src/github/operations/auth.ts
+index 2e3e8da..66a4529 100644
+--- a/src/github/operations/auth.ts
++++ b/src/github/operations/auth.ts
+@@ -1,5 +1,5 @@
+ import {GITHUB_SERVER_URL} from "../api/config";
+-import {GitHubContext} from "../context";
++import {JunieExecutionContext} from "../context";
+ import {$} from "bun";
+ import type {Octokits} from "../api/client";
+ import type {GitHubTokenConfig} from "../token";
+@@ -31,7 +31,7 @@ export interface TokenOwner {
+  * @returns Token owner information (login, id, type)
+  * @throws {Error} if unable to authenticate with the provided token
+  */
+-export async function getTokenOwnerInfo(octokit: Octokits, tokenConfig: GitHubTokenConfig): Promise<TokenOwner> {
++export async function fetchGitHubTokenOwnerDetails(octokit: Octokits, tokenConfig: GitHubTokenConfig): Promise<TokenOwner> {
+     try {
+         // Default GITHUB_TOKEN has limited permissions and can't read user info
+         // Return well-known github-actions bot credentials to avoid unnecessary API call
+@@ -123,11 +123,11 @@ export async function getTokenOwnerInfo(octokit: Octokits, tokenConfig: GitHubTo
+  * - For bots/apps: Use noreply email format (id+login@users.noreply.github.com)
+  * - For human users: Use actor's credentials from GitHub context
+  *
+- * @param parsedContext - GitHub context with token owner and actor information
++ * @param parsedContext - Junie execution context with token owner and actor information
+  * @param tokenConfig - Token configuration (default or custom)
+  * @throws {Error} if git configuration fails (git not installed, permission issues)
+  */
+-export async function gitAuth(parsedContext: GitHubContext, tokenConfig: GitHubTokenConfig) {
++export async function configureGitCredentials(parsedContext: JunieExecutionContext, tokenConfig: GitHubTokenConfig) {
+     console.log("Configuring git authentication...");
+ 
+     const serverUrl = new URL(GITHUB_SERVER_URL);
+diff --git a/src/github/operations/branch.ts b/src/github/operations/branch.ts
+index bc53baf..b344d46 100644
+--- a/src/github/operations/branch.ts
++++ b/src/github/operations/branch.ts
+@@ -3,7 +3,7 @@
+ import * as core from "@actions/core";
+ import {$} from "bun";
+ import {
+-    GitHubContext,
++    JunieExecutionContext,
+     isPullRequestEvent,
+     isPullRequestReviewCommentEvent,
+     isPullRequestReviewEvent,
+@@ -121,7 +121,7 @@ async function createNewBranch(baseBranch: string, branchName: string, prBaseBra
+     }
+ }
+ 
+-async function setupWorkingBranch(context: GitHubContext, octokit: Octokits): Promise<BranchInfo> {
++async function prepareWorkingBranchForJunie(context: JunieExecutionContext, octokit: Octokits): Promise<BranchInfo> {
+     let baseBranch = context.inputs.baseBranch || context.payload.repository.default_branch
+     let prBaseBranch: string | undefined;
+     const entityNumber = context.entityNumber;
+@@ -215,7 +215,7 @@ async function setupWorkingBranch(context: GitHubContext, octokit: Octokits): Pr
+ 
+     if (!context.inputs.silentMode) {
+         const entityType = isPR ? "pr" : entityNumber ? "issue" : "run";
+-        const branchName = `${WORKING_BRANCH_PREFIX}${entityType}-${entityNumber}-${context.runId}`;
++        const branchName = `${WORKING_BRANCH_PREFIX}${entityType}${entityNumber ? `-${entityNumber}` : ""}-${context.runId}`;
+ 
+         return await createNewBranch(baseBranch, branchName, prBaseBranch)
+     }
+@@ -282,12 +282,12 @@ export async function ensureBranchHistory(branch: string, depth?: number) {
+  * Sets GitHub Actions outputs: BASE_BRANCH, WORKING_BRANCH, IS_NEW_BRANCH
+  *
+  * @param octokit - Octokit clients (rest and graphql)
+- * @param context - GitHub context (event payload, inputs, etc.)
++ * @param context - Junie execution(event payload, inputs, etc.)
+  * @returns Branch information with base branch, working branch, and isNewBranch flag
+  * @throws {Error} if unable to fetch PR information or create/checkout branches
+  */
+-export async function setupBranch(octokit: Octokits, context: GitHubContext) {
+-    let branchInfo = await setupWorkingBranch(context, octokit)
++export async function initializeJunieWorkspace(octokit: Octokits, context: JunieExecutionContext) {
++    let branchInfo = await prepareWorkingBranchForJunie(context, octokit)
+ 
+     // Set GitHub Actions outputs for use in subsequent steps
+     core.setOutput(OUTPUT_VARS.BASE_BRANCH, branchInfo.baseBranch);
+diff --git a/src/github/operations/comments/feedback.ts b/src/github/operations/comments/feedback.ts
+index 5a04c0e..0f42659 100644
+--- a/src/github/operations/comments/feedback.ts
++++ b/src/github/operations/comments/feedback.ts
+@@ -2,16 +2,99 @@
+ 
+ import * as core from "@actions/core";
+ import {addJunieMarker, createCommentBody, createJobRunLink, hasJunieMarker} from "./common";
+-import {GitHubContext, isPullRequestReviewCommentEvent,} from "../../context";
++import {
++    isIssueCommentEvent,
++    isJiraWorkflowDispatchEvent,
++    isPullRequestReviewCommentEvent,
++    isPullRequestReviewEvent,
++    JiraIssuePayload,
++    JunieExecutionContext,
++} from "../../context";
+ import type {Octokit} from "@octokit/rest";
+ import {GITHUB_SERVER_URL} from "../../api/config";
+ import {OUTPUT_VARS} from "../../../constants/environment";
+ import {
+     COMMIT_PUSHED_FEEDBACK_COMMENT_TEMPLATE,
+-    ERROR_FEEDBACK_COMMENT_TEMPLATE, MANUALLY_PR_CREATE_FEEDBACK_COMMENT_TEMPLATE, PR_CREATED_FEEDBACK_COMMENT_TEMPLATE,
++    ERROR_FEEDBACK_COMMENT_TEMPLATE,
++    MANUALLY_PR_CREATE_FEEDBACK_COMMENT_TEMPLATE,
++    PR_CREATED_FEEDBACK_COMMENT_TEMPLATE, SUCCESS_FEEDBACK_COMMENT,
+     SUCCESS_FEEDBACK_COMMENT_WITH_RESULT
+ } from "../../../constants/github";
+ import type {FailureFeedbackData, FinishFeedbackData, SuccessFeedbackData} from "./types";
++import {getJiraClient} from "../../jira/client";
++import {convertMarkdownToADF} from "../../jira/markdown-to-jira";
++
++/**
++ * Adds a thumbs up reaction to the trigger comment/review that started the workflow.
++ *
++ * @param octokit - Octokit REST client for GitHub API
++ * @param context - GitHub context (contains event payload and entity number)
++ */
++async function addThumbsUpToTriggerComment(
++    octokit: Octokit,
++    context: JunieExecutionContext,
++): Promise<void> {
++    try {
++        const reaction = '+1';
++        const {owner, name} = context.payload.repository;
++        const ownerLogin = owner.login;
++
++        // Handle pull request review event - add reactions to all review comments
++        if (isPullRequestReviewEvent(context)) {
++            const reviewId = context.payload.review.id;
++            console.log(`Pull request review detected - adding thumbs up to all review comments (review ID: ${reviewId})`);
++            // Get all comments from this review
++            const {data: reviewComments} = await octokit.rest.pulls.listCommentsForReview({
++                owner: ownerLogin,
++                repo: name,
++                pull_number: context.entityNumber!,
++                review_id: reviewId,
++            });
++            console.log(`Found ${reviewComments.length} comments in the review`);
++            // Add thumbs up reaction to each review comment
++            for (const comment of reviewComments) {
++                try {
++                    await octokit.rest.reactions.createForPullRequestReviewComment({
++                        owner: ownerLogin,
++                        repo: name,
++                        comment_id: comment.id,
++                        content: reaction,
++                    });
++                    console.log(`✓ Added thumbs up reaction to review comment ${comment.id}`);
++                } catch (commentError) {
++                    console.warn(`Failed to add reaction to review comment ${comment.id}:`, commentError);
++                }
++            }
++            return;
++        } else if (isIssueCommentEvent(context)) {
++            const commentId = context.payload.comment.id;
++            console.log(`Issue comment detected - adding thumbs (comment ID: ${commentId})`);
++            await octokit.rest.reactions.createForIssueComment({
++                owner: ownerLogin,
++                repo: name,
++                comment_id: commentId,
++                content: reaction,
++            });
++            console.log(`✓ Added thumbs up reaction to comment ${commentId}`);
++        } else if (isPullRequestReviewCommentEvent(context)) {
++            const commentId = context.payload.comment.id;
++            console.log(`Pull Request review comment detected - adding thumbs (review comment ID: ${commentId})`);
++            await octokit.rest.reactions.createForPullRequestReviewComment({
++                owner: ownerLogin,
++                repo: name,
++                comment_id: commentId,
++                content: reaction,
++            });
++            console.log(`✓ Added thumbs up reaction to review comment ${commentId}`);
++        } else {
++            console.log('Not a comment/review event - skipping thumbs up reaction');
++            return;
++        }
++    } catch (error) {
++        // Don't fail the workflow if we can't add a reaction
++        console.warn('Failed to add thumbs up reaction to trigger comment:', error);
++    }
++}
+ 
+ /**
+  * Finds an existing Junie comment by searching for the hidden marker.
+@@ -25,7 +108,7 @@ import type {FailureFeedbackData, FinishFeedbackData, SuccessFeedbackData} from
+  */
+ async function findExistingJunieComment(
+     octokit: Octokit,
+-    context: GitHubContext,
++    context: JunieExecutionContext,
+ ): Promise<number | undefined> {
+     // entityNumber is required for all comment searches
+     // It's checked in writeInitialFeedbackComment, but we verify here too for safety
+@@ -105,7 +188,7 @@ async function findExistingJunieComment(
+  */
+ async function updateExistingComment(
+     octokit: Octokit,
+-    context: GitHubContext,
++    context: JunieExecutionContext,
+     commentId: number,
+     body: string,
+     ownerLogin: string,
+@@ -147,9 +230,9 @@ async function updateExistingComment(
+  * @returns The comment ID (used later for updating), or undefined if skipped
+  * @throws {Error} if unable to create comment (permissions, API limits, locked issue/PR)
+  */
+-export async function writeInitialFeedbackComment(
++export async function postJunieWorkingStatusComment(
+     octokit: Octokit,
+-    context: GitHubContext,
++    context: JunieExecutionContext,
+ ) {
+     if (context.inputs.silentMode) {
+         console.log('Silent mode enabled - skipping initial feedback comment');
+@@ -169,6 +252,9 @@ export async function writeInitialFeedbackComment(
+     const jobRunLink = createJobRunLink(ownerLogin, name, context.runId);
+     const initialBody = createCommentBody(jobRunLink, context.workflow);
+ 
++    // Add thumbs up reaction to the trigger comment
++    await addThumbsUpToTriggerComment(octokit, context);
++
+     try {
+         let initCommentId: number | undefined;
+ 
+@@ -221,7 +307,7 @@ export async function writeInitialFeedbackComment(
+  */
+ async function createNewComment(
+     octokit: Octokit,
+-    context: GitHubContext,
++    context: JunieExecutionContext,
+     body: string,
+     ownerLogin: string,
+     repoName: string,
+@@ -271,7 +357,10 @@ async function createNewComment(
+  * @param data - Feedback data containing result, comment ID, and context
+  * @throws {Error} if unable to update comment (permissions, comment deleted, API limits)
+  */
+-export async function writeFinishFeedbackComment(
++/**
++ * Posts completion comment with Junie task results
++ */
++export async function postJunieCompletionComment(
+     octokit: Octokit,
+     data: FinishFeedbackData
+ ) {
+@@ -280,11 +369,28 @@ export async function writeFinishFeedbackComment(
+     const repoFullName = `${ownerLogin}/${name}`;
+     const workflowName = data.parsedContext.workflow;
+ 
++    // Check if this is a Jira-triggered workflow
++    if (isJiraWorkflowDispatchEvent(data.parsedContext)) {
++        console.log('Jira workflow detected - posting feedback to Jira');
++        try {
++            await postJiraFeedback(data);
++        } catch (jiraError) {
++            console.warn('Failed to post feedback to Jira:', jiraError);
++            // Don't fail the workflow if Jira update fails
++        }
++        return;
++    }
++
++    if (!data.initCommentId) {
++        console.log('No initial comment ID - skipping feedback');
++        return;
++    }
++
+     let feedbackBody: string | undefined;
+     if (data.isJobFailed) {
+-        feedbackBody = getFailedBody(ownerLogin, name, data.parsedContext.runId, data.failureData!, workflowName)
++        feedbackBody = getFailedBodyWithMarker(ownerLogin, name, data.parsedContext.runId, data.failureData!, workflowName)
+     } else {
+-        feedbackBody = getSuccessBody(repoFullName, data.successData!, workflowName)
++        feedbackBody = getSuccessBodyWithMarker(repoFullName, data.successData!, workflowName)
+     }
+ 
+     if (!feedbackBody) {
+@@ -320,14 +426,54 @@ export async function writeFinishFeedbackComment(
+     }
+ }
+ 
+-function getFailedBody(owner: string, repoName: string, runId: string, failureData: FailureFeedbackData, workflowName: string): string | undefined {
++/**
++ * Posts feedback to Jira issue instead of GitHub comment
++ */
++async function postJiraFeedback(data: FinishFeedbackData): Promise<void> {
++    const jiraPayload = data.parsedContext.payload as JiraIssuePayload;
++    const client = getJiraClient();
++    const {owner, name} = data.parsedContext.payload.repository;
++    const ownerLogin = owner.login;
++
++    console.log(`Updating Jira issue ${jiraPayload.issueKey}...`);
++
++    let comment: string;
++
++    if (data.isJobFailed) {
++        console.log(`Add failure comment to Jira issue ${jiraPayload.issueKey}`);
++        comment = getFailedBody(ownerLogin, name, data.parsedContext.runId, data.failureData!);
++    } else {
++        console.log(`Add success comment to Jira issue ${jiraPayload.issueKey}`);
++        const repoFullName = `${ownerLogin}/${name}`;
++        comment = getSuccessBody(repoFullName, data.successData!);
++
++        // Move to "In Review" if PR was created
++        if (data.successData?.actionToDo === 'CREATE_PR' && data.successData.prLink) {
++            console.log(`Move Jira issue ${jiraPayload.issueKey} to "In Review"`);
++            await client.moveIssueToReview(jiraPayload.issueKey);
++        }
++    }
++
++    if (comment) {
++        // Convert Markdown to Atlassian Document Format (ADF)
++        const jiraComment = convertMarkdownToADF(comment);
++        await client.addComment(jiraPayload.issueKey, jiraComment);
++        console.log(`✓ Successfully updated Jira issue ${jiraPayload.issueKey}`);
++    }
++}
++
++function getFailedBody(owner: string, repoName: string, runId: string, failureData: FailureFeedbackData) {
+     const details = failureData.error || "Check job logs for more details"
+     const jobLink = createJobRunLink(owner, repoName, runId)
+-    return addJunieMarker(ERROR_FEEDBACK_COMMENT_TEMPLATE(details, jobLink), workflowName);
++    return ERROR_FEEDBACK_COMMENT_TEMPLATE(details, jobLink);
+ }
+ 
+-function getSuccessBody(repoFullName: string, successData: SuccessFeedbackData, workflowName: string): string | undefined {
+-    let result: string | undefined;
++function getFailedBodyWithMarker(owner: string, repoName: string, runId: string, failureData: FailureFeedbackData, workflowName: string): string | undefined {
++    return addJunieMarker(getFailedBody(owner, repoName, runId, failureData), workflowName);
++}
++
++function getSuccessBody(repoFullName: string, successData: SuccessFeedbackData) {
++    let result: string = SUCCESS_FEEDBACK_COMMENT;
+     switch (successData.actionToDo) {
+         case "COMMIT_CHANGES":
+             console.log(`Commit pushed to current branch: ${successData.commitSHA}`);
+@@ -353,5 +499,10 @@ function getSuccessBody(repoFullName: string, successData: SuccessFeedbackData,
+             break;
+     }
+ 
++    return result;
++}
++
++function getSuccessBodyWithMarker(repoFullName: string, successData: SuccessFeedbackData, workflowName: string): string | undefined {
++    const result = getSuccessBody(repoFullName, successData);
+     return result ? addJunieMarker(result, workflowName) : undefined;
+ }
+\ No newline at end of file
+diff --git a/src/github/operations/comments/types.ts b/src/github/operations/comments/types.ts
+index 25adc28..0ef785b 100644
+--- a/src/github/operations/comments/types.ts
++++ b/src/github/operations/comments/types.ts
+@@ -1,10 +1,10 @@
+-import {GitHubContext} from "../../context";
++import {JunieExecutionContext} from "../../context";
+ import {ActionType} from "../../../entrypoints/handle-results";
+ 
+ export interface FinishFeedbackData {
+-    initCommentId: string;
++    initCommentId?: string;
+     isJobFailed: boolean;
+-    parsedContext: GitHubContext;
++    parsedContext: JunieExecutionContext;
+     successData?: SuccessFeedbackData;
+     failureData?: FailureFeedbackData;
+ }
+diff --git a/src/github/token.ts b/src/github/token.ts
+index d213fce..1499c2e 100644
+--- a/src/github/token.ts
++++ b/src/github/token.ts
+@@ -8,7 +8,11 @@ export interface GitHubTokenConfig {
+     isDefaultToken: (token?: string) => boolean;
+ }
+ 
+-export async function setupGitHubToken(): Promise<GitHubTokenConfig> {
++/**
++ * Acquires and configures GitHub authentication token for Junie workflow
++ * Prioritizes custom token if provided, otherwise uses default workflow token
++ */
++export async function acquireGitHubAuthentication(): Promise<GitHubTokenConfig> {
+     const defaultToken = process.env[ENV_VARS.DEFAULT_WORKFLOW_TOKEN]!;
+     const providedToken = process.env[ENV_VARS.OVERRIDE_GITHUB_TOKEN];
+ 
+diff --git a/src/github/validation/actor.ts b/src/github/validation/actor.ts
+index 1ca5bf0..1053d12 100644
+--- a/src/github/validation/actor.ts
++++ b/src/github/validation/actor.ts
+@@ -1,7 +1,7 @@
+ #!/usr/bin/env bun
+ 
+ import type {Octokit} from "@octokit/rest";
+-import type {ParsedGitHubContext} from "../context";
++import type {UserInitiatedEventContext} from "../context";
+ 
+ /**
+  * Verifies that the workflow was triggered by a human user, not a bot.
+@@ -10,13 +10,13 @@ import type {ParsedGitHubContext} from "../context";
+  * Only applies to interactive events (comments, issues, PRs) - automated workflows skip this check.
+  *
+  * @param octokit - Octokit REST client for GitHub API calls
+- * @param githubContext - Parsed GitHub context containing actor information
++ * @param githubContext - User-initiated event context containing actor information
+  * @throws {Error} if actor is a bot (type !== "User")
+  * @throws {Error} if unable to fetch actor information from GitHub API
+  */
+ export async function checkHumanActor(
+     octokit: Octokit,
+-    githubContext: ParsedGitHubContext,
++    githubContext: UserInitiatedEventContext,
+ ): Promise<boolean> {
+     try {
+         // Fetch actor information from GitHub API to determine their type (User, Bot)
+diff --git a/src/github/validation/permissions.ts b/src/github/validation/permissions.ts
+index b2f8407..b9d064e 100644
+--- a/src/github/validation/permissions.ts
++++ b/src/github/validation/permissions.ts
+@@ -1,21 +1,21 @@
+ import * as core from "@actions/core";
+-import type {ParsedGitHubContext} from "../context";
++import type {UserInitiatedEventContext} from "../context";
+ import type {Octokit} from "@octokit/rest";
+ 
+ /**
+- * Checks if the actor has write or admin permissions on the repository.
++ * Verifies if the actor has repository access for triggering Junie workflows.
+  *
+- * This ensures only repository collaborators can trigger Junie, preventing unauthorized access.
++ * Ensures only authorized users can trigger Junie, preventing unauthorized access.
+  * GitHub Apps (actors ending with "[bot]") automatically bypass this check.
+  *
+  * @param octokit - Octokit REST client for GitHub API calls
+- * @param context - Parsed GitHub context containing actor and repository information
++ * @param context - User-initiated event context containing actor and repository information
+  * @returns `true` if actor has write/admin permissions or is a GitHub App, `false` otherwise
+- * @throws {Error} if unable to check permissions (API errors, network issues)
++ * @throws {Error} if unable to verify permissions (API errors, network issues)
+  */
+-export async function checkWritePermissions(
++export async function verifyRepositoryAccess(
+     octokit: Octokit,
+-    context: ParsedGitHubContext
++    context: UserInitiatedEventContext
+ ): Promise<boolean> {
+     const {actor} = context;
+     const repo = context.payload.repository;
+diff --git a/src/github/validation/trigger.ts b/src/github/validation/trigger.ts
+index 0e67e8c..fa51d2e 100644
+--- a/src/github/validation/trigger.ts
++++ b/src/github/validation/trigger.ts
+@@ -1,6 +1,6 @@
+ #!/usr/bin/env bun
+ 
+-import type {GitHubContext, ParsedGitHubContext} from "../context";
++import type {JunieExecutionContext} from "../context";
+ import {
+     isIssueCommentEvent,
+     isIssuesAssignedEvent,
+@@ -11,7 +11,11 @@ import {
+ } from "../context";
+ import {RESOLVE_CONFLICTS_TRIGGER_PHRASE_REGEXP} from "../../constants/github";
+ 
+-export function checkContainsTrigger(context: GitHubContext): boolean {
++/**
++ * Detects if the Junie trigger phrase is present in the workflow context
++ * Checks for @mentions, labels, or assignees that match Junie trigger patterns
++ */
++export function detectJunieTriggerPhrase(context: JunieExecutionContext): boolean {
+     const {
+         inputs: {assigneeTrigger, labelTrigger, triggerPhrase},
+     } = context;
+@@ -83,11 +87,11 @@ export function checkContainsTrigger(context: GitHubContext): boolean {
+     return false;
+ }
+ 
+-export function isReviewOrCommentHasResolveConflictsTrigger(context: GitHubContext) {
++export function isReviewOrCommentHasResolveConflictsTrigger(context: JunieExecutionContext) {
+     return isReviewOrCommentHasTrigger(context, RESOLVE_CONFLICTS_TRIGGER_PHRASE_REGEXP)
+ }
+ 
+-export function isReviewOrCommentHasTrigger(context: GitHubContext, regExp: RegExp) {
++export function isReviewOrCommentHasTrigger(context: JunieExecutionContext, regExp: RegExp) {
+     if (
+         isPullRequestReviewEvent(context) &&
+         (context.eventAction === "submitted" || context.eventAction === "edited")
+diff --git a/src/mcp/prepare-mcp-config.ts b/src/mcp/prepare-mcp-config.ts
+index 8349074..df4cc54 100644
+--- a/src/mcp/prepare-mcp-config.ts
++++ b/src/mcp/prepare-mcp-config.ts
+@@ -37,7 +37,7 @@ export async function prepareMcpConfig(
+ 
+ 
+     if (hasGHCheksServer) {
+-        const head = branchInfo.prBaseBranch ? branchInfo.baseBranch : branchInfo.workingBranch
++        const head = branchInfo.isNewBranch ? branchInfo.baseBranch : branchInfo.workingBranch
+         baseMcpConfig.mcpServers.github_checks = {
+             command: "bun",
+             args: [
+diff --git a/test/actor.test.ts b/test/actor.test.ts
+index 1ea021a..f5d696f 100644
+--- a/test/actor.test.ts
++++ b/test/actor.test.ts
+@@ -2,6 +2,7 @@ import { describe, test, expect, beforeEach, afterEach, spyOn } from "bun:test";
+ import { checkHumanActor } from "../src/github/validation/actor";
+ import { mockIssueCommentContext } from "./mockContext";
+ import type { Octokit } from "@octokit/rest";
++import type { UserInitiatedEventContext } from "../src/github/context";
+ 
+ describe("Actor Validation", () => {
+   let getUserByUsernameSpy: any;
+@@ -27,7 +28,7 @@ describe("Actor Validation", () => {
+         data: { type: "User", login: "contributor-user" },
+       } as any);
+ 
+-      const result = await checkHumanActor(mockOctokit, mockIssueCommentContext);
++      const result = await checkHumanActor(mockOctokit, mockIssueCommentContext as UserInitiatedEventContext);
+       expect(result).toBe(true);
+       expect(getUserByUsernameSpy).toHaveBeenCalledWith({
+         username: "contributor-user",
+@@ -39,7 +40,7 @@ describe("Actor Validation", () => {
+         data: { type: "Bot", login: "dependabot[bot]" },
+       } as any);
+ 
+-      const context = { ...mockIssueCommentContext, actor: "dependabot[bot]" };
++      const context = { ...mockIssueCommentContext, actor: "dependabot[bot]" } as UserInitiatedEventContext;
+ 
+       const result = await checkHumanActor(mockOctokit, context);
+       expect(result).toBe(false);
+@@ -50,7 +51,7 @@ describe("Actor Validation", () => {
+         data: { type: "Bot", login: "github-actions[bot]" },
+       } as any);
+ 
+-      const context = { ...mockIssueCommentContext, actor: "github-actions[bot]" };
++      const context = { ...mockIssueCommentContext, actor: "github-actions[bot]" } as UserInitiatedEventContext;
+ 
+       const result = await checkHumanActor(mockOctokit, context);
+       expect(result).toBe(false);
+@@ -61,7 +62,7 @@ describe("Actor Validation", () => {
+         data: { type: "User", login: "alice" },
+       } as any);
+ 
+-      const context = { ...mockIssueCommentContext, actor: "alice" };
++      const context = { ...mockIssueCommentContext, actor: "alice" } as UserInitiatedEventContext;
+ 
+       const result = await checkHumanActor(mockOctokit, context);
+ 
+@@ -77,7 +78,7 @@ describe("Actor Validation", () => {
+         new Error("API rate limit exceeded")
+       );
+ 
+-      const result = await checkHumanActor(mockOctokit, mockIssueCommentContext);
++      const result = await checkHumanActor(mockOctokit, mockIssueCommentContext as UserInitiatedEventContext);
+       expect(result).toBe(false);
+     });
+ 
+@@ -87,7 +88,7 @@ describe("Actor Validation", () => {
+         message: "Not Found",
+       });
+ 
+-      const result = await checkHumanActor(mockOctokit, mockIssueCommentContext);
++      const result = await checkHumanActor(mockOctokit, mockIssueCommentContext as UserInitiatedEventContext);
+       expect(result).toBe(false);
+     });
+ 
+@@ -99,7 +100,7 @@ describe("Actor Validation", () => {
+           data: { type: "User", login: actor },
+         } as any);
+ 
+-        const context = { ...mockIssueCommentContext, actor };
++        const context = { ...mockIssueCommentContext, actor } as UserInitiatedEventContext;
+         const result = await checkHumanActor(mockOctokit, context);
+         expect(result).toBe(true);
+ 
+diff --git a/test/comment-feedback.test.ts b/test/comment-feedback.test.ts
+index f77ed9e..0f833c6 100644
+--- a/test/comment-feedback.test.ts
++++ b/test/comment-feedback.test.ts
+@@ -1,7 +1,7 @@
+ import { describe, test, expect, beforeEach, afterEach, spyOn, mock } from "bun:test";
+ import {
+-  writeInitialFeedbackComment,
+-  writeFinishFeedbackComment,
++  postJunieWorkingStatusComment,
++  postJunieCompletionComment,
+ } from "../src/github/operations/comments/feedback";
+ import type {FinishFeedbackData} from "../src/github/operations/comments/types";
+ import {
+@@ -13,7 +13,7 @@ import type { Octokit } from "@octokit/rest";
+ import type { PullRequestReviewCommentEvent } from "@octokit/webhooks-types";
+ import * as core from "@actions/core";
+ import * as clientModule from "../src/github/api/client";
+-import {GitHubContext} from "../src/github/context";
++import {JunieExecutionContext} from "../src/github/context";
+ import {createJunieCommentMarker} from "../src/constants/github";
+ 
+ describe("Comment Feedback Operations", () => {
+@@ -50,8 +50,8 @@ describe("Comment Feedback Operations", () => {
+     updateReviewCommentSpy = mockOctokit.rest.pulls.updateReviewComment;
+     listReviewCommentsSpy = mockOctokit.rest.pulls.listReviewComments;
+ 
+-    // Mock createOctokit to return Octokits structure
+-    createOctokitSpy = spyOn(clientModule, "createOctokit").mockReturnValue({
++    // Mock buildGitHubApiClient to return Octokits structure
++    createOctokitSpy = spyOn(clientModule, "buildGitHubApiClient").mockReturnValue({
+       rest: mockOctokit,
+       graphql: {} as any,
+     } as any);
+@@ -64,9 +64,9 @@ describe("Comment Feedback Operations", () => {
+     setOutputSpy.mockRestore();
+   });
+ 
+-  describe("writeInitialFeedbackComment", () => {
++  describe("postJunieWorkingStatusComment", () => {
+     test("should create comment on issue", async () => {
+-      const commentId = await writeInitialFeedbackComment(
++      const commentId = await postJunieWorkingStatusComment(
+         mockOctokit,
+         mockIssueCommentContext
+       );
+@@ -82,7 +82,7 @@ describe("Comment Feedback Operations", () => {
+     });
+ 
+     test("should create comment on PR", async () => {
+-      const commentId = await writeInitialFeedbackComment(
++      const commentId = await postJunieWorkingStatusComment(
+         mockOctokit,
+         mockPullRequestCommentContext
+       );
+@@ -97,7 +97,7 @@ describe("Comment Feedback Operations", () => {
+     });
+ 
+     test("should create reply for review comment", async () => {
+-      const commentId = await writeInitialFeedbackComment(
++      const commentId = await postJunieWorkingStatusComment(
+         mockOctokit,
+         mockPullRequestReviewCommentContext
+       );
+@@ -117,16 +117,16 @@ describe("Comment Feedback Operations", () => {
+         ...mockIssueCommentContext,
+         entityNumber: undefined,
+         eventName: "workflow_dispatch" as const,
+-      } as GitHubContext;
++      } as JunieExecutionContext;
+ 
+-      const commentId = await writeInitialFeedbackComment(mockOctokit, context);
++      const commentId = await postJunieWorkingStatusComment(mockOctokit, context);
+ 
+       expect(commentId).toBeUndefined();
+       expect(createCommentSpy).not.toHaveBeenCalled();
+     });
+ 
+     test("should include job run link in comment body", async () => {
+-      await writeInitialFeedbackComment(mockOctokit, mockIssueCommentContext);
++      await postJunieWorkingStatusComment(mockOctokit, mockIssueCommentContext);
+ 
+       expect(createCommentSpy).toHaveBeenCalledWith(
+         expect.objectContaining({
+@@ -141,7 +141,7 @@ describe("Comment Feedback Operations", () => {
+       createCommentSpy.mockRejectedValue(new Error("API Error"));
+ 
+         expect(
+-            writeInitialFeedbackComment(mockOctokit, mockIssueCommentContext)
++            postJunieWorkingStatusComment(mockOctokit, mockIssueCommentContext)
+         ).rejects.toThrow("API Error");
+     });
+ 
+@@ -152,9 +152,9 @@ describe("Comment Feedback Operations", () => {
+           ...mockIssueCommentContext.inputs,
+           silentMode: true,
+         },
+-      } as GitHubContext;
++      } as JunieExecutionContext;
+ 
+-      const commentId = await writeInitialFeedbackComment(mockOctokit, silentModeContext);
++      const commentId = await postJunieWorkingStatusComment(mockOctokit, silentModeContext);
+ 
+       expect(commentId).toBeUndefined();
+       expect(createCommentSpy).not.toHaveBeenCalled();
+@@ -162,7 +162,7 @@ describe("Comment Feedback Operations", () => {
+     });
+ 
+     test("should include Junie marker in comment body", async () => {
+-      await writeInitialFeedbackComment(mockOctokit, mockIssueCommentContext);
++      await postJunieWorkingStatusComment(mockOctokit, mockIssueCommentContext);
+ 
+       const marker = createJunieCommentMarker(mockIssueCommentContext.workflow);
+       expect(createCommentSpy).toHaveBeenCalledWith(
+@@ -179,12 +179,12 @@ describe("Comment Feedback Operations", () => {
+           ...mockIssueCommentContext.inputs,
+           useSingleComment: true,
+         },
+-      } as GitHubContext;
++      } as JunieExecutionContext;
+ 
+       // Mock listComments to return no existing Junie comments
+       listCommentsSpy.mockResolvedValue({ data: [] });
+ 
+-      const commentId = await writeInitialFeedbackComment(mockOctokit, singleCommentContext);
++      const commentId = await postJunieWorkingStatusComment(mockOctokit, singleCommentContext);
+ 
+       expect(commentId).toBe(12345);
+       expect(listCommentsSpy).toHaveBeenCalledTimes(1);
+@@ -199,7 +199,7 @@ describe("Comment Feedback Operations", () => {
+           ...mockIssueCommentContext.inputs,
+           useSingleComment: true,
+         },
+-      } as GitHubContext;
++      } as JunieExecutionContext;
+ 
+       // Mock listComments to return an existing Junie comment
+       listCommentsSpy.mockResolvedValue({
+@@ -209,7 +209,7 @@ describe("Comment Feedback Operations", () => {
+         ],
+       });
+ 
+-      const commentId = await writeInitialFeedbackComment(mockOctokit, singleCommentContext);
++      const commentId = await postJunieWorkingStatusComment(mockOctokit, singleCommentContext);
+ 
+       expect(commentId).toBe(99999);
+       expect(listCommentsSpy).toHaveBeenCalledTimes(1);
+@@ -228,7 +228,7 @@ describe("Comment Feedback Operations", () => {
+           ...mockIssueCommentContext.inputs,
+           useSingleComment: true,
+         },
+-      } as GitHubContext;
++      } as JunieExecutionContext;
+ 
+       // Mock listComments to return multiple Junie comments
+       listCommentsSpy.mockResolvedValue({
+@@ -239,7 +239,7 @@ describe("Comment Feedback Operations", () => {
+         ],
+       });
+ 
+-      const commentId = await writeInitialFeedbackComment(mockOctokit, singleCommentContext);
++      const commentId = await postJunieWorkingStatusComment(mockOctokit, singleCommentContext);
+ 
+       // Should use the most recent (last in array) Junie comment
+       expect(commentId).toBe(33333);
+@@ -258,7 +258,7 @@ describe("Comment Feedback Operations", () => {
+           ...mockPullRequestReviewCommentContext.inputs,
+           useSingleComment: true,
+         },
+-      } as GitHubContext;
++      } as JunieExecutionContext;
+ 
+       const parentCommentId = (mockPullRequestReviewCommentContext.payload as PullRequestReviewCommentEvent).comment.id;
+ 
+@@ -269,7 +269,7 @@ describe("Comment Feedback Operations", () => {
+         ],
+       });
+ 
+-      const commentId = await writeInitialFeedbackComment(mockOctokit, singleCommentContext);
++      const commentId = await postJunieWorkingStatusComment(mockOctokit, singleCommentContext);
+ 
+       expect(commentId).toBe(88888);
+       expect(listReviewCommentsSpy).toHaveBeenCalledTimes(1);
+@@ -284,7 +284,7 @@ describe("Comment Feedback Operations", () => {
+           ...mockPullRequestReviewCommentContext.inputs,
+           useSingleComment: true,
+         },
+-      } as GitHubContext;
++      } as JunieExecutionContext;
+ 
+       const parentCommentId = (mockPullRequestReviewCommentContext.payload as PullRequestReviewCommentEvent).comment.id;
+ 
+@@ -300,7 +300,7 @@ describe("Comment Feedback Operations", () => {
+         ],
+       });
+ 
+-      const commentId = await writeInitialFeedbackComment(mockOctokit, singleCommentContext);
++      const commentId = await postJunieWorkingStatusComment(mockOctokit, singleCommentContext);
+ 
+       // Should find the comment from our thread (22222), not from other threads
+       expect(commentId).toBe(22222);
+@@ -319,7 +319,7 @@ describe("Comment Feedback Operations", () => {
+           ...mockPullRequestReviewCommentContext.inputs,
+           useSingleComment: true,
+         },
+-      } as GitHubContext;
++      } as JunieExecutionContext;
+ 
+       const parentCommentId = (mockPullRequestReviewCommentContext.payload as PullRequestReviewCommentEvent).comment.id;
+ 
+@@ -333,7 +333,7 @@ describe("Comment Feedback Operations", () => {
+         ],
+       });
+ 
+-      const commentId = await writeInitialFeedbackComment(mockOctokit, singleCommentContext);
++      const commentId = await postJunieWorkingStatusComment(mockOctokit, singleCommentContext);
+ 
+       // Should find the parent comment itself
+       expect(commentId).toBe(parentCommentId);
+@@ -346,13 +346,13 @@ describe("Comment Feedback Operations", () => {
+           ...mockIssueCommentContext.inputs,
+           useSingleComment: true,
+         },
+-      } as GitHubContext;
++      } as JunieExecutionContext;
+ 
+       // Mock listComments to throw an error
+       listCommentsSpy.mockRejectedValue(new Error("API Error"));
+ 
+       // Should fall back to creating a new comment
+-      const commentId = await writeInitialFeedbackComment(mockOctokit, singleCommentContext);
++      const commentId = await postJunieWorkingStatusComment(mockOctokit, singleCommentContext);
+ 
+       expect(commentId).toBe(12345);
+       expect(listCommentsSpy).toHaveBeenCalledTimes(1);
+@@ -360,7 +360,7 @@ describe("Comment Feedback Operations", () => {
+     });
+   });
+ 
+-  describe("writeFinishFeedbackComment", () => {
++  describe("postJunieCompletionComment", () => {
+     const baseFinishData: Omit<FinishFeedbackData, "isJobFailed" | "successData" | "failureData"> = {
+       initCommentId: "12345",
+       parsedContext: mockIssueCommentContext,
+@@ -378,7 +378,7 @@ describe("Comment Feedback Operations", () => {
+         },
+       };
+ 
+-      await writeFinishFeedbackComment(mockOctokit, data);
++      await postJunieCompletionComment(mockOctokit, data);
+ 
+       expect(updateCommentSpy).toHaveBeenCalledWith({
+         owner: "test-owner",
+@@ -400,7 +400,7 @@ describe("Comment Feedback Operations", () => {
+         },
+       };
+ 
+-      await writeFinishFeedbackComment(mockOctokit, data);
++      await postJunieCompletionComment(mockOctokit, data);
+ 
+       expect(updateCommentSpy).toHaveBeenCalledWith({
+         owner: "test-owner",
+@@ -423,7 +423,7 @@ describe("Comment Feedback Operations", () => {
+         },
+       };
+ 
+-      await writeFinishFeedbackComment(mockOctokit, data);
++      await postJunieCompletionComment(mockOctokit, data);
+ 
+       expect(updateCommentSpy).toHaveBeenCalledWith({
+         owner: "test-owner",
+@@ -446,7 +446,7 @@ describe("Comment Feedback Operations", () => {
+         },
+       };
+ 
+-      await writeFinishFeedbackComment(mockOctokit, data);
++      await postJunieCompletionComment(mockOctokit, data);
+ 
+       expect(updateCommentSpy).toHaveBeenCalledWith({
+         owner: "test-owner",
+@@ -467,7 +467,7 @@ describe("Comment Feedback Operations", () => {
+         },
+       };
+ 
+-      await writeFinishFeedbackComment(mockOctokit, data);
++      await postJunieCompletionComment(mockOctokit, data);
+ 
+       expect(updateCommentSpy).toHaveBeenCalledWith({
+         owner: "test-owner",
+@@ -486,7 +486,7 @@ describe("Comment Feedback Operations", () => {
+         },
+       };
+ 
+-      await writeFinishFeedbackComment(mockOctokit, data);
++      await postJunieCompletionComment(mockOctokit, data);
+ 
+       expect(updateCommentSpy).toHaveBeenCalledWith({
+         owner: "test-owner",
+@@ -505,7 +505,7 @@ describe("Comment Feedback Operations", () => {
+         },
+       };
+ 
+-      await writeFinishFeedbackComment(mockOctokit, data);
++      await postJunieCompletionComment(mockOctokit, data);
+ 
+       expect(updateCommentSpy).toHaveBeenCalledWith({
+         owner: "test-owner",
+@@ -527,7 +527,7 @@ describe("Comment Feedback Operations", () => {
+         },
+       };
+ 
+-      await writeFinishFeedbackComment(mockOctokit, data);
++      await postJunieCompletionComment(mockOctokit, data);
+ 
+       expect(updateReviewCommentSpy).toHaveBeenCalledWith({
+         owner: "test-owner",
+@@ -545,7 +545,7 @@ describe("Comment Feedback Operations", () => {
+         failureData: {},
+       };
+ 
+-      await writeFinishFeedbackComment(mockOctokit, data);
++      await postJunieCompletionComment(mockOctokit, data);
+ 
+       expect(updateCommentSpy).toHaveBeenCalledWith({
+         owner: "test-owner",
+diff --git a/test/junie-tasks.test.ts b/test/junie-tasks.test.ts
+index 2f29852..7e02635 100644
+--- a/test/junie-tasks.test.ts
++++ b/test/junie-tasks.test.ts
+@@ -1,6 +1,6 @@
+ import {describe, test, expect, mock, beforeEach} from "bun:test";
+ import {prepareJunieTask} from "../src/github/junie/junie-tasks";
+-import {GitHubContext} from "../src/github/context";
++import {JunieExecutionContext} from "../src/github/context";
+ import {BranchInfo} from "../src/github/operations/branch";
+ import {Octokits} from "../src/github/api/client";
+ import * as core from "@actions/core";
+@@ -15,7 +15,7 @@ mock.module("../src/github/junie/attachment-downloader", () => ({
+ }));
+ 
+ describe("prepareJunieTask", () => {
+-    const createMockContext = (overrides: Partial<GitHubContext> = {}): GitHubContext => {
++    const createMockContext = (overrides: Partial<JunieExecutionContext> = {}): JunieExecutionContext => {
+         return {
+             eventName: "issue_comment",
+             runId: "123",
+@@ -59,7 +59,7 @@ describe("prepareJunieTask", () => {
+                 }
+             } as any,
+             ...overrides
+-        } as GitHubContext;
++        } as JunieExecutionContext;
+     };
+ 
+     const createMockOctokit = (): Octokits => {
+diff --git a/test/mockContext.ts b/test/mockContext.ts
+index 3456095..fad45d5 100644
+--- a/test/mockContext.ts
++++ b/test/mockContext.ts
+@@ -1,4 +1,4 @@
+-import type {ParsedGitHubContext} from "../src/github/context";
++import type {JunieExecutionContext} from "../src/github/context";
+ import type {
+     IssueCommentEvent,
+     IssuesEvent,
+@@ -13,6 +13,7 @@ const defaultInputs = {
+     createNewBranchForPR: false,
+     silentMode: false,
+     useSingleComment: false,
++    attachGithubContextToCustomPrompt: true,
+     junieWorkingDir: "/tmp/junie-work",
+     appToken: "test-token",
+     prompt: "",
+@@ -98,7 +99,7 @@ export interface MockContextOverrides {
+     payload?: any;
+ }
+ 
+-export const createMockContext = (overrides: MockContextOverrides = {}): ParsedGitHubContext => {
++export const createMockContext = (overrides: MockContextOverrides = {}): JunieExecutionContext => {
+     return {
+         runId: "1234567890",
+         workflow: "Test Workflow",
+@@ -122,7 +123,7 @@ export const createMockContext = (overrides: MockContextOverrides = {}): ParsedG
+ };
+ 
+ // Pre-built contexts for common scenarios
+-export const mockIssueOpenedContext: ParsedGitHubContext = createMockContext({
++export const mockIssueOpenedContext: JunieExecutionContext = createMockContext({
+     eventName: "issues",
+     eventAction: "opened",
+     entityNumber: 42,
+@@ -144,7 +145,7 @@ export const mockIssueOpenedContext: ParsedGitHubContext = createMockContext({
+     } as IssuesEvent,
+ });
+ 
+-export const mockIssueAssignedContext: ParsedGitHubContext = createMockContext({
++export const mockIssueAssignedContext: JunieExecutionContext = createMockContext({
+     eventName: "issues",
+     eventAction: "assigned",
+     entityNumber: 42,
+@@ -170,7 +171,7 @@ export const mockIssueAssignedContext: ParsedGitHubContext = createMockContext({
+     } as any,
+ });
+ 
+-export const mockIssueLabeledContext: ParsedGitHubContext = createMockContext({
++export const mockIssueLabeledContext: JunieExecutionContext = createMockContext({
+     eventName: "issues",
+     eventAction: "labeled",
+     entityNumber: 42,
+@@ -196,7 +197,7 @@ export const mockIssueLabeledContext: ParsedGitHubContext = createMockContext({
+     } as any,
+ });
+ 
+-export const mockIssueCommentContext: ParsedGitHubContext = createMockContext({
++export const mockIssueCommentContext: JunieExecutionContext = createMockContext({
+     eventName: "issue_comment",
+     eventAction: "created",
+     entityNumber: 55,
+@@ -227,7 +228,7 @@ export const mockIssueCommentContext: ParsedGitHubContext = createMockContext({
+     } as IssueCommentEvent,
+ });
+ 
+-export const mockPullRequestCommentContext: ParsedGitHubContext = createMockContext({
++export const mockPullRequestCommentContext: JunieExecutionContext = createMockContext({
+     eventName: "issue_comment",
+     eventAction: "created",
+     entityNumber: 100,
+@@ -261,7 +262,7 @@ export const mockPullRequestCommentContext: ParsedGitHubContext = createMockCont
+     } as IssueCommentEvent,
+ });
+ 
+-export const mockPullRequestOpenedContext: ParsedGitHubContext = createMockContext({
++export const mockPullRequestOpenedContext: JunieExecutionContext = createMockContext({
+     eventName: "pull_request",
+     eventAction: "opened",
+     entityNumber: 200,
+@@ -291,7 +292,7 @@ export const mockPullRequestOpenedContext: ParsedGitHubContext = createMockConte
+     } as PullRequestEvent,
+ });
+ 
+-export const mockPullRequestReviewContext: ParsedGitHubContext = createMockContext({
++export const mockPullRequestReviewContext: JunieExecutionContext = createMockContext({
+     eventName: "pull_request_review",
+     eventAction: "submitted",
+     entityNumber: 200,
+@@ -329,7 +330,7 @@ export const mockPullRequestReviewContext: ParsedGitHubContext = createMockConte
+     } as PullRequestReviewEvent,
+ });
+ 
+-export const mockPullRequestReviewCommentContext: ParsedGitHubContext = createMockContext({
++export const mockPullRequestReviewCommentContext: JunieExecutionContext = createMockContext({
+     eventName: "pull_request_review_comment",
+     eventAction: "created",
+     entityNumber: 200,
+diff --git a/src/github/junie/new-prompt-formatter.test.ts b/test/new-prompt-formatter.test.ts
+similarity index 83%
+rename from src/github/junie/new-prompt-formatter.test.ts
+rename to test/new-prompt-formatter.test.ts
+index 6a343af..4664135 100644
+--- a/src/github/junie/new-prompt-formatter.test.ts
++++ b/test/new-prompt-formatter.test.ts
+@@ -1,12 +1,12 @@
+ import {describe, test, expect} from "bun:test";
+-import {NewGitHubPromptFormatter} from "./new-prompt-formatter";
+-import {GitHubContext} from "../context";
+-import {FetchedData, GraphQLPullRequest, GraphQLIssue} from "../api/queries";
++import {NewGitHubPromptFormatter} from "../src/github/junie/new-prompt-formatter";
++import {JunieExecutionContext} from "../src/github/context";
++import {FetchedData, GraphQLPullRequest, GraphQLIssue} from "../src/github/api/queries";
+ 
+ describe("NewGitHubPromptFormatter", () => {
+     const formatter = new NewGitHubPromptFormatter();
+ 
+-    const createMockContext = (overrides: Partial<GitHubContext> = {}): GitHubContext => ({
++    const createMockContext = (overrides: Partial<JunieExecutionContext> = {}): JunieExecutionContext => ({
+         runId: "123",
+         workflow: "test",
+         eventName: "pull_request",
+@@ -101,11 +101,11 @@ describe("NewGitHubPromptFormatter", () => {
+         }
+     });
+ 
+-    test("generatePrompt includes repository info", () => {
++    test("generatePrompt includes repository info", async () => {
+         const context = createMockContext();
+         const fetchedData: FetchedData = {};
+ 
+-        const prompt = formatter.generatePrompt(context, fetchedData);
++        const prompt = await formatter.generatePrompt(context, fetchedData);
+ 
+         expect(prompt).toContain("<repository>");
+         expect(prompt).toContain("Repository: test-owner/test-repo");
+@@ -113,11 +113,11 @@ describe("NewGitHubPromptFormatter", () => {
+         expect(prompt).toContain("</repository>");
+     });
+ 
+-    test("generatePrompt includes actor info", () => {
++    test("generatePrompt includes actor info", async () => {
+         const context = createMockContext();
+         const fetchedData: FetchedData = {};
+ 
+-        const prompt = formatter.generatePrompt(context, fetchedData);
++        const prompt = await formatter.generatePrompt(context, fetchedData);
+ 
+         expect(prompt).toContain("<actor>");
+         expect(prompt).toContain("Triggered by: @test-user");
+@@ -125,13 +125,13 @@ describe("NewGitHubPromptFormatter", () => {
+         expect(prompt).toContain("</actor>");
+     });
+ 
+-    test("generatePrompt includes PR info when available", () => {
++    test("generatePrompt includes PR info when available", async () => {
+         const context = createMockContext();
+         const fetchedData: FetchedData = {
+             pullRequest: createMockPR()
+         };
+ 
+-        const prompt = formatter.generatePrompt(context, fetchedData);
++        const prompt = await formatter.generatePrompt(context, fetchedData);
+ 
+         expect(prompt).toContain("<pull_request_info>");
+         expect(prompt).toContain("Number: #1");
+@@ -142,13 +142,13 @@ describe("NewGitHubPromptFormatter", () => {
+         expect(prompt).toContain("</pull_request_info>");
+     });
+ 
+-    test("generatePrompt includes commits info", () => {
++    test("generatePrompt includes commits info", async () => {
+         const context = createMockContext();
+         const fetchedData: FetchedData = {
+             pullRequest: createMockPR()
+         };
+ 
+-        const prompt = formatter.generatePrompt(context, fetchedData);
++        const prompt = await formatter.generatePrompt(context, fetchedData);
+ 
+         expect(prompt).toContain("<commits>");
+         expect(prompt).toContain("abc123");
+@@ -158,13 +158,13 @@ describe("NewGitHubPromptFormatter", () => {
+         expect(prompt).toContain("</commits>");
+     });
+ 
+-    test("generatePrompt includes changed files info", () => {
++    test("generatePrompt includes changed files info", async () => {
+         const context = createMockContext();
+         const fetchedData: FetchedData = {
+             pullRequest: createMockPR()
+         };
+ 
+-        const prompt = formatter.generatePrompt(context, fetchedData);
++        const prompt = await formatter.generatePrompt(context, fetchedData);
+ 
+         expect(prompt).toContain("<changed_files>");
+         expect(prompt).toContain("file1.ts (modified) +5/-2");
+@@ -172,7 +172,7 @@ describe("NewGitHubPromptFormatter", () => {
+         expect(prompt).toContain("</changed_files>");
+     });
+ 
+-    test("generatePrompt includes issue info when not a PR", () => {
++    test("generatePrompt includes issue info when not a PR", async () => {
+         const mockIssue = createMockIssue();
+         const context = createMockContext({
+             eventName: "issues",
+@@ -195,7 +195,7 @@ describe("NewGitHubPromptFormatter", () => {
+             issue: mockIssue
+         };
+ 
+-        const prompt = formatter.generatePrompt(context, fetchedData);
++        const prompt = await formatter.generatePrompt(context, fetchedData);
+ 
+         expect(prompt).toContain("<issue_info>");
+         expect(prompt).toContain("Number: #1");
+@@ -204,19 +204,19 @@ describe("NewGitHubPromptFormatter", () => {
+         expect(prompt).toContain("</issue_info>");
+     });
+ 
+-    test("generatePrompt includes custom prompt", () => {
++    test("generatePrompt includes custom prompt", async () => {
+         const context = createMockContext();
+         const fetchedData: FetchedData = {};
+         const customPrompt = "Please fix this bug";
+ 
+-        const prompt = formatter.generatePrompt(context, fetchedData, customPrompt);
++        const prompt = await formatter.generatePrompt(context, fetchedData, customPrompt);
+ 
+         expect(prompt).toContain("<user_instruction>");
+         expect(prompt).toContain("Please fix this bug");
+         expect(prompt).toContain("</user_instruction>");
+     });
+ 
+-    test("generatePrompt handles timeline comments", () => {
++    test("generatePrompt handles timeline comments", async () => {
+         const context = createMockContext();
+         const fetchedData: FetchedData = {
+             pullRequest: {
+@@ -238,7 +238,7 @@ describe("NewGitHubPromptFormatter", () => {
+             }
+         };
+ 
+-        const prompt = formatter.generatePrompt(context, fetchedData);
++        const prompt = await formatter.generatePrompt(context, fetchedData);
+ 
+         expect(prompt).toContain("<timeline>");
+         expect(prompt).toContain("Comment by @commenter");
+@@ -246,7 +246,7 @@ describe("NewGitHubPromptFormatter", () => {
+         expect(prompt).toContain("</timeline>");
+     });
+ 
+-    test("generatePrompt handles reviews", () => {
++    test("generatePrompt handles reviews", async () => {
+         const context = createMockContext();
+         const fetchedData: FetchedData = {
+             pullRequest: {
+@@ -269,7 +269,7 @@ describe("NewGitHubPromptFormatter", () => {
+             }
+         };
+ 
+-        const prompt = formatter.generatePrompt(context, fetchedData);
++        const prompt = await formatter.generatePrompt(context, fetchedData);
+ 
+         expect(prompt).toContain("<reviews>");
+         expect(prompt).toContain("Review by @reviewer (APPROVED)");
+@@ -277,11 +277,11 @@ describe("NewGitHubPromptFormatter", () => {
+         expect(prompt).toContain("</reviews>");
+     });
+ 
+-    test("generatePrompt omits empty sections", () => {
++    test("generatePrompt omits empty sections", async () => {
+         const context = createMockContext();
+         const fetchedData: FetchedData = {};
+ 
+-        const prompt = formatter.generatePrompt(context, fetchedData);
++        const prompt = await formatter.generatePrompt(context, fetchedData);
+ 
+         expect(prompt).not.toContain("<timeline>");
+         expect(prompt).not.toContain("<reviews>");
+@@ -289,14 +289,14 @@ describe("NewGitHubPromptFormatter", () => {
+         expect(prompt).not.toContain("<commits>");
+     });
+ 
+-    test("generatePrompt returns only custom prompt when attachGithubContext is false", () => {
++    test("generatePrompt returns only custom prompt when attachGithubContext is false", async () => {
+         const context = createMockContext();
+         const fetchedData: FetchedData = {
+             pullRequest: createMockPR()
+         };
+         const customPrompt = "Please fix this specific bug";
+ 
+-        const prompt = formatter.generatePrompt(context, fetchedData, customPrompt, false);
++        const prompt = await formatter.generatePrompt(context, fetchedData, customPrompt, false);
+ 
+         // Should contain only the custom prompt
+         expect(prompt).toBe("Please fix this specific bug");
+@@ -309,14 +309,14 @@ describe("NewGitHubPromptFormatter", () => {
+         expect(prompt).not.toContain("<changed_files>");
+     });
+ 
+-    test("generatePrompt includes GitHub context when attachGithubContext is true with custom prompt", () => {
++    test("generatePrompt includes GitHub context when attachGithubContext is true with custom prompt", async () => {
+         const context = createMockContext();
+         const fetchedData: FetchedData = {
+             pullRequest: createMockPR()
+         };
+         const customPrompt = "Please review this PR";
+ 
+-        const prompt = formatter.generatePrompt(context, fetchedData, customPrompt, true);
++        const prompt = await formatter.generatePrompt(context, fetchedData, customPrompt, true);
+ 
+         // Should contain custom prompt
+         expect(prompt).toContain("Please review this PR");
+@@ -329,7 +329,7 @@ describe("NewGitHubPromptFormatter", () => {
+         expect(prompt).toContain("<changed_files>");
+     });
+ 
+-    test("generatePrompt includes GitHub context when attachGithubContext is true without custom prompt", () => {
++    test("generatePrompt includes GitHub context when attachGithubContext is true without custom prompt", async () => {
+         const context = createMockContext({
+             payload: {
+                 repository: {
+@@ -349,7 +349,7 @@ describe("NewGitHubPromptFormatter", () => {
+             pullRequest: createMockPR()
+         };
+ 
+-        const prompt = formatter.generatePrompt(context, fetchedData, undefined, true);
++        const prompt = await formatter.generatePrompt(context, fetchedData, undefined, true);
+ 
+         // Should contain PR body as user instruction
+         expect(prompt).toContain("PR description from GitHub");
+diff --git a/test/permissions.test.ts b/test/permissions.test.ts
+index bd84ccd..3492878 100644
+--- a/test/permissions.test.ts
++++ b/test/permissions.test.ts
+@@ -1,9 +1,9 @@
+ import { describe, test, expect, beforeEach, afterEach, spyOn } from "bun:test";
+-import { checkWritePermissions } from "../src/github/validation/permissions";
++import { verifyRepositoryAccess } from "../src/github/validation/permissions";
+ import { mockIssueCommentContext } from "./mockContext";
+ import type { Octokit } from "@octokit/rest";
+ import * as core from "@actions/core";
+-import {ParsedGitHubContext} from "../src/github/context";
++import type {UserInitiatedEventContext} from "../src/github/context";
+ 
+ describe("Permission Validation", () => {
+   let getCollaboratorPermissionLevelSpy: any;
+@@ -35,7 +35,7 @@ describe("Permission Validation", () => {
+     coreErrorSpy.mockRestore();
+   });
+ 
+-  describe("checkWritePermissions", () => {
++  describe("verifyRepositoryAccess", () => {
+     test("should return true for admin permission", async () => {
+       getCollaboratorPermissionLevelSpy = spyOn(
+         mockOctokit.repos,
+@@ -44,7 +44,7 @@ describe("Permission Validation", () => {
+         data: { permission: "admin" },
+       } as any);
+ 
+-      const result = await checkWritePermissions(mockOctokit, mockIssueCommentContext);
++      const result = await verifyRepositoryAccess(mockOctokit, mockIssueCommentContext as UserInitiatedEventContext);
+ 
+       expect(result).toBe(true);
+       expect(coreInfoSpy).toHaveBeenCalledWith(
+@@ -60,7 +60,7 @@ describe("Permission Validation", () => {
+         data: { permission: "write" },
+       } as any);
+ 
+-      const result = await checkWritePermissions(mockOctokit, mockIssueCommentContext);
++      const result = await verifyRepositoryAccess(mockOctokit, mockIssueCommentContext as UserInitiatedEventContext);
+ 
+       expect(result).toBe(true);
+       expect(coreInfoSpy).toHaveBeenCalledWith(
+@@ -76,7 +76,7 @@ describe("Permission Validation", () => {
+         data: { permission: "read" },
+       } as any);
+ 
+-      const result = await checkWritePermissions(mockOctokit, mockIssueCommentContext);
++      const result = await verifyRepositoryAccess(mockOctokit, mockIssueCommentContext as UserInitiatedEventContext);
+ 
+       expect(result).toBe(false);
+       expect(coreWarningSpy).toHaveBeenCalledWith(
+@@ -92,7 +92,7 @@ describe("Permission Validation", () => {
+         data: { permission: "none" },
+       } as any);
+ 
+-      const result = await checkWritePermissions(mockOctokit, mockIssueCommentContext);
++      const result = await verifyRepositoryAccess(mockOctokit, mockIssueCommentContext as UserInitiatedEventContext);
+ 
+       expect(result).toBe(false);
+       expect(coreWarningSpy).toHaveBeenCalledWith(
+@@ -104,9 +104,9 @@ describe("Permission Validation", () => {
+       const context = {
+         ...mockIssueCommentContext,
+         actor: "junie-bot[bot]",
+-      };
++      } as UserInitiatedEventContext;
+ 
+-      const result = await checkWritePermissions(mockOctokit, context);
++      const result = await verifyRepositoryAccess(mockOctokit, context);
+ 
+       expect(result).toBe(true);
+       expect(coreInfoSpy).toHaveBeenCalledWith("Actor is a GitHub App: junie-bot[bot]");
+@@ -122,7 +122,7 @@ describe("Permission Validation", () => {
+         data: { permission: "write" },
+       } as any);
+ 
+-      await checkWritePermissions(mockOctokit, mockIssueCommentContext);
++      await verifyRepositoryAccess(mockOctokit, mockIssueCommentContext as UserInitiatedEventContext);
+ 
+       expect(getCollaboratorPermissionLevelSpy).toHaveBeenCalledWith({
+         owner: "test-owner",
+@@ -138,7 +138,7 @@ describe("Permission Validation", () => {
+       ).mockRejectedValue(new Error("API Error"));
+ 
+       expect(
+-        checkWritePermissions(mockOctokit, mockIssueCommentContext)
++        verifyRepositoryAccess(mockOctokit, mockIssueCommentContext as UserInitiatedEventContext)
+       ).rejects.toThrow(/Failed to check permissions for "contributor-user" on test-owner\/test-repo/);
+ 
+       expect(coreErrorSpy).toHaveBeenCalled();
+@@ -151,7 +151,7 @@ describe("Permission Validation", () => {
+       ).mockRejectedValue(new Error("Network timeout"));
+ 
+       expect(
+-        checkWritePermissions(mockOctokit, mockIssueCommentContext)
++        verifyRepositoryAccess(mockOctokit, mockIssueCommentContext as UserInitiatedEventContext)
+       ).rejects.toThrow(/Network timeout/);
+     });
+ 
+@@ -163,7 +163,7 @@ describe("Permission Validation", () => {
+         data: { permission: "admin" },
+       } as any);
+ 
+-      await checkWritePermissions(mockOctokit, mockIssueCommentContext);
++      await verifyRepositoryAccess(mockOctokit, mockIssueCommentContext as UserInitiatedEventContext);
+ 
+       expect(coreInfoSpy).toHaveBeenCalledWith(
+         "Checking permissions for actor: contributor-user"
+@@ -191,9 +191,9 @@ describe("Permission Validation", () => {
+             name: "awesome-project",
+           },
+         },
+-      } as ParsedGitHubContext;
++      } as UserInitiatedEventContext;
+ 
+-      await checkWritePermissions(mockOctokit, context);
++      await verifyRepositoryAccess(mockOctokit, context);
+ 
+       expect(getCollaboratorPermissionLevelSpy).toHaveBeenCalledWith({
+         owner: "acme-corp",
+@@ -214,9 +214,9 @@ describe("Permission Validation", () => {
+         const context = {
+           ...mockIssueCommentContext,
+           actor: botName,
+-        };
++        } as UserInitiatedEventContext;
+ 
+-        const result = await checkWritePermissions(mockOctokit, context);
++        const result = await verifyRepositoryAccess(mockOctokit, context);
+         expect(result).toBe(true);
+         expect(coreInfoSpy).toHaveBeenCalledWith(
+           `Actor is a GitHub App: ${botName}`
+diff --git a/test/trigger-validation.case-insensitive.test.ts b/test/trigger-validation.case-insensitive.test.ts
+index 77f0d3e..3f0e983 100644
+--- a/test/trigger-validation.case-insensitive.test.ts
++++ b/test/trigger-validation.case-insensitive.test.ts
+@@ -1,5 +1,5 @@
+ import {describe, expect, test} from "bun:test";
+-import {checkContainsTrigger} from "../src/github/validation/trigger";
++import {detectJunieTriggerPhrase} from "../src/github/validation/trigger";
+ import {createMockContext, mockPullRequestCommentContext} from "./mockContext";
+ import type {IssuesEvent, IssueCommentEvent} from "@octokit/webhooks-types";
+ 
+@@ -19,7 +19,7 @@ describe("Trigger Validation - case insensitive", () => {
+       }
+     });
+ 
+-    expect(checkContainsTrigger(context)).toBe(true);
++    expect(detectJunieTriggerPhrase(context)).toBe(true);
+   });
+ 
+   test("should match trigger phrase in issue title regardless of case", () => {
+@@ -37,7 +37,7 @@ describe("Trigger Validation - case insensitive", () => {
+       }
+     });
+ 
+-    expect(checkContainsTrigger(context)).toBe(true);
++    expect(detectJunieTriggerPhrase(context)).toBe(true);
+   });
+ 
+   test("should match trigger phrase in comments regardless of case", () => {
+@@ -54,6 +54,6 @@ describe("Trigger Validation - case insensitive", () => {
+       }
+     });
+ 
+-    expect(checkContainsTrigger(context)).toBe(true);
++    expect(detectJunieTriggerPhrase(context)).toBe(true);
+   });
+ });
+\ No newline at end of file
+diff --git a/test/trigger-validation.test.ts b/test/trigger-validation.test.ts
+index 702eb05..de38012 100644
+--- a/test/trigger-validation.test.ts
++++ b/test/trigger-validation.test.ts
+@@ -1,5 +1,5 @@
+ import {describe, expect, test} from "bun:test";
+-import {checkContainsTrigger, escapeRegExp} from "../src/github/validation/trigger";
++import {detectJunieTriggerPhrase, escapeRegExp} from "../src/github/validation/trigger";
+ import {
+     createMockContext,
+     mockIssueAssignedContext,
+@@ -25,7 +25,7 @@ describe("Trigger Validation", () => {
+     });
+   });
+ 
+-  describe("checkContainsTrigger", () => {
++  describe("detectJunieTriggerPhrase", () => {
+     describe("assignee trigger", () => {
+       test("should trigger when issue is assigned to trigger user", () => {
+         const context = createMockContext({
+@@ -38,7 +38,7 @@ describe("Trigger Validation", () => {
+           },
+         });
+ 
+-        expect(checkContainsTrigger(context)).toBe(true);
++        expect(detectJunieTriggerPhrase(context)).toBe(true);
+       });
+ 
+       test("should handle @ prefix in trigger user", () => {
+@@ -52,7 +52,7 @@ describe("Trigger Validation", () => {
+           },
+         });
+ 
+-        expect(checkContainsTrigger(context)).toBe(true);
++        expect(detectJunieTriggerPhrase(context)).toBe(true);
+       });
+ 
+       test("should not trigger when assigned to different user", () => {
+@@ -66,7 +66,7 @@ describe("Trigger Validation", () => {
+           },
+         });
+ 
+-        expect(checkContainsTrigger(context)).toBe(false);
++        expect(detectJunieTriggerPhrase(context)).toBe(false);
+       });
+ 
+       test("should not trigger when assignee is missing", () => {
+@@ -80,7 +80,7 @@ describe("Trigger Validation", () => {
+           },
+         });
+ 
+-        expect(checkContainsTrigger(context)).toBe(false);
++        expect(detectJunieTriggerPhrase(context)).toBe(false);
+       });
+     });
+ 
+@@ -96,7 +96,7 @@ describe("Trigger Validation", () => {
+           },
+         });
+ 
+-        expect(checkContainsTrigger(context)).toBe(true);
++        expect(detectJunieTriggerPhrase(context)).toBe(true);
+       });
+ 
+       test("should not trigger when labeled with different label", () => {
+@@ -110,7 +110,7 @@ describe("Trigger Validation", () => {
+           },
+         });
+ 
+-        expect(checkContainsTrigger(context)).toBe(false);
++        expect(detectJunieTriggerPhrase(context)).toBe(false);
+       });
+ 
+       test("should not trigger when label is missing", () => {
+@@ -124,7 +124,7 @@ describe("Trigger Validation", () => {
+           },
+         });
+ 
+-        expect(checkContainsTrigger(context)).toBe(false);
++        expect(detectJunieTriggerPhrase(context)).toBe(false);
+       });
+     });
+ 
+@@ -144,7 +144,7 @@ describe("Trigger Validation", () => {
+           },
+         });
+ 
+-        expect(checkContainsTrigger(context)).toBe(true);
++        expect(detectJunieTriggerPhrase(context)).toBe(true);
+       });
+ 
+       test("should trigger when phrase is in issue title", () => {
+@@ -162,7 +162,7 @@ describe("Trigger Validation", () => {
+           },
+         });
+ 
+-        expect(checkContainsTrigger(context)).toBe(true);
++        expect(detectJunieTriggerPhrase(context)).toBe(true);
+       });
+ 
+       test("should trigger when phrase is at start of text", () => {
+@@ -179,7 +179,7 @@ describe("Trigger Validation", () => {
+           },
+         });
+ 
+-        expect(checkContainsTrigger(context)).toBe(true);
++        expect(detectJunieTriggerPhrase(context)).toBe(true);
+       });
+ 
+       test("should trigger when phrase is at end of text", () => {
+@@ -196,7 +196,7 @@ describe("Trigger Validation", () => {
+           },
+         });
+ 
+-        expect(checkContainsTrigger(context)).toBe(true);
++        expect(detectJunieTriggerPhrase(context)).toBe(true);
+       });
+ 
+       test("should trigger with punctuation after phrase", () => {
+@@ -223,7 +223,7 @@ describe("Trigger Validation", () => {
+             },
+           });
+ 
+-          expect(checkContainsTrigger(context)).toBe(true);
++          expect(detectJunieTriggerPhrase(context)).toBe(true);
+         });
+       });
+ 
+@@ -248,7 +248,7 @@ describe("Trigger Validation", () => {
+             },
+           });
+ 
+-          expect(checkContainsTrigger(context)).toBe(false);
++          expect(detectJunieTriggerPhrase(context)).toBe(false);
+         });
+       });
+ 
+@@ -267,7 +267,7 @@ describe("Trigger Validation", () => {
+           },
+         });
+ 
+-        expect(checkContainsTrigger(context)).toBe(false);
++        expect(detectJunieTriggerPhrase(context)).toBe(false);
+       });
+ 
+       test("should handle empty body and title", () => {
+@@ -285,7 +285,7 @@ describe("Trigger Validation", () => {
+           },
+         });
+ 
+-        expect(checkContainsTrigger(context)).toBe(false);
++        expect(detectJunieTriggerPhrase(context)).toBe(false);
+       });
+ 
+       test("should handle null body", () => {
+@@ -303,7 +303,7 @@ describe("Trigger Validation", () => {
+           },
+         });
+ 
+-        expect(checkContainsTrigger(context)).toBe(false);
++        expect(detectJunieTriggerPhrase(context)).toBe(false);
+       });
+     });
+ 
+@@ -322,7 +322,7 @@ describe("Trigger Validation", () => {
+           },
+         });
+ 
+-        expect(checkContainsTrigger(context)).toBe(true);
++        expect(detectJunieTriggerPhrase(context)).toBe(true);
+       });
+ 
+       test("should trigger when phrase is in PR title", () => {
+@@ -340,25 +340,25 @@ describe("Trigger Validation", () => {
+           },
+         });
+ 
+-        expect(checkContainsTrigger(context)).toBe(true);
++        expect(detectJunieTriggerPhrase(context)).toBe(true);
+       });
+     });
+ 
+     describe("trigger phrase in comments", () => {
+       test("should trigger on issue comment", () => {
+-          expect(checkContainsTrigger(mockIssueCommentContext)).toBe(true);
++          expect(detectJunieTriggerPhrase(mockIssueCommentContext)).toBe(true);
+       });
+ 
+       test("should trigger on PR comment", () => {
+-          expect(checkContainsTrigger(mockPullRequestCommentContext)).toBe(true);
++          expect(detectJunieTriggerPhrase(mockPullRequestCommentContext)).toBe(true);
+       });
+ 
+       test("should trigger on PR review", () => {
+-          expect(checkContainsTrigger(mockPullRequestReviewContext)).toBe(true);
++          expect(detectJunieTriggerPhrase(mockPullRequestReviewContext)).toBe(true);
+       });
+ 
+       test("should trigger on PR review comment", () => {
+-          expect(checkContainsTrigger(mockPullRequestReviewCommentContext)).toBe(true);
++          expect(detectJunieTriggerPhrase(mockPullRequestReviewCommentContext)).toBe(true);
+       });
+ 
+       test("should not trigger when comment lacks trigger phrase", () => {
+@@ -375,7 +375,7 @@ describe("Trigger Validation", () => {
+           },
+         });
+ 
+-        expect(checkContainsTrigger(context)).toBe(false);
++        expect(detectJunieTriggerPhrase(context)).toBe(false);
+       });
+     });
+ 
+@@ -394,7 +394,7 @@ describe("Trigger Validation", () => {
+           },
+         });
+ 
+-        expect(checkContainsTrigger(context)).toBe(true);
++        expect(detectJunieTriggerPhrase(context)).toBe(true);
+       });
+ 
+       test("should escape special characters in custom trigger", () => {
+@@ -411,7 +411,7 @@ describe("Trigger Validation", () => {
+           },
+         });
+ 
+-        expect(checkContainsTrigger(context)).toBe(true);
++        expect(detectJunieTriggerPhrase(context)).toBe(true);
+       });
+     });
+ 
+@@ -431,7 +431,7 @@ describe("Trigger Validation", () => {
+           },
+         });
+ 
+-        expect(checkContainsTrigger(context)).toBe(true);
++        expect(detectJunieTriggerPhrase(context)).toBe(true);
+       });
+     });
+   });
