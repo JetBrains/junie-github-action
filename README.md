@@ -133,7 +133,7 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 | Input | Description | Default |
 |-------|-------------|---------|
 | `base_branch` | Base branch for creating new branches | `github.base_ref` |
-| `create_new_branch_for_pr` | Create new branch for PR contributors | `false` |
+| `create_new_branch_for_pr` | Create a new branch for PR instead of pushing to the same branch | `false` |
 
 #### Junie Configuration
 
@@ -155,7 +155,7 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 | `resolve_conflicts` | Enable automatic conflict detection (not needed for manual `@junie-agent` resolution) | `false` |
 | `silent_mode` | Run Junie without comments, branch creation, or commits - only prepare data and output results | `false` |
 | `use_single_comment` | Update a single comment for all runs instead of creating new comments each time | `false` |
-| `attach_github_context_to_custom_prompt` | Attach GitHub context (PR/issue info, commits, reviews, etc.) when using custom prompt | `false` |
+| `attach_github_context_to_custom_prompt` | Attach GitHub context (PR/issue info, commits, reviews, etc.) when using custom prompt. Only applies when `prompt` input is provided. | `false` |
 
 #### Jira Integration
 
