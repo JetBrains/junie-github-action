@@ -58,11 +58,11 @@ name: Junie
 
 on:
   issue_comment:
-    types: [created]
+    types: [created, edited]
   pull_request_review_comment:
-    types: [created]
+    types: [created, edited]
   pull_request_review:
-    types: [submitted]
+    types: [submitted, edited]
   pull_request:
     types: [opened, edited]
   issues:
