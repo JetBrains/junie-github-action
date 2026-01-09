@@ -62,9 +62,11 @@ on:
   pull_request_review_comment:
     types: [created]
   issues:
-    types: [opened, assigned]
+    types: [opened, assigned, labeled]
   pull_request_review:
     types: [submitted]
+  pull_request:
+    types: [opened, edited]
 
 jobs:
   junie:
@@ -72,7 +74,10 @@ jobs:
       (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@junie-agent')) ||
       (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@junie-agent')) ||
       (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@junie-agent')) ||
-      (github.event_name == 'issues' && (contains(github.event.issue.body, '@junie-agent') || contains(github.event.issue.title, '@junie-agent')))
+      (github.event_name == 'issues' && (contains(github.event.issue.body, '@junie-agent') || contains(github.event.issue.title, '@junie-agent'))) ||
+      (github.event_name == 'issues' && github.event.action == 'assigned') ||
+      (github.event_name == 'issues' && github.event.action == 'labeled') ||
+      (github.event_name == 'pull_request' && (contains(github.event.pull_request.body, '@junie-agent') || contains(github.event.pull_request.title, '@junie-agent')))
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -206,6 +211,14 @@ For detailed setup instructions, see the [Jira Integration Guide](docs/JIRA_INTE
     fi
 ```
 
+### Artifacts
+
+For easier debugging and auditing, the action uploads the following artifacts (retained for 7 days):
+
+- `junie-working-directory`: Contents of your configured `junie_work_dir` (default: `/tmp/junie-work`)
+- `junie-logs`: Execution logs from `~/.junie/logs`
+- `junie-sessions`: Junie session data from `~/.junie/sessions`
+
 ### Required Permissions
 
 The action requires specific GitHub token permissions to perform its operations. Configure these in your workflow:
@@ -216,6 +229,7 @@ permissions:
   pull-requests: write # Required to create PRs, add comments to PRs, and update PR status
   issues: write        # Required to add comments to issues and update issue metadata
   checks: read         # Optional: only needed for CI failure analysis with MCP servers
+  actions: read        # Optional: only needed for CI failure analysis with MCP servers
 ```
 
 **Minimal permissions** for `silent_mode` (read-only operations):
@@ -343,7 +357,7 @@ jobs:
     - Push events
   - ⚠️ **Important**: When using custom prompts or automated workflows, ensure proper workflow permissions and conditions to prevent unintended execution
 - **Token Management**: Supports custom GitHub tokens for enhanced security
-- **Artifact Retention**: Working directory uploaded as artifact (7-day retention)
+- **Artifact Retention**: `junie-working-directory`, `junie-logs`, and `junie-sessions` artifacts uploaded (7-day retention)
 
 ## Troubleshooting
 
