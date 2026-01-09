@@ -157,7 +157,7 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 | `resolve_conflicts` | Enable automatic conflict detection (not needed for manual `@junie-agent` resolution) | `false` |
 | `silent_mode` | Run Junie without comments, branch creation, or commits - only prepare data and output results | `false` |
 | `use_single_comment` | Update a single comment for all runs instead of creating new comments each time | `false` |
-| `attach_github_context_to_custom_prompt` | Attach GitHub context (PR/issue info, commits, reviews, etc.) when using custom prompt | `false` |
+| `attach_github_context_to_custom_prompt` | Attach GitHub context (PR/issue info, commits, reviews, etc.) when using custom prompt. Only applies when `prompt` input is provided. | `false` |
 
 #### Jira Integration
 
@@ -289,13 +289,15 @@ GitHub App tokens
 **Setup steps:**
 
 a. **Install Your App to the Repository:**
+   - Click "Install App" in the sidebar
+   - Select your repository
 
 b. **Add secrets to repository:**
    - Go to repository Settings → Secrets and variables → Actions
    - Add `APP_ID` with your App ID
    - Add `APP_PRIVATE_KEY` with the entire contents of the `.pem` file
 
-e. **Use in workflow:**
+c. **Use in workflow:**
 
 ```yaml
 jobs:
