@@ -112,7 +112,7 @@ jobs:
 - **Sync Code → Documentation** - Auto-update docs when code changes
 - **Fix Failing CI Tests** - Diagnose and fix test failures automatically
 - **Security Audit for Secrets** - Scan commits for accidentally committed credentials
-- **Dependency Update Assistant** - Review and adapt to breaking changes in dependencies
+- **Automatic Merge Conflict Resolution** - Resolve conflicts automatically when base branch is updated
 
 Each recipe includes complete workflows, prompts, and configuration examples you can copy and adapt.
 
@@ -216,7 +216,7 @@ permissions:
   pull-requests: write # Required to create PRs, add comments to PRs, and update PR status
   issues: write        # Required to add comments to issues and update issue metadata
   checks: read         # Optional: needed for CI failure analysis (with MCP)
-  actions: read        # Optional: needed for CI failure analysis to download logs
+  actions: read        # Optional: needed for CI failure analysis. Use 'write' for automatic conflict resolution.
 ```
 
 **Minimal permissions** for `silent_mode` (read-only operations):
@@ -366,5 +366,5 @@ jobs:
 
 - Check if branch already exists (may push to existing branch)
 - Verify `create_new_branch_for_pr` setting for PR scenarios
-- Review action outputs for `ACTION_TO_DO` value
+- Review action outputs (e.g., `junie_title`, `junie_summary`) for execution results
 - Ensure there are actual file changes to commit
