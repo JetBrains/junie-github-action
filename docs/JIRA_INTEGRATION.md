@@ -11,7 +11,7 @@ When a Jira issue is created or updated with a specific trigger (e.g., adding a 
 3. **Implements the changes** based on the issue description
 4. **Creates a pull request** with the changes
 5. **Transitions the issue to "In Review"**
-6. **Adds a comment** to the Jira issue with the PR link
+6. **Adds a comment** to the Jira issue with the PR link (supports Markdown, automatically converted to Jira format)
 
 ## Setup
 
@@ -149,3 +149,5 @@ Junie will receive all comments and attachments from the Jira issue. This allows
 - Read user discussions and clarifications in comments
 - Access screenshots, diagrams, and other files attached to the issue
 - Better understand the context and requirements
+
+When Junie posts feedback back to Jira, it automatically converts Markdown to Atlassian Document Format (ADF), ensuring that rich formatting, links, and code blocks are displayed correctly in the Jira UI.

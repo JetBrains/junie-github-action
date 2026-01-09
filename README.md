@@ -34,6 +34,7 @@ A powerful GitHub Action that integrates [Junie](https://www.jetbrains.com/junie
 - **Comprehensive Feedback**: Real-time updates via GitHub comments with links to PRs and commits
 - **Rich Job Summaries**: Beautiful markdown reports in GitHub Actions with execution details
 - **Attachment Support**: Automatically downloads and processes images and files attached to issues and PRs (GitHub and Jira)
+- **Jira Rich Formatting**: Automatically converts Markdown to Atlassian Document Format for rich comments in Jira
 - **MCP Extensibility**: Integrate custom Model Context Protocol servers for enhanced capabilities
 - **Runs on Your Infrastructure**: Executes entirely on your GitHub runners
 
