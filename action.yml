@@ -219,7 +219,7 @@ runs:
       uses: actions/upload-artifact@v4
       with:
         name: junie-sessions
-        path: ~/.junie/sessions
+        path: ~/.junie
         retention-days: 7
         if-no-files-found: warn
         include-hidden-files: true
