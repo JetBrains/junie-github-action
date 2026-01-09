@@ -226,6 +226,15 @@ permissions:
   issues: read
 ```
 
+### Artifacts
+
+This action uploads helpful artifacts for debugging and auditing (7-day retention, hidden files included):
+- junie-working-directory: The Junie working directory (defaults to `/tmp/junie-work` or the value of `junie_work_dir`)
+- junie-logs: Junie CLI logs from `~/.junie/logs`
+- junie-sessions: Junie local data from `~/.junie`
+
+These artifacts can be downloaded from the workflow run page.
+
 #### Repository Settings for PR Creation
 
 If you're using the default `github.token` and want Junie to create pull requests, you must enable this in your repository settings:
@@ -343,7 +352,7 @@ jobs:
     - Push events
   - ⚠️ **Important**: When using custom prompts or automated workflows, ensure proper workflow permissions and conditions to prevent unintended execution
 - **Token Management**: Supports custom GitHub tokens for enhanced security
-- **Artifact Retention**: Working directory uploaded as artifact (7-day retention)
+- **Artifacts**: Working directory, logs, and sessions are uploaded as artifacts (7-day retention)
 
 ## Troubleshooting
 
@@ -358,7 +367,7 @@ jobs:
 
 - Verify `JUNIE_API_KEY` secret is set correctly
 - Check Junie version compatibility (`junie_version` input)
-- Review uploaded artifacts for Junie working directory logs
+- Review uploaded artifacts: junie-working-directory, junie-logs, and junie-sessions
 - Ensure runner has internet access for API calls
 
 ### No PR Created
