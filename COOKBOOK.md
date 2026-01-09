@@ -272,6 +272,7 @@ jobs:
       pull-requests: write
       issues: write
       checks: read
+      actions: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -392,7 +393,7 @@ jobs:
             No secrets detected in this commit.
 
             Procedure:
-            Use gh pr diff ${{ github.event.pull_request.head.ref }} to get a diff of the PR. 
+            Use gh pr diff ${{ github.event.pull_request.head.ref }} to get a diff of the PR.
 
             Only provide feedback without modifying files.
 
@@ -464,7 +465,7 @@ jobs:
 
       - name: Run Junie
         id: junie
-        uses: JetBrains/junie-github-action@main
+        uses: JetBrains/junie-github-action@v0
         with:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
           resolve_conflicts: true

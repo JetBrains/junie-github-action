@@ -215,7 +215,8 @@ permissions:
   contents: write      # Required to create branches, make commits, and push changes
   pull-requests: write # Required to create PRs, add comments to PRs, and update PR status
   issues: write        # Required to add comments to issues and update issue metadata
-  checks: read         # Optional: only needed for CI failure analysis with MCP servers
+  checks: read         # Optional: needed for CI failure analysis (with MCP)
+  actions: read        # Optional: needed for CI failure analysis to download logs
 ```
 
 **Minimal permissions** for `silent_mode` (read-only operations):

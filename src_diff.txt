@@ -1,0 +1,699 @@
+diff --git a/src/constants/github.ts b/src/constants/github.ts
+index f6f2c7d..4c77598 100644
+--- a/src/constants/github.ts
++++ b/src/constants/github.ts
+@@ -69,7 +69,7 @@ export const COMMIT_MESSAGE_TEMPLATE = (junieTitle: string, issueId?: number) =>
+ // Feedback Comments
+ // ============================================================================
+ 
+-export const SUCCESS_FEEDBACK_COMMENT = "Junie is successful finished!"
++export const SUCCESS_FEEDBACK_COMMENT = "Junie successfully finished!"
+ 
+ export const ERROR_FEEDBACK_COMMENT_TEMPLATE = (details: string, jobLink: string) => `Junie is failed!
+ 
+diff --git a/src/github/jira/client.ts b/src/github/jira/client.ts
+index 2d8e6e0..2626615 100644
+--- a/src/github/jira/client.ts
++++ b/src/github/jira/client.ts
+@@ -72,16 +72,16 @@ class JiraClient {
+      * Adds a comment to a Jira issue
+      *
+      * @param issueKey - Jira issue key (e.g., PROJ-123)
+-     * @param comment - Comment text (supports Jira markdown)
++     * @param adfDocument - Comment in Atlassian Document Format (ADF)
+      * @returns true if successful, false otherwise
+      */
+-    async addComment(issueKey: string, comment: string): Promise<boolean> {
++    async addComment(issueKey: string, adfDocument: any): Promise<boolean> {
+         try {
+             console.log(`Adding comment to Jira issue ${issueKey}`);
+ 
+             await this.client.issueComments.addComment({
+                 issueIdOrKey: issueKey,
+-                comment: comment,
++                comment: adfDocument,
+             });
+ 
+             console.log(`✓ Successfully added comment to Jira issue ${issueKey}`);
+diff --git a/src/github/jira/markdown-to-jira.test.ts b/src/github/jira/markdown-to-jira.test.ts
+index b78fa47..ba6769f 100644
+--- a/src/github/jira/markdown-to-jira.test.ts
++++ b/src/github/jira/markdown-to-jira.test.ts
+@@ -1,51 +1,57 @@
+ import {describe, test, expect} from "bun:test";
+-import {convertMarkdownToJiraWikiMarkup} from "./markdown-to-jira";
++import {convertMarkdownToADF} from "./markdown-to-jira";
+ 
+-describe("convertMarkdownToJiraWikiMarkup", () => {
+-    test("converts headers", () => {
+-        const markdown = `# H1
+-## H2
+-### H3
+-#### H4`;
+-        const expected = `h1. H1
+-h2. H2
+-h3. H3
+-h4. H4`;
+-        expect(convertMarkdownToJiraWikiMarkup(markdown)).toBe(expected);
++describe("convertMarkdownToADF", () => {
++    test("returns valid ADF document structure", () => {
++        const markdown = "Simple text";
++        const result = convertMarkdownToADF(markdown);
++
++        expect(result).toHaveProperty("type", "doc");
++        expect(result).toHaveProperty("version", 1);
++        expect(result).toHaveProperty("content");
++        expect(Array.isArray(result.content)).toBe(true);
+     });
+ 
+-    test("converts links", () => {
+-        const markdown = "[GitHub](https://github.com)";
+-        const expected = "[GitHub|https://github.com]";
+-        expect(convertMarkdownToJiraWikiMarkup(markdown)).toBe(expected);
++    test("converts simple text to paragraph", () => {
++        const markdown = "Simple text";
++        const result = convertMarkdownToADF(markdown);
++
++        expect(result.content).toHaveLength(1);
++        expect(result.content[0].type).toBe("paragraph");
++        expect(result.content[0].content).toBeDefined();
++    });
++
++    test("converts headers", () => {
++        const markdown = "# H1\n## H2\n### H3";
++        const result = convertMarkdownToADF(markdown);
++
++        expect(result.type).toBe("doc");
++        expect(result.content.length).toBeGreaterThan(0);
++        expect(result.content.some((node: any) => node.type === "heading")).toBe(true);
+     });
+ 
+     test("converts bold text", () => {
+         const markdown = "This is **bold** text";
+-        const expected = "This is *bold* text";
+-        expect(convertMarkdownToJiraWikiMarkup(markdown)).toBe(expected);
++        const result = convertMarkdownToADF(markdown);
++
++        expect(result.type).toBe("doc");
++        expect(JSON.stringify(result)).toContain("strong");
+     });
+ 
+     test("converts inline code", () => {
+         const markdown = "Use `console.log()` for debugging";
+-        const expected = "Use {{console.log()}} for debugging";
+-        expect(convertMarkdownToJiraWikiMarkup(markdown)).toBe(expected);
+-    });
++        const result = convertMarkdownToADF(markdown);
+ 
+-    test("converts code blocks", () => {
+-        const markdown = "```javascript\nconst x = 1;\n```";
+-        const expected = "{code:javascript}\nconst x = 1;\n{code}";
+-        expect(convertMarkdownToJiraWikiMarkup(markdown)).toBe(expected);
++        expect(result.type).toBe("doc");
++        expect(JSON.stringify(result)).toContain("code");
+     });
+ 
+-    test("converts unordered lists", () => {
+-        const markdown = `- Item 1
+-- Item 2
+-* Item 3`;
+-        const expected = `- Item 1
+-- Item 2
+-* Item 3`;
+-        expect(convertMarkdownToJiraWikiMarkup(markdown)).toBe(expected);
++    test("converts links", () => {
++        const markdown = "[GitHub](https://github.com)";
++        const result = convertMarkdownToADF(markdown);
++
++        expect(result.type).toBe("doc");
++        expect(JSON.stringify(result)).toContain("https://github.com");
+     });
+ 
+     test("converts complex example", () => {
+@@ -58,15 +64,15 @@ h4. H4`;
+ ### Details
+ Check the [PR link](https://github.com/owner/repo/pull/123)`;
+ 
+-        const expected = `Result: Add Update User Route
+-
+-h3. Summary
+-- Reviewed the project
+-- Located the target file at {{src/routes/users.ts}}
++        const result = convertMarkdownToADF(markdown);
+ 
+-h3. Details
+-Check the [PR link|https://github.com/owner/repo/pull/123]`;
++        expect(result.type).toBe("doc");
++        expect(result.version).toBe(1);
++        expect(Array.isArray(result.content)).toBe(true);
++        expect(result.content.length).toBeGreaterThan(0);
+ 
+-        expect(convertMarkdownToJiraWikiMarkup(markdown)).toBe(expected);
++        // Check that it contains expected content types
++        const types = result.content.map((node: any) => node.type);
++        expect(types).toContain("paragraph");
+     });
+ });
+diff --git a/src/github/jira/markdown-to-jira.ts b/src/github/jira/markdown-to-jira.ts
+index bb73766..7b50b98 100644
+--- a/src/github/jira/markdown-to-jira.ts
++++ b/src/github/jira/markdown-to-jira.ts
+@@ -1,12 +1,11 @@
+-// @ts-ignore - no types available for jira2md
+-import * as jira2md from 'jira2md';
++import { markdownToAdf } from 'marklassian';
+ 
+ /**
+- * Converts GitHub Markdown to Jira Wiki Markup using jira2md library
++ * Converts GitHub Markdown to Atlassian Document Format (ADF) using marklassian library
+  *
+  * @param markdown - Text in GitHub Markdown format
+- * @returns Text in Jira Wiki Markup format
++ * @returns ADF document object
+  */
+-export function convertMarkdownToJiraWikiMarkup(markdown: string): string {
+-    return jira2md.to_jira(markdown);
++export function convertMarkdownToADF(markdown: string): any {
++    return markdownToAdf(markdown);
+ }
+diff --git a/src/github/junie/new-prompt-formatter.test.ts b/src/github/junie/new-prompt-formatter.test.ts
+deleted file mode 100644
+index a00e4b4..0000000
+--- a/src/github/junie/new-prompt-formatter.test.ts
++++ /dev/null
+@@ -1,362 +0,0 @@
+-import {describe, test, expect} from "bun:test";
+-import {NewGitHubPromptFormatter} from "./new-prompt-formatter";
+-import {JunieExecutionContext} from "../context";
+-import {FetchedData, GraphQLPullRequest, GraphQLIssue} from "../api/queries";
+-
+-describe("NewGitHubPromptFormatter", () => {
+-    const formatter = new NewGitHubPromptFormatter();
+-
+-    const createMockContext = (overrides: Partial<JunieExecutionContext> = {}): JunieExecutionContext => ({
+-        runId: "123",
+-        workflow: "test",
+-        eventName: "pull_request",
+-        eventAction: "opened",
+-        actor: "test-user",
+-        actorEmail: "test@example.com",
+-        tokenOwner: {login: "test-owner", id: 123, type: "User"},
+-        entityNumber: 1,
+-        isPR: true,
+-        inputs: {
+-            resolveConflicts: false,
+-            createNewBranchForPR: false,
+-            silentMode: false,
+-            useSingleComment: false,
+-            attachGithubContextToCustomPrompt: true,
+-            junieWorkingDir: "/tmp",
+-            appToken: "token",
+-            prompt: "",
+-            triggerPhrase: "@junie-agent",
+-            assigneeTrigger: "",
+-            labelTrigger: "junie",
+-            allowedMcpServers: ""
+-        },
+-        payload: {
+-            repository: {
+-                name: "test-repo",
+-                owner: {login: "test-owner"},
+-                full_name: "test-owner/test-repo"
+-            },
+-            pull_request: {
+-                number: 1,
+-                title: "Test PR",
+-                body: "Test body",
+-                updated_at: "2024-01-01T00:00:00Z"
+-            }
+-        } as any,
+-        ...overrides
+-    });
+-
+-    const createMockPR = (): GraphQLPullRequest => ({
+-        number: 1,
+-        title: "Test PR",
+-        body: "Test PR body",
+-        bodyHTML: "<p>Test PR body</p>",
+-        state: "OPEN",
+-        url: "https://github.com/test/test/pull/1",
+-        author: {login: "test-author"},
+-        baseRefName: "main",
+-        headRefName: "feature",
+-        headRefOid: "abc123def456",
+-        baseRefOid: "def456abc123",
+-        additions: 10,
+-        deletions: 5,
+-        changedFiles: 3,
+-        createdAt: "2024-01-01T00:00:00Z",
+-        updatedAt: "2024-01-02T00:00:00Z",
+-        lastEditedAt: null,
+-        commits: {
+-            totalCount: 2,
+-            nodes: [
+-                {commit: {oid: "abc123", messageHeadline: "First commit", message: "First commit", committedDate: "2024-01-01T00:00:00Z"}},
+-                {commit: {oid: "def456", messageHeadline: "Second commit", message: "Second commit", committedDate: "2024-01-02T00:00:00Z"}}
+-            ]
+-        },
+-        files: {
+-            nodes: [
+-                {path: "file1.ts", additions: 5, deletions: 2, changeType: "MODIFIED"},
+-                {path: "file2.ts", additions: 5, deletions: 3, changeType: "ADDED"}
+-            ]
+-        },
+-        timelineItems: {
+-            nodes: []
+-        },
+-        reviews: {
+-            nodes: []
+-        }
+-    });
+-
+-    const createMockIssue = (): GraphQLIssue => ({
+-        number: 1,
+-        title: "Test Issue",
+-        body: "Test issue body",
+-        bodyHTML: "<p>Test issue body</p>",
+-        state: "OPEN",
+-        url: "https://github.com/test/test/issues/1",
+-        author: {login: "test-author"},
+-        createdAt: "2024-01-01T00:00:00Z",
+-        updatedAt: "2024-01-02T00:00:00Z",
+-        lastEditedAt: null,
+-        timelineItems: {
+-            nodes: []
+-        }
+-    });
+-
+-    test("generatePrompt includes repository info", async () => {
+-        const context = createMockContext();
+-        const fetchedData: FetchedData = {};
+-
+-        const prompt = await formatter.generatePrompt(context, fetchedData);
+-
+-        expect(prompt).toContain("<repository>");
+-        expect(prompt).toContain("Repository: test-owner/test-repo");
+-        expect(prompt).toContain("Owner: test-owner");
+-        expect(prompt).toContain("</repository>");
+-    });
+-
+-    test("generatePrompt includes actor info", async () => {
+-        const context = createMockContext();
+-        const fetchedData: FetchedData = {};
+-
+-        const prompt = await formatter.generatePrompt(context, fetchedData);
+-
+-        expect(prompt).toContain("<actor>");
+-        expect(prompt).toContain("Triggered by: @test-user");
+-        expect(prompt).toContain("Event: pull_request (opened)");
+-        expect(prompt).toContain("</actor>");
+-    });
+-
+-    test("generatePrompt includes PR info when available", async () => {
+-        const context = createMockContext();
+-        const fetchedData: FetchedData = {
+-            pullRequest: createMockPR()
+-        };
+-
+-        const prompt = await formatter.generatePrompt(context, fetchedData);
+-
+-        expect(prompt).toContain("<pull_request_info>");
+-        expect(prompt).toContain("Number: #1");
+-        expect(prompt).toContain("Title: Test PR");
+-        expect(prompt).toContain("Author: @test-author");
+-        expect(prompt).toContain("State: OPEN");
+-        expect(prompt).toContain("Branch: feature -> main");
+-        expect(prompt).toContain("</pull_request_info>");
+-    });
+-
+-    test("generatePrompt includes commits info", async () => {
+-        const context = createMockContext();
+-        const fetchedData: FetchedData = {
+-            pullRequest: createMockPR()
+-        };
+-
+-        const prompt = await formatter.generatePrompt(context, fetchedData);
+-
+-        expect(prompt).toContain("<commits>");
+-        expect(prompt).toContain("abc123");
+-        expect(prompt).toContain("First commit");
+-        expect(prompt).toContain("def456");
+-        expect(prompt).toContain("Second commit");
+-        expect(prompt).toContain("</commits>");
+-    });
+-
+-    test("generatePrompt includes changed files info", async () => {
+-        const context = createMockContext();
+-        const fetchedData: FetchedData = {
+-            pullRequest: createMockPR()
+-        };
+-
+-        const prompt = await formatter.generatePrompt(context, fetchedData);
+-
+-        expect(prompt).toContain("<changed_files>");
+-        expect(prompt).toContain("file1.ts (modified) +5/-2");
+-        expect(prompt).toContain("file2.ts (added) +5/-3");
+-        expect(prompt).toContain("</changed_files>");
+-    });
+-
+-    test("generatePrompt includes issue info when not a PR", async () => {
+-        const mockIssue = createMockIssue();
+-        const context = createMockContext({
+-            eventName: "issues",
+-            isPR: false,
+-            payload: {
+-                repository: {
+-                    name: "test-repo",
+-                    owner: {login: "test-owner"},
+-                    full_name: "test-owner/test-repo"
+-                },
+-                issue: {
+-                    number: 1,
+-                    title: "Test Issue",
+-                    body: "Test issue body",
+-                    updated_at: "2024-01-01T00:00:00Z"
+-                }
+-            } as any
+-        });
+-        const fetchedData: FetchedData = {
+-            issue: mockIssue
+-        };
+-
+-        const prompt = await formatter.generatePrompt(context, fetchedData);
+-
+-        expect(prompt).toContain("<issue_info>");
+-        expect(prompt).toContain("Number: #1");
+-        expect(prompt).toContain("Title: Test Issue");
+-        expect(prompt).toContain("Author: @test-author");
+-        expect(prompt).toContain("</issue_info>");
+-    });
+-
+-    test("generatePrompt includes custom prompt", async () => {
+-        const context = createMockContext();
+-        const fetchedData: FetchedData = {};
+-        const customPrompt = "Please fix this bug";
+-
+-        const prompt = await formatter.generatePrompt(context, fetchedData, customPrompt);
+-
+-        expect(prompt).toContain("<user_instruction>");
+-        expect(prompt).toContain("Please fix this bug");
+-        expect(prompt).toContain("</user_instruction>");
+-    });
+-
+-    test("generatePrompt handles timeline comments", async () => {
+-        const context = createMockContext();
+-        const fetchedData: FetchedData = {
+-            pullRequest: {
+-                ...createMockPR(),
+-                timelineItems: {
+-                    nodes: [
+-                        {
+-                            __typename: "IssueComment",
+-                            id: "1",
+-                            databaseId: 1,
+-                            body: "Test comment",
+-                            author: {login: "commenter"},
+-                            createdAt: "2024-01-03T00:00:00Z",
+-                            lastEditedAt: null,
+-                            url: "https://github.com/test/test/pull/1#issuecomment-1"
+-                        }
+-                    ]
+-                }
+-            }
+-        };
+-
+-        const prompt = await formatter.generatePrompt(context, fetchedData);
+-
+-        expect(prompt).toContain("<timeline>");
+-        expect(prompt).toContain("Comment by @commenter");
+-        expect(prompt).toContain("Test comment");
+-        expect(prompt).toContain("</timeline>");
+-    });
+-
+-    test("generatePrompt handles reviews", async () => {
+-        const context = createMockContext();
+-        const fetchedData: FetchedData = {
+-            pullRequest: {
+-                ...createMockPR(),
+-                reviews: {
+-                    nodes: [
+-                        {
+-                            id: "1",
+-                            databaseId: 1,
+-                            author: {login: "reviewer"},
+-                            body: "Looks good!",
+-                            state: "APPROVED",
+-                            submittedAt: "2024-01-03T00:00:00Z",
+-                            lastEditedAt: null,
+-                            url: "https://github.com/test/test/pull/1#pullrequestreview-1",
+-                            comments: {nodes: []}
+-                        }
+-                    ]
+-                }
+-            }
+-        };
+-
+-        const prompt = await formatter.generatePrompt(context, fetchedData);
+-
+-        expect(prompt).toContain("<reviews>");
+-        expect(prompt).toContain("Review by @reviewer (APPROVED)");
+-        expect(prompt).toContain("Looks good!");
+-        expect(prompt).toContain("</reviews>");
+-    });
+-
+-    test("generatePrompt omits empty sections", async () => {
+-        const context = createMockContext();
+-        const fetchedData: FetchedData = {};
+-
+-        const prompt = await formatter.generatePrompt(context, fetchedData);
+-
+-        expect(prompt).not.toContain("<timeline>");
+-        expect(prompt).not.toContain("<reviews>");
+-        expect(prompt).not.toContain("<changed_files>");
+-        expect(prompt).not.toContain("<commits>");
+-    });
+-
+-    test("generatePrompt returns only custom prompt when attachGithubContext is false", async () => {
+-        const context = createMockContext();
+-        const fetchedData: FetchedData = {
+-            pullRequest: createMockPR()
+-        };
+-        const customPrompt = "Please fix this specific bug";
+-
+-        const prompt = await formatter.generatePrompt(context, fetchedData, customPrompt, false);
+-
+-        // Should contain only the custom prompt
+-        expect(prompt).toBe("Please fix this specific bug");
+-
+-        // Should NOT contain any GitHub context
+-        expect(prompt).not.toContain("<repository>");
+-        expect(prompt).not.toContain("<actor>");
+-        expect(prompt).not.toContain("<pull_request_info>");
+-        expect(prompt).not.toContain("<commits>");
+-        expect(prompt).not.toContain("<changed_files>");
+-    });
+-
+-    test("generatePrompt includes GitHub context when attachGithubContext is true with custom prompt", async () => {
+-        const context = createMockContext();
+-        const fetchedData: FetchedData = {
+-            pullRequest: createMockPR()
+-        };
+-        const customPrompt = "Please review this PR";
+-
+-        const prompt = await formatter.generatePrompt(context, fetchedData, customPrompt, true);
+-
+-        // Should contain custom prompt
+-        expect(prompt).toContain("Please review this PR");
+-
+-        // Should also contain GitHub context
+-        expect(prompt).toContain("<repository>");
+-        expect(prompt).toContain("<actor>");
+-        expect(prompt).toContain("<pull_request_info>");
+-        expect(prompt).toContain("<commits>");
+-        expect(prompt).toContain("<changed_files>");
+-    });
+-
+-    test("generatePrompt includes GitHub context when attachGithubContext is true without custom prompt", async () => {
+-        const context = createMockContext({
+-            payload: {
+-                repository: {
+-                    name: "test-repo",
+-                    owner: {login: "test-owner"},
+-                    full_name: "test-owner/test-repo"
+-                },
+-                pull_request: {
+-                    number: 1,
+-                    title: "Test PR",
+-                    body: "PR description from GitHub",
+-                    updated_at: "2024-01-01T00:00:00Z"
+-                }
+-            } as any
+-        });
+-        const fetchedData: FetchedData = {
+-            pullRequest: createMockPR()
+-        };
+-
+-        const prompt = await formatter.generatePrompt(context, fetchedData, undefined, true);
+-
+-        // Should contain PR body as user instruction
+-        expect(prompt).toContain("PR description from GitHub");
+-
+-        // Should contain GitHub context
+-        expect(prompt).toContain("<repository>");
+-        expect(prompt).toContain("<actor>");
+-        expect(prompt).toContain("<pull_request_info>");
+-    });
+-});
+diff --git a/src/github/operations/comments/feedback.ts b/src/github/operations/comments/feedback.ts
+index 4153f6a..0f42659 100644
+--- a/src/github/operations/comments/feedback.ts
++++ b/src/github/operations/comments/feedback.ts
+@@ -22,7 +22,7 @@ import {
+ } from "../../../constants/github";
+ import type {FailureFeedbackData, FinishFeedbackData, SuccessFeedbackData} from "./types";
+ import {getJiraClient} from "../../jira/client";
+-import {convertMarkdownToJiraWikiMarkup} from "../../jira/markdown-to-jira";
++import {convertMarkdownToADF} from "../../jira/markdown-to-jira";
+ 
+ /**
+  * Adds a thumbs up reaction to the trigger comment/review that started the workflow.
+@@ -455,8 +455,8 @@ async function postJiraFeedback(data: FinishFeedbackData): Promise<void> {
+     }
+ 
+     if (comment) {
+-        // Convert Markdown to Jira Wiki Markup
+-        const jiraComment = convertMarkdownToJiraWikiMarkup(comment);
++        // Convert Markdown to Atlassian Document Format (ADF)
++        const jiraComment = convertMarkdownToADF(comment);
+         await client.addComment(jiraPayload.issueKey, jiraComment);
+         console.log(`✓ Successfully updated Jira issue ${jiraPayload.issueKey}`);
+     }
+diff --git a/src/mcp/github-checks-server.ts b/src/mcp/github-checks-server.ts
+index ae76322..3e58733 100644
+--- a/src/mcp/github-checks-server.ts
++++ b/src/mcp/github-checks-server.ts
+@@ -224,55 +224,69 @@ function clearTimestampFromGhLogs(logLines: string[]): string[] {
+     });
+ }
+ 
++/**
++ * Extracts relevant error information from test logs.
++ *
++ * Simple approach: find lines with error keywords and extract context around them.
++ * Works universally across all test frameworks and languages.
++ */
+ function extractRelevantInfo(logLines: string[]): string {
+-    const relevantLines: string[] = [];
+-    let insideFailedTask = false;
+-
+-    for (const line of logLines) {
+-
+-        // --- 1) Maven failures ---
+-        if (line.startsWith("[ERROR]")) {
+-            relevantLines.push(line);
+-            continue;
+-        }
+-
+-        // --- 2) Kotlin compiler errors ---
+-        if (line.startsWith("e:")) {
+-            relevantLines.push(line);
+-            continue;
+-        }
++    // Universal error keywords (case-insensitive)
++    const ERROR_KEYWORDS = [
++        'error', 'fail', 'failed', 'failure', 'exception',
++        'assert', 'expected', 'actual', 'received',
++        'panic', 'fatal', 'critical', 'traceback'
++    ];
++
++    const CONTEXT_BEFORE = 10; // Lines to capture before error
++    const CONTEXT_AFTER = 50;  // Lines to capture after error
++
++    // Find all lines with error keywords
++    const errorRanges = logLines
++        .map((line, i) => {
++            const lowerLine = line.toLowerCase();
++            const hasErrorKeyword = ERROR_KEYWORDS.some(keyword => lowerLine.includes(keyword));
++
++            if (hasErrorKeyword) {
++                return {
++                    start: Math.max(0, i - CONTEXT_BEFORE),
++                    end: Math.min(logLines.length, i + CONTEXT_AFTER + 1)
++                };
++            }
++            return null;
++        })
++        .filter((range): range is {start: number, end: number} => range !== null);
+ 
+-        // --- 3) Gradle "Task :xxx FAILED" ---
+-        if (/Task\s+:[\w:-]+.*FAILED/.test(line)) {
+-            insideFailedTask = true;
+-            relevantLines.push(line);
+-            continue;
+-        }
++    // No errors found
++    if (errorRanges.length === 0) {
++        return '';
++    }
+ 
+-        if (insideFailedTask) {
+-            relevantLines.push(line);
+-            if (line.includes("FAILURE:")) {
+-                insideFailedTask = false;
++    // Merge overlapping ranges
++    const mergedRanges: Array<{start: number, end: number}> = [];
++    errorRanges.forEach(range => {
++        if (mergedRanges.length === 0) {
++            mergedRanges.push(range);
++        } else {
++            const last = mergedRanges[mergedRanges.length - 1];
++            // Merge if ranges overlap or are adjacent
++            if (range.start <= last.end) {
++                last.end = Math.max(last.end, range.end);
++            } else {
++                mergedRanges.push(range);
+             }
+-            continue;
+-        }
+-
+-        // --- 4) GitHub Actions "##[error]" ---
+-        if (line.includes("##[error]")) {
+-            relevantLines.push(line);
+-            continue;
+         }
++    });
+ 
+-        // --- 5) Test framework failures ---
+-        if (
+-            line.includes("FAILED") ||
+-            line.includes("Assertion error") ||
+-            /Assertion.*failed/i.test(line) ||
+-            line.startsWith("Error:") ||
+-            line.includes("exit code 1")
+-        ) {
+-            relevantLines.push(line);
++    // Extract lines from merged ranges
++    const relevantLines: string[] = [];
++    for (const range of mergedRanges) {
++        if (relevantLines.length > 0) {
++            relevantLines.push('');
++            relevantLines.push('--- (continuing in different section) ---');
++            relevantLines.push('');
+         }
++        relevantLines.push(...logLines.slice(range.start, range.end));
+     }
+ 
+     return relevantLines.join("\n").trim();
+diff --git a/src/mcp/prepare-mcp-config.ts b/src/mcp/prepare-mcp-config.ts
+index 8349074..df4cc54 100644
+--- a/src/mcp/prepare-mcp-config.ts
++++ b/src/mcp/prepare-mcp-config.ts
+@@ -37,7 +37,7 @@ export async function prepareMcpConfig(
+ 
+ 
+     if (hasGHCheksServer) {
+-        const head = branchInfo.prBaseBranch ? branchInfo.baseBranch : branchInfo.workingBranch
++        const head = branchInfo.isNewBranch ? branchInfo.baseBranch : branchInfo.workingBranch
+         baseMcpConfig.mcpServers.github_checks = {
+             command: "bun",
+             args: [
