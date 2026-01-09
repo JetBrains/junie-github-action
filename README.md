@@ -62,9 +62,11 @@ on:
   pull_request_review_comment:
     types: [created]
   issues:
-    types: [opened, assigned]
+    types: [opened, assigned, labeled]
   pull_request_review:
     types: [submitted]
+  pull_request:
+    types: [opened, edited]
 
 jobs:
   junie:
@@ -72,7 +74,8 @@ jobs:
       (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@junie-agent')) ||
       (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@junie-agent')) ||
       (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@junie-agent')) ||
-      (github.event_name == 'issues' && (contains(github.event.issue.body, '@junie-agent') || contains(github.event.issue.title, '@junie-agent')))
+      (github.event_name == 'issues' && (contains(github.event.issue.body, '@junie-agent') || contains(github.event.issue.title, '@junie-agent'))) ||
+      (github.event_name == 'pull_request' && (contains(github.event.pull_request.body, '@junie-agent') || contains(github.event.pull_request.title, '@junie-agent')))
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -330,6 +333,14 @@ jobs:
 7. **Result Processing**: Analyzes changes and determines the action (commit, PR, or comment)
 8. **Feedback**: Updates GitHub with results, PR links, and commit information
 
+### Artifacts
+
+For easier debugging and auditing, the action uploads the following artifacts (retained for 7 days):
+
+- junie-working-directory — contents of your configured `junie_work_dir` (default: `/tmp/junie-work`)
+- junie-logs — logs from `~/.junie/logs`
+- junie-sessions — full Junie directory from `~/.junie` (includes sessions and related metadata)
+
 ## Security Considerations
 
 - **Permission Validation**: Only users with write access can trigger Junie (by default)
@@ -358,7 +369,7 @@ jobs:
 
 - Verify `JUNIE_API_KEY` secret is set correctly
 - Check Junie version compatibility (`junie_version` input)
-- Review uploaded artifacts for Junie working directory logs
+- Review uploaded artifacts (junie-working-directory, junie-logs, junie-sessions)
 - Ensure runner has internet access for API calls
 
 ### No PR Created
