@@ -14,6 +14,7 @@ A powerful GitHub Action that integrates [Junie](https://www.jetbrains.com/junie
   - [Input Parameters](#input-parameters)
   - [Outputs](#outputs)
   - [Required Permissions](#required-permissions)
+  - [Artifacts](#artifacts)
   - [GitHub Token Considerations](#github-token-considerations)
 - [How It Works](#how-it-works)
 - [Security Considerations](#security-considerations)
