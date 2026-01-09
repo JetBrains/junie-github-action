@@ -75,6 +75,8 @@ jobs:
       (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@junie-agent')) ||
       (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@junie-agent')) ||
       (github.event_name == 'issues' && (contains(github.event.issue.body, '@junie-agent') || contains(github.event.issue.title, '@junie-agent'))) ||
+      (github.event_name == 'issues' && github.event.action == 'assigned') ||
+      (github.event_name == 'issues' && github.event.action == 'labeled') ||
       (github.event_name == 'pull_request' && (contains(github.event.pull_request.body, '@junie-agent') || contains(github.event.pull_request.title, '@junie-agent')))
     runs-on: ubuntu-latest
     permissions:
@@ -354,7 +356,7 @@ For easier debugging and auditing, the action uploads the following artifacts (r
     - Push events
   - ⚠️ **Important**: When using custom prompts or automated workflows, ensure proper workflow permissions and conditions to prevent unintended execution
 - **Token Management**: Supports custom GitHub tokens for enhanced security
-- **Artifact Retention**: Working directory uploaded as artifact (7-day retention)
+- **Artifact Retention**: junie-working-directory, junie-logs, and junie-sessions artifacts uploaded (7-day retention)
 
 ## Troubleshooting
 
