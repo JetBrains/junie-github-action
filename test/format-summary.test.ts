@@ -10,7 +10,7 @@ describe("Format Junie Summary", () => {
 
     const markdown = formatJunieSummary(output);
 
-    expect(markdown).toContain("## 🤖 Junie Execution Report");
+    expect(markdown).toContain("## 🤖 Junie Execution Report dsa");
     expect(markdown).toContain("### Task Completed");
     expect(markdown).toContain("Successfully implemented the feature");
     expect(markdown).toContain("All tests passing");
