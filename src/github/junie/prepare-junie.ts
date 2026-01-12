@@ -4,7 +4,7 @@ import {
     isTriggeredByUserInteraction,
     isPushEvent,
     isJiraWorkflowDispatchEvent,
-    isResolveConflictsWorkflowDispatchEvent
+    isResolveConflictsWorkflowDispatchEvent, isPullRequestEvent
 } from "../context";
 import {checkHumanActor} from "../validation/actor";
 import {postJunieWorkingStatusComment} from "../operations/comments/feedback";
@@ -43,7 +43,7 @@ export async function initializeJunieExecution({
 
     await configureGitCredentials(context, tokenConfig)
 
-    await postJunieWorkingStatusComment(octokit.rest, context);
+    const initCommentId = await postJunieWorkingStatusComment(octokit.rest, context);
 
     // Start Jira issue if this is a Jira-triggered workflow
     if (isJiraWorkflowDispatchEvent(context)) {
@@ -60,16 +60,28 @@ export async function initializeJunieExecution({
     const mcpServers = context.inputs.allowedMcpServers ? context.inputs.allowedMcpServers.split(',') : []
     console.log(`MCP Servers: ${mcpServers}`)
 
-    if (mcpServers.length > 0) {
-        await prepareMcpConfig({
-            junieWorkingDir: context.inputs.junieWorkingDir,
-            allowedMcpServers: context.inputs.allowedMcpServers ? context.inputs.allowedMcpServers.split(',') : [],
-            githubToken: tokenConfig.workingToken,
-            owner: context.payload.repository.owner.login,
-            repo: context.payload.repository.name,
-            branchInfo: branchInfo,
-        })
+    // Get PR-specific info
+    let commitSha
+    let prNumber
+    if (isPullRequestEvent(context)) {
+        commitSha = context.payload.pull_request.head.sha;
+        prNumber = context.entityNumber;
     }
+
+    // Prepare MCP configuration with automatic server activation
+    // - Comment server: enabled if initCommentId is available
+    // - Inline comment server: enabled for PRs (requires commitSha)
+    await prepareMcpConfig({
+        junieWorkingDir: context.inputs.junieWorkingDir,
+        allowedMcpServers: mcpServers,
+        githubToken: tokenConfig.workingToken,
+        owner: context.payload.repository.owner.login,
+        repo: context.payload.repository.name,
+        branchInfo: branchInfo,
+        initCommentId: initCommentId,
+        prNumber: prNumber,
+        commitSha: commitSha
+    })
 
     await prepareJunieTask(context, branchInfo, octokit)
 }

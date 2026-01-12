@@ -25,12 +25,14 @@ A powerful GitHub Action that integrates [Junie](https://www.jetbrains.com/junie
 - **Interactive Code Assistant**: Responds to @junie-agent mentions in comments, issues, and PRs
 - **Issue Resolution**: Automatically implements solutions for GitHub issues
 - **PR Management**: Reviews code changes and implements requested modifications
+- **Inline Code Reviews**: Create code review comments with GitHub suggestions directly on PR diffs
 - **Conflict Resolution**: Resolve merge conflicts via `@junie-agent` comment or automatic detection
 - **CI Failure Analysis**: Investigates failed checks and suggests fixes using MCP integration
 - **Flexible Triggers**: Activate via mentions, assignees, labels, or custom prompts
 - **Smart Branch Management**: Context-aware branch creation and management
 - **Silent Mode**: Run analysis-only workflows without comments or git operations
 - **Single Comment Mode**: Update a single comment instead of creating multiple comments for each run (per workflow)
+- **Real-time Progress Updates**: Junie updates progress comments during execution for live feedback
 - **Comprehensive Feedback**: Real-time updates via GitHub comments with links to PRs and commits
 - **Rich Job Summaries**: Beautiful markdown reports in GitHub Actions with execution details
 - **MCP Extensibility**: Integrate custom Model Context Protocol servers for enhanced capabilities
@@ -146,7 +148,22 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 | `allowed_mcp_servers` | MCP servers to enable (comma-separated) | - |
 
 **Available MCP Servers**:
-- `mcp_github_checks_server`: Analyze failed GitHub Actions checks
+- `mcp_github_checks_server`: Analyze failed GitHub Actions checks and provide detailed error information
+- `mcp_github_comment_server`: Update progress comments in real-time during execution (automatically enabled)
+- `mcp_github_inline_comment_server`: Create inline code review comments with GitHub suggestions on PRs (automatically enabled for pull requests)
+
+**Example configuration**:
+```yaml
+- uses: JetBrains/junie-github-action@v0
+  with:
+    junie_api_key: ${{ secrets.JUNIE_API_KEY }}
+    allowed_mcp_servers: "mcp_github_checks_server"
+```
+
+**Note**: The `comment` and `inline_comment` servers are automatically enabled based on context:
+- Comment server enables when Junie creates an initial progress comment
+- Inline comment server enables for all pull request events
+- No manual configuration needed for these servers
 
 #### Advanced Features
 
@@ -326,7 +343,10 @@ jobs:
 3. **Branch Management**: Creates or checks out the appropriate working branch
 4. **Task Preparation**: Converts GitHub context into a Junie-compatible task
 5. **MCP Setup**: Configures enabled MCP servers for enhanced capabilities
-6. **Junie Execution**: Runs Junie CLI with the prepared task
+   - **Checks Server**: Analyze CI failures if explicitly enabled
+   - **Comment Server**: Automatically enabled for real-time progress updates
+   - **Inline Comment Server**: Automatically enabled for PR code review suggestions
+6. **Junie Execution**: Runs Junie CLI with the prepared task and connected MCP tools
 7. **Result Processing**: Analyzes changes and determines the action (commit, PR, or comment)
 8. **Feedback**: Updates GitHub with results, PR links, and commit information
 

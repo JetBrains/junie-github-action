@@ -19,9 +19,11 @@ const server = new McpServer({
     version: "1.0.0",
 });
 
-server.tool(
+server.registerTool(
     "get_pr_failed_checks_info",
-    "Get detailed information about failed checks for a Pull Request, including extracted error logs",
+    {
+        description: "Get detailed information about failed checks for a Pull Request, including extracted error logs",
+    },
     async () => {
         try {
             const client = new Octokit({
@@ -70,7 +72,7 @@ server.tool(
                 isError: true,
             };
         }
-    },
+    }
 );
 
 async function runServer() {

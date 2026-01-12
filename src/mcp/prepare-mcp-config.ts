@@ -13,6 +13,9 @@ type PrepareConfigParams = {
     repo: string;
     branchInfo: BranchInfo;
     allowedMcpServers: string[];
+    initCommentId?: number;
+    prNumber?: number;
+    commitSha?: string;
 };
 
 
@@ -25,6 +28,9 @@ export async function prepareMcpConfig(
         repo,
         branchInfo,
         allowedMcpServers,
+        initCommentId,
+        prNumber,
+        commitSha,
     } = params;
 
     const hasGHCheksServer = allowedMcpServers.some((name) =>
@@ -35,6 +41,44 @@ export async function prepareMcpConfig(
         mcpServers: {},
     };
 
+    // Automatically enable comment server if initCommentId is available
+    if (initCommentId !== undefined) {
+        console.log(`Enabling GitHub Comment MCP Server for comment ID: ${initCommentId}`);
+        baseMcpConfig.mcpServers.github_comment = {
+            command: "bun",
+            args: [
+                "run",
+                `${process.env.GITHUB_ACTION_PATH}/src/mcp/github-comment-server.ts`,
+            ],
+            env: {
+                GITHUB_API_URL: GITHUB_API_URL,
+                GITHUB_TOKEN: githubToken,
+                REPO_OWNER: owner,
+                REPO_NAME: repo,
+                JUNIE_COMMENT_ID: String(initCommentId),
+            },
+        };
+    }
+
+    // Automatically enable inline comment server for PRs
+    if (prNumber && commitSha) {
+        console.log(`Enabling GitHub Inline Comment MCP Server for PR #${prNumber}`);
+        baseMcpConfig.mcpServers.github_inline_comment = {
+            command: "bun",
+            args: [
+                "run",
+                `${process.env.GITHUB_ACTION_PATH}/src/mcp/github-inline-comment-server.ts`,
+            ],
+            env: {
+                GITHUB_API_URL: GITHUB_API_URL,
+                GITHUB_TOKEN: githubToken,
+                REPO_OWNER: owner,
+                REPO_NAME: repo,
+                PR_NUMBER: String(prNumber),
+                COMMIT_SHA: commitSha,
+            },
+        };
+    }
 
     if (hasGHCheksServer) {
         const head = branchInfo.isNewBranch ? branchInfo.baseBranch : branchInfo.workingBranch
