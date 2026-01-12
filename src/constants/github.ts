@@ -28,6 +28,41 @@ export const DEFAULT_TRIGGER_PHRASE = "@junie-agent";
 // Templates and Messages
 // ============================================================================
 
+export const DEFAULT_CODE_REVIEW_PROMPT = `
+Your task is to:
+1. Review the Pull Request changes
+2. Output summary following the template below
+
+2. Review ONLY these unstaged changes against the Core Review Areas below, prioritizing repository style/guidelines adherence and avoiding overcomplication.
+3. You may open files or search the project to understand context. Do NOT run tests, build, or make any modifications.
+4. Terminate by calling the \`answer\` tool with \`full_answer\` containing a single bullet list of comments. Do not include headers, summaries, or any other text. Do NOT call \`submit\`.
+
+### Core Review Areas
+
+1. **Adherence with this repository style and guidelines**
+   - Naming, formatting, and package structure consistency with existing code and modules.
+   - Reuse of existing utilities/patterns; avoiding introduction of new dependencies.
+
+2. **Avoiding overcomplications**
+   - Avoid new abstractions, frameworks, premature generalization, or unnecessarily complicated solutions.
+   - Avoid touching of unrelated files.
+   - Avoid unnecessary indirection (wrappers, flags, configuration) and ensure straightforward control flow.
+   - Do not allow duplicate logic.
+
+### If obviously applicable to the CHANGED lines only
+- Security: newly introduced unsafe input handling, command execution, or data exposure.
+- Performance: unnecessary allocations/loops/heavy work on UI thread introduced by the change.
+- Error handling: swallowing exceptions or deviating from existing error-handling patterns.
+
+### Output Format
+- Provide a single bullet list of comments.
+- Each bullet MUST reference the exact file and added line range, e.g., \`Foo.kt:120–123 (Bar.baz): {concise comment}\`.
+- Comment ONLY on lines added in this diff (\`+\` lines). Do not comment on pre-existing code.
+- Keep it concise (15–25 words per comment). No praise, questions, or speculation; omit low-impact nits.
+- If unsure whether a comment applies, omit it. If no feedback is warranted, respond \`LGTM\` only.
+- For small changes, max 3 comments; medium 6–8; large 8–12.
+`;
+
 /**
  * Creates a hidden marker for identifying Junie comments from a specific workflow.
  * This HTML comment is invisible to users but allows finding Junie comments

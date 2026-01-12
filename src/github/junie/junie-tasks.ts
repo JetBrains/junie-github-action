@@ -10,6 +10,7 @@ import * as core from "@actions/core";
 import {BranchInfo} from "../operations/branch";
 import {isReviewOrCommentHasResolveConflictsTrigger} from "../validation/trigger";
 import {OUTPUT_VARS} from "../../constants/environment";
+import {DEFAULT_CODE_REVIEW_PROMPT} from "../../constants/github";
 import {Octokits} from "../api/client";
 import {NewGitHubPromptFormatter} from "./new-prompt-formatter";
 import {validateInputSize} from "../validation/input-size";
@@ -65,12 +66,44 @@ export async function prepareJunieTask(
             fetchedData = await fetcher.fetchIssueData(owner, repo, context.entityNumber, triggerTime);
         }
 
-        // Generate prompt using formatter
-        const promptText = await formatter.generatePrompt(context, fetchedData, customPrompt, context.inputs.attachGithubContextToCustomPrompt);
-        junieCLITask.task = await getValidatedTextTask(promptText, "task");
+        const issue = fetchedData.pullRequest || fetchedData.issue;
+
+        const isCodeReview = isPullRequestReviewEvent(context) || isPullRequestReviewCommentEvent(context);
+
+        if (issue && isCodeReview) {
+            // For code reviews, we use the issueTask (agent)
+            // We use the hardcoded prompt from inputs, or a default one.
+            // We ignore the comment/review body as instructions.
+            const instructions = context.inputs.prompt || DEFAULT_CODE_REVIEW_PROMPT;
+            const validatedInstructions = await getValidatedTextTask(instructions, "task");
+
+            junieCLITask.issueTask = {
+                issue,
+                owner,
+                repo,
+                instructions: validatedInstructions,
+                targetBranch: branchInfo.workingBranch,
+                baseBranch: branchInfo.baseBranch,
+                bannedTools: [
+                    "apply_patch",
+                    "search_replace",
+                    "create_file",
+                    "rename_element",
+                    "undo_edit",
+                    "bash",
+                    "run_test",
+                    "build",
+                    "submit"
+                ]
+            };
+        } else {
+            // Fallback to legacy task string for other events (like issue_comment "fix this")
+            const promptText = await formatter.generatePrompt(context, fetchedData, customPrompt, context.inputs.attachGithubContextToCustomPrompt);
+            junieCLITask.task = await getValidatedTextTask(promptText, "task");
+        }
     }
 
-    if (!junieCLITask.task && !junieCLITask.mergeTask) {
+    if (!junieCLITask.task && !junieCLITask.mergeTask && !junieCLITask.issueTask) {
         throw new Error("No task was created. Please check your inputs.");
     }
 

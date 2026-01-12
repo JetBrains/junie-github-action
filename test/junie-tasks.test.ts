@@ -254,10 +254,11 @@ describe("prepareJunieTask", () => {
     });
 
     describe("issue comment event (not on PR)", () => {
-        test("should format issue comment prompt", async () => {
+        test("should use legacy task string for issue comments", async () => {
             const context = createMockContext({
                 eventName: "issue_comment",
-                isPR: false
+                isPR: false,
+                entityNumber: 123
             });
             const octokit = createMockOctokit();
 
@@ -265,18 +266,16 @@ describe("prepareJunieTask", () => {
 
             expect(result).toBeDefined();
             expect(result.task).toBeDefined();
-            expect(result.mergeTask).toBeUndefined();
-            expect(result.task).toContain("<user_instruction>");
+            expect(result.issueTask).toBeUndefined();
             expect(result.task).toContain("@junie-agent help");
-            expect(result.task).toContain("<repository>");
-            expect(result.task).toContain("<actor>");
         });
     });
 
     describe("issues event", () => {
-        test("should format issue prompt", async () => {
+        test("should use legacy task string for issues event", async () => {
             const context = createMockContext({
                 eventName: "issues",
+                entityNumber: 123,
                 payload: {
                     action: "opened",
                     issue: {
@@ -299,15 +298,13 @@ describe("prepareJunieTask", () => {
 
             expect(result).toBeDefined();
             expect(result.task).toBeDefined();
-            expect(result.mergeTask).toBeUndefined();
-            expect(result.task).toContain("<user_instruction>");
+            expect(result.issueTask).toBeUndefined();
             expect(result.task).toContain("Issue body");
-            expect(result.task).toContain("<repository>");
         });
     });
 
     describe("PR comment event", () => {
-        test("should format PR comment prompt with all details", async () => {
+        test("should use legacy task string for PR comments", async () => {
             const context = createMockContext({
                 eventName: "issue_comment",
                 isPR: true,
@@ -340,18 +337,21 @@ describe("prepareJunieTask", () => {
 
             expect(result).toBeDefined();
             expect(result.task).toBeDefined();
-            expect(result.mergeTask).toBeUndefined();
-            expect(result.task).toContain("<user_instruction>");
+            expect(result.issueTask).toBeUndefined();
             expect(result.task).toContain("Please fix this");
-            expect(result.task).toContain("<repository>");
-            expect(result.task).toContain("<pull_request_info>");
         });
     });
 
     describe("PR review event", () => {
-        test("should format PR review prompt", async () => {
+        test("should use issueTask with custom prompt for PR reviews when provided", async () => {
             const context = createMockContext({
                 eventName: "pull_request_review",
+                isPR: true,
+                entityNumber: 123,
+                inputs: {
+                    ...createMockContext().inputs,
+                    prompt: "Custom review prompt"
+                },
                 payload: {
                     action: "submitted",
                     pull_request: {
@@ -376,18 +376,54 @@ describe("prepareJunieTask", () => {
             const result = await prepareJunieTask(context, branchInfo, octokit);
 
             expect(result).toBeDefined();
-            expect(result.task).toBeDefined();
-            expect(result.mergeTask).toBeUndefined();
-            expect(result.task).toContain("<user_instruction>");
-            expect(result.task).toContain("Changes needed");
-            expect(result.task).toContain("<repository>");
+            expect(result.issueTask).toBeDefined();
+            expect(result.issueTask?.instructions).toBe("Custom review prompt");
+        });
+
+        test("should use issueTask with default prompt for PR reviews", async () => {
+            const context = createMockContext({
+                eventName: "pull_request_review",
+                isPR: true,
+                entityNumber: 123,
+                payload: {
+                    action: "submitted",
+                    pull_request: {
+                        number: 123,
+                        title: "Test PR",
+                        updated_at: "2024-01-01T00:00:00Z"
+                    },
+                    review: {
+                        id: 456,
+                        user: {login: "reviewer"},
+                        body: "Changes needed",
+                        submitted_at: "2024-01-01T00:00:00Z"
+                    },
+                    repository: {
+                        owner: {login: "owner"},
+                        name: "repo"
+                    }
+                } as any
+            });
+            const octokit = createMockOctokit();
+
+            const result = await prepareJunieTask(context, branchInfo, octokit);
+
+            expect(result).toBeDefined();
+            expect(result.issueTask).toBeDefined();
+            expect(result.issueTask?.instructions).toContain("Review the Pull Request changes");
+            expect(result.issueTask?.instructions).not.toContain("Changes needed");
+            expect(result.issueTask?.bannedTools).toBeDefined();
+            expect(result.issueTask?.bannedTools).toContain("apply_patch");
+            expect(result.issueTask?.bannedTools).toContain("submit");
         });
     });
 
     describe("PR review comment event", () => {
-        test("should format PR review comment prompt", async () => {
+        test("should use issueTask with default prompt for PR review comments", async () => {
             const context = createMockContext({
                 eventName: "pull_request_review_comment",
+                isPR: true,
+                entityNumber: 123,
                 payload: {
                     action: "created",
                     pull_request: {
@@ -412,16 +448,14 @@ describe("prepareJunieTask", () => {
             const result = await prepareJunieTask(context, branchInfo, octokit);
 
             expect(result).toBeDefined();
-            expect(result.task).toBeDefined();
-            expect(result.mergeTask).toBeUndefined();
-            expect(result.task).toContain("<user_instruction>");
-            expect(result.task).toContain("Fix this line");
-            expect(result.task).toContain("<repository>");
+            expect(result.issueTask).toBeDefined();
+            expect(result.issueTask?.instructions).toContain("Review the Pull Request changes");
+            expect(result.issueTask?.instructions).not.toContain("Fix this line");
         });
     });
 
     describe("PR event", () => {
-        test("should format PR prompt for opened/edited PR", async () => {
+        test("should use legacy task string for opened/edited PR", async () => {
             const context = createMockContext({
                 eventName: "pull_request",
                 isPR: true,
@@ -448,11 +482,8 @@ describe("prepareJunieTask", () => {
 
             expect(result).toBeDefined();
             expect(result.task).toBeDefined();
-            expect(result.mergeTask).toBeUndefined();
-            expect(result.task).toContain("<user_instruction>");
+            expect(result.issueTask).toBeUndefined();
             expect(result.task).toContain("PR description");
-            expect(result.task).toContain("<pull_request_info>");
-            expect(result.task).toContain("<repository>");
         });
     });
 
@@ -552,14 +583,22 @@ describe("prepareJunieTask", () => {
             const octokit = createMockOctokit();
 
             // Test issue comment
-            const issueContext = createMockContext({eventName: "issue_comment", isPR: false});
+            const issueContext = createMockContext({
+                eventName: "issue_comment",
+                isPR: false,
+                entityNumber: 123
+            });
             const issueResult = await prepareJunieTask(issueContext, branchInfo, octokit);
             expect(issueResult).toBeDefined();
             expect(issueResult.task).toBeDefined();
             expect(issueResult.mergeTask).toBeUndefined();
 
             // Test PR comment
-            const prContext = createMockContext({eventName: "issue_comment", isPR: true});
+            const prContext = createMockContext({
+                eventName: "issue_comment",
+                isPR: true,
+                entityNumber: 123
+            });
             const prResult = await prepareJunieTask(prContext, branchInfo, octokit);
             expect(prResult).toBeDefined();
             expect(prResult.task).toBeDefined();
