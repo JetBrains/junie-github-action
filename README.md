@@ -126,7 +126,7 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 
 | Input | Description | Default |
 |-------|-------------|---------|
-| `trigger_phrase` | Phrase to activate Junie in comments/issues | `@junie-agent` |
+| `trigger_phrase` | Phrase to activate Junie and for output redaction | `@junie-agent` |
 | `assignee_trigger` | Username that triggers when assigned | - |
 | `label_trigger` | Label that triggers the action | `junie` |
 
@@ -357,8 +357,8 @@ jobs:
     - Automated workflows (scheduled, workflow_dispatch, workflow_run)
     - Push events
   - ⚠️ **Important**: When using custom prompts or automated workflows, ensure proper workflow permissions and conditions to prevent unintended execution
-- **Content Sanitization**: Protects against prompt injection by removing malicious instructions hidden in HTML comments, invisible characters, and obfuscated entities
-- **Output Redaction**: Automatically redacts GitHub tokens and replaces trigger phrases in Junie's responses to prevent accidental token exposure and self-triggering loops
+- **Content Sanitization**: Protects against prompt injection by removing malicious instructions hidden in HTML comments or invisible characters, and by normalizing obfuscated entities
+- **Output Redaction**: Automatically redacts GitHub tokens and replaces the trigger phrase in Junie's responses to prevent accidental token exposure and self-triggering loops
 - **Token Management**: Supports custom GitHub tokens for enhanced security
 - **Artifact Retention**: Working directory uploaded as artifact (7-day retention)
 
