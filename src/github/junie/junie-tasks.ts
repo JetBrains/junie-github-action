@@ -1,4 +1,6 @@
 import {
+    isCodeReviewWorkflowDispatchEvent,
+    isResolveConflictsWorkflowDispatchEvent,
     JunieExecutionContext,
     isIssueCommentEvent,
     isIssuesEvent,
@@ -8,7 +10,10 @@ import {
 } from "../context";
 import * as core from "@actions/core";
 import {BranchInfo} from "../operations/branch";
-import {isReviewOrCommentHasResolveConflictsTrigger} from "../validation/trigger";
+import {
+    isReviewOrCommentHasCodeReviewTrigger,
+    isReviewOrCommentHasResolveConflictsTrigger
+} from "../validation/trigger";
 import {OUTPUT_VARS} from "../../constants/environment";
 import {DEFAULT_CODE_REVIEW_PROMPT} from "../../constants/github";
 import {Octokits} from "../api/client";
@@ -52,7 +57,7 @@ export async function prepareJunieTask(
     const customPrompt = context.inputs.prompt || undefined;
     let junieCLITask: CliInput = {}
 
-    if (context.inputs.resolveConflicts || isReviewOrCommentHasResolveConflictsTrigger(context)) {
+    if (context.inputs.resolveConflicts || isReviewOrCommentHasResolveConflictsTrigger(context) || isResolveConflictsWorkflowDispatchEvent(context)) {
         junieCLITask.mergeTask = {branch: branchInfo.prBaseBranch || branchInfo.baseBranch}
     } else {
         const formatter = new NewGitHubPromptFormatter();
@@ -68,7 +73,10 @@ export async function prepareJunieTask(
 
         const issue = fetchedData.pullRequest || fetchedData.issue;
 
-        const isCodeReview = isPullRequestReviewEvent(context) || isPullRequestReviewCommentEvent(context);
+        const isCodeReview = isPullRequestReviewEvent(context) || 
+                             isPullRequestReviewCommentEvent(context) || 
+                             isReviewOrCommentHasCodeReviewTrigger(context) || 
+                             isCodeReviewWorkflowDispatchEvent(context);
 
         if (issue && isCodeReview) {
             // For code reviews, we use the issueTask (agent)

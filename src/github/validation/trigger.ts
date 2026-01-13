@@ -9,7 +9,7 @@ import {
     isPullRequestReviewCommentEvent,
     isPullRequestReviewEvent,
 } from "../context";
-import {RESOLVE_CONFLICTS_TRIGGER_PHRASE_REGEXP} from "../../constants/github";
+import {CODE_REVIEW_TRIGGER_PHRASE_REGEXP, RESOLVE_CONFLICTS_TRIGGER_PHRASE_REGEXP} from "../../constants/github";
 
 /**
  * Detects if the Junie trigger phrase is present in the workflow context
@@ -77,7 +77,9 @@ export function detectJunieTriggerPhrase(context: JunieExecutionContext): boolea
             return true;
         }
     }
-    const hasTrigger = isReviewOrCommentHasTrigger(context, triggerPhraseRegex)
+    const hasTrigger = isReviewOrCommentHasTrigger(context, triggerPhraseRegex) ||
+        isReviewOrCommentHasResolveConflictsTrigger(context) ||
+        isReviewOrCommentHasCodeReviewTrigger(context);
 
     if (hasTrigger) {
         return true;
@@ -89,6 +91,10 @@ export function detectJunieTriggerPhrase(context: JunieExecutionContext): boolea
 
 export function isReviewOrCommentHasResolveConflictsTrigger(context: JunieExecutionContext) {
     return isReviewOrCommentHasTrigger(context, RESOLVE_CONFLICTS_TRIGGER_PHRASE_REGEXP)
+}
+
+export function isReviewOrCommentHasCodeReviewTrigger(context: JunieExecutionContext) {
+    return isReviewOrCommentHasTrigger(context, CODE_REVIEW_TRIGGER_PHRASE_REGEXP)
 }
 
 export function isReviewOrCommentHasTrigger(context: JunieExecutionContext, regExp: RegExp) {

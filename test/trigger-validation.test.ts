@@ -434,5 +434,41 @@ describe("Trigger Validation", () => {
         expect(detectJunieTriggerPhrase(context)).toBe(true);
       });
     });
+
+    describe("special triggers", () => {
+      test("should trigger on 'resolve conflicts' without @junie-agent", () => {
+        const context = createMockContext({
+          eventName: "issue_comment",
+          eventAction: "created",
+          inputs: { triggerPhrase: "@junie-agent" },
+          payload: {
+            ...mockIssueCommentContext.payload,
+            comment: {
+              ...(mockIssueCommentContext.payload as IssueCommentEvent).comment,
+              body: "Please resolve conflicts",
+            },
+          },
+        });
+
+        expect(detectJunieTriggerPhrase(context)).toBe(true);
+      });
+
+      test("should trigger on 'review code' without @junie-agent", () => {
+        const context = createMockContext({
+          eventName: "issue_comment",
+          eventAction: "created",
+          inputs: { triggerPhrase: "@junie-agent" },
+          payload: {
+            ...mockIssueCommentContext.payload,
+            comment: {
+              ...(mockIssueCommentContext.payload as IssueCommentEvent).comment,
+              body: "Can you review code please?",
+            },
+          },
+        });
+
+        expect(detectJunieTriggerPhrase(context)).toBe(true);
+      });
+    });
   });
 });
