@@ -34,7 +34,7 @@ A powerful GitHub Action that integrates [Junie](https://www.jetbrains.com/junie
 - **Single Comment Mode**: Update a single comment instead of creating multiple comments for each run (per workflow)
 - **Comprehensive Feedback**: Updates via GitHub comments with links to PRs and commits
 - **Rich Job Summaries**: Beautiful markdown reports in GitHub Actions with execution details
-- **Security-First Design**: Built-in sanitization against prompt injection and automated redaction of sensitive information like GitHub tokens
+- **Security-First Design**: Built-in sanitization against prompt injection, automated redaction of sensitive information, and time-based edit protection
 - **Automatic Attachment Handling**: Downloads and passes images or files attached to issues and PRs to Junie
 - **MCP Extensibility**: Integrate custom Model Context Protocol servers for enhanced capabilities
 - **Runs on Your Infrastructure**: Executes entirely on your GitHub runners
@@ -360,6 +360,7 @@ jobs:
     - Push events
   - ⚠️ **Important**: When using custom prompts or automated workflows, ensure proper workflow permissions and conditions to prevent unintended execution
 - **Content Sanitization**: Protects against prompt injection by removing malicious instructions hidden in HTML comments, invisible characters, image alt text, link titles, and obfuscated entities
+- **Edit Protection**: Protects against post-trigger edits by only including content (bodies, comments, reviews) that existed at the time the action was triggered
 - **Output Redaction**: Automatically redacts GitHub tokens (including `ghp_`, `gho_`, `ghs_`, `ghr_`, and `github_pat_` prefixes) and replaces trigger phrases (replaced with "the assistant") in Junie's responses to prevent accidental token exposure and self-triggering loops
 - **Token Management**: Supports custom GitHub tokens for enhanced security
 - **Artifact Retention**: Working directory uploaded as artifact (7-day retention)
