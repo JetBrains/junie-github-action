@@ -116,7 +116,8 @@ jobs:
             Your task is to:
             1. Download the Pull Request diff using `gh pr diff ${{ github.event.pull_request.head.ref }}`
             2. Review the downloaded diff according to the criteria below
-            3. Output summary following the template below using `submit` action
+            3. Provide inline feedback and code suggestions using `post_inline_review_comment` for specific issues found
+            4. Output a summary report following the template below using `submit` action
             
             ## Review Criteria
             
@@ -158,7 +159,7 @@ jobs:
             ## Additional instructions
             - Strictly follow the plan above (`Your task is to:` section)
             - You are not expected to explore the repo. Do review solely based on the downloaded diff
-            - You are not expected to run any code or any commands except `gh pr diff`
+            - You are not expected to run any code or any commands except `gh pr diff` and `post_inline_review_comment`
 ```
 
 </details>
@@ -166,8 +167,9 @@ jobs:
 **How it works:**
 1. Triggers on PR open/update or when someone replies `@junie-agent`
 2. Analyzes all changed files in the PR diff
-3. Leaves a structured review comment with severity levels
-4. Updates the same comment on subsequent runs (via `use_single_comment`)
+3. Uses the **Inline Comment MCP Server** to leave detailed feedback with code suggestions directly on the PR diff
+4. Leaves a structured summary review comment with overall assessment and highlights
+5. Updates the summary comment on subsequent runs (via `use_single_comment`)
 
 **Next steps:**
 - Add blocking reviews for critical issues (require approval before merge)
