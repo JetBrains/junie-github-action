@@ -113,7 +113,7 @@ jobs:
 - **Sync Code → Documentation** - Auto-update docs when code changes
 - **Fix Failing CI Tests** - Diagnose and fix test failures automatically
 - **Security Audit for Secrets** - Scan commits for accidentally committed credentials
-- **Dependency Update Assistant** - Review and adapt to breaking changes in dependencies
+- **Automatic Merge Conflict Resolution** - Automatically resolve conflicts when base branch changes
 
 Each recipe includes complete workflows, prompts, and configuration examples you can copy and adapt.
 
@@ -144,7 +144,7 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 | `junie_version` | Junie CLI version to install | `576.1` |
 | `junie_work_dir` | Working directory for Junie files | `/tmp/junie-work` |
 | `junie_guidelines_filename` | Filename of the guidelines file (should be in `<project-root>/.junie` dir) | `guidelines.md` |
-| `allowed_mcp_servers` | MCP servers to enable (comma-separated) | - |
+| `allowed_mcp_servers` | Comma-separated list of MCP servers to use (e.g., `mcp_github_checks_server`). Note: inline comment server is automatically enabled for PRs. | - |
 
 **Available MCP Servers**:
 - `mcp_github_checks_server`: Analyze failed GitHub Actions checks and provide detailed error information
@@ -158,7 +158,7 @@ Each recipe includes complete workflows, prompts, and configuration examples you
     allowed_mcp_servers: "mcp_github_checks_server"
 ```
 
-**Note**: The `mcp_github_inline_comment_server` is automatically enabled for all pull request events - no manual configuration needed.
+**Note**: The `mcp_github_inline_comment_server` is automatically enabled for `pull_request` events - no manual configuration needed.
 
 #### Advanced Features
 
