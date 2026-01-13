@@ -44,6 +44,7 @@ jobs:
             2. Verify all code examples in README.md are correct
             3. Check if any new features in src/ are documented
             4. Ensure configuration examples match the actual implementation
+            5. Ignore minor changes, spelling or syntax errors, etc.
 
             If you find any discrepancies or improvements needed:
             - Update README.md accordingly
