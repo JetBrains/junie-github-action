@@ -35,6 +35,7 @@ A powerful GitHub Action that integrates [Junie](https://www.jetbrains.com/junie
 - **Comprehensive Feedback**: Updates via GitHub comments with links to PRs and commits
 - **Rich Job Summaries**: Beautiful markdown reports in GitHub Actions with execution details
 - **Security-First Design**: Built-in sanitization against prompt injection and automated redaction of sensitive information like GitHub tokens
+- **Automatic Attachment Handling**: Downloads and passes images or files attached to issues and PRs to Junie
 - **MCP Extensibility**: Integrate custom Model Context Protocol servers for enhanced capabilities
 - **Runs on Your Infrastructure**: Executes entirely on your GitHub runners
 
@@ -145,7 +146,7 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 | `junie_version` | Junie CLI version to install | `576.1` |
 | `junie_work_dir` | Working directory for Junie files | `/tmp/junie-work` |
 | `junie_guidelines_filename` | Filename of the guidelines file (should be in `<project-root>/.junie` dir) | `guidelines.md` |
-| `allowed_mcp_servers` | Comma-separated list of MCP servers to use (e.g., `mcp_github_checks_server`). Note: inline comment server is automatically enabled for PRs. | - |
+| `allowed_mcp_servers` | Comma-separated list of MCP servers to use (e.g., `mcp_github_checks_server`, `mcp_github_inline_comment_server`). Note: inline comment server is automatically enabled for PRs. | - |
 
 **Available MCP Servers**:
 - `mcp_github_checks_server`: Analyze failed GitHub Actions checks and provide detailed error information
@@ -299,14 +300,14 @@ GitHub App tokens
 
 **Setup steps:**
 
-a. **Install Your App to the Repository:**
+1. **Install Your App to the Repository:**
 
-b. **Add secrets to repository:**
+2. **Add secrets to repository:**
    - Go to repository Settings → Secrets and variables → Actions
    - Add `APP_ID` with your App ID
    - Add `APP_PRIVATE_KEY` with the entire contents of the `.pem` file
 
-e. **Use in workflow:**
+3. **Use in workflow:**
 
 ```yaml
 jobs:
@@ -338,7 +339,7 @@ jobs:
 1. **Trigger Detection**: The action detects triggers (mentions, labels, assignments, or prompts)
 2. **Validation**: Verifies permissions and checks if the actor is human (when applicable - see Security Considerations)
 3. **Branch Management**: Creates or checks out the appropriate working branch
-4. **Task Preparation**: Converts GitHub context into a Junie-compatible task, applying security sanitization to user-submitted content to prevent prompt injection
+4. **Task Preparation**: Converts GitHub context into a Junie-compatible task, applying security sanitization to user-submitted content to prevent prompt injection and downloading any referenced attachments (images/files) for Junie's use.
 5. **MCP Setup**: Configures enabled MCP servers for enhanced capabilities
    - **Checks Server**: Analyze CI failures if explicitly enabled
    - **Inline Comment Server**: Automatically enabled for PR code review suggestions
@@ -359,7 +360,7 @@ jobs:
     - Push events
   - ⚠️ **Important**: When using custom prompts or automated workflows, ensure proper workflow permissions and conditions to prevent unintended execution
 - **Content Sanitization**: Protects against prompt injection by removing malicious instructions hidden in HTML comments, invisible characters, image alt text, link titles, and obfuscated entities
-- **Output Redaction**: Automatically redacts GitHub tokens and replaces trigger phrases (replaced with "the assistant") in Junie's responses to prevent accidental token exposure and self-triggering loops
+- **Output Redaction**: Automatically redacts GitHub tokens (including `ghp_`, `gho_`, `ghs_`, `ghr_`, and `github_pat_` prefixes) and replaces trigger phrases (replaced with "the assistant") in Junie's responses to prevent accidental token exposure and self-triggering loops
 - **Token Management**: Supports custom GitHub tokens for enhanced security
 - **Artifact Retention**: Working directory uploaded as artifact (7-day retention)
 
