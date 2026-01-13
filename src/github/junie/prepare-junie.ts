@@ -43,7 +43,7 @@ export async function initializeJunieExecution({
 
     await configureGitCredentials(context, tokenConfig)
 
-    const initCommentId = await postJunieWorkingStatusComment(octokit.rest, context);
+    await postJunieWorkingStatusComment(octokit.rest, context);
 
     // Start Jira issue if this is a Jira-triggered workflow
     if (isJiraWorkflowDispatchEvent(context)) {
@@ -69,7 +69,6 @@ export async function initializeJunieExecution({
     }
 
     // Prepare MCP configuration with automatic server activation
-    // - Comment server: enabled if initCommentId is available
     // - Inline comment server: enabled for PRs (requires commitSha)
     const mcpConfig = await prepareMcpConfig({
         junieWorkingDir: context.inputs.junieWorkingDir,
@@ -78,7 +77,6 @@ export async function initializeJunieExecution({
         owner: context.payload.repository.owner.login,
         repo: context.payload.repository.name,
         branchInfo: branchInfo,
-        initCommentId: initCommentId,
         prNumber: prNumber,
         commitSha: commitSha
     })

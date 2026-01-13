@@ -13,7 +13,6 @@ type PrepareConfigParams = {
     repo: string;
     branchInfo: BranchInfo;
     allowedMcpServers: string[];
-    initCommentId?: number;
     prNumber?: number;
     commitSha?: string;
 };
@@ -28,7 +27,6 @@ export async function prepareMcpConfig(
         repo,
         branchInfo,
         allowedMcpServers,
-        initCommentId,
         prNumber,
         commitSha,
     } = params;
@@ -43,26 +41,6 @@ export async function prepareMcpConfig(
 
     // Track which servers are actually enabled
     const enabledServers: string[] = [];
-
-    // Automatically enable comment server if initCommentId is available
-    if (initCommentId !== undefined) {
-        console.log(`Enabling GitHub Comment MCP Server for comment ID: ${initCommentId}`);
-        baseMcpConfig.mcpServers.github_comment = {
-            command: "bun",
-            args: [
-                "run",
-                `${process.env.GITHUB_ACTION_PATH}/src/mcp/github-comment-server.ts`,
-            ],
-            env: {
-                GITHUB_API_URL: GITHUB_API_URL,
-                GITHUB_TOKEN: githubToken,
-                REPO_OWNER: owner,
-                REPO_NAME: repo,
-                JUNIE_COMMENT_ID: String(initCommentId),
-            },
-        };
-        enabledServers.push('mcp_github_comment_server');
-    }
 
     // Automatically enable inline comment server for PRs
     if (prNumber && commitSha) {
