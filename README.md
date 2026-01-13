@@ -144,7 +144,7 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 | `junie_version` | Junie CLI version to install | `576.1` |
 | `junie_work_dir` | Working directory for Junie files | `/tmp/junie-work` |
 | `junie_guidelines_filename` | Filename of the guidelines file (should be in `<project-root>/.junie` dir) | `guidelines.md` |
-| `allowed_mcp_servers` | Comma-separated list of MCP servers to use (e.g., `mcp_github_checks_server`). Note: inline comment server is automatically enabled for PRs. | - |
+| `allowed_mcp_servers` | Comma-separated list of GitHub MCP servers to use. Allowed server names: `mcp_github_checks_server`, `mcp_github_inline_comment_server`. Note: inline comment server is automatically enabled for pull requests. | - |
 
 **Available MCP Servers**:
 - `mcp_github_checks_server`: Analyze failed GitHub Actions checks and provide detailed error information
