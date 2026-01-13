@@ -17,6 +17,7 @@ import {downloadAttachmentsAndRewriteText} from "./attachment-downloader";
 import {GraphQLGitHubDataFetcher} from "../api/graphql-data-fetcher";
 import {FetchedData} from "../api/queries";
 import {CliInput} from "./types/junie";
+import {generateMcpToolsPrompt} from "../../mcp/mcp-prompts";
 
 async function getValidatedTextTask(text: string, taskType: string): Promise<string> {
     // Download attachments and rewrite URLs in the text
@@ -43,7 +44,8 @@ function getTriggerTime(context: JunieExecutionContext): string | undefined {
 export async function prepareJunieTask(
     context: JunieExecutionContext,
     branchInfo: BranchInfo,
-    octokit: Octokits
+    octokit: Octokits,
+    enabledMcpServers: string[] = []
 ) {
     const owner = context.payload.repository.owner.login;
     const repo = context.payload.repository.name;
@@ -66,7 +68,14 @@ export async function prepareJunieTask(
         }
 
         // Generate prompt using formatter
-        const promptText = await formatter.generatePrompt(context, fetchedData, customPrompt, context.inputs.attachGithubContextToCustomPrompt);
+        let promptText = await formatter.generatePrompt(context, fetchedData, customPrompt, context.inputs.attachGithubContextToCustomPrompt);
+
+        // Append MCP tools information if any MCP servers are enabled
+        const mcpToolsPrompt = generateMcpToolsPrompt(enabledMcpServers);
+        if (mcpToolsPrompt) {
+            promptText = promptText + mcpToolsPrompt;
+        }
+
         junieCLITask.task = await getValidatedTextTask(promptText, "task");
     }
 

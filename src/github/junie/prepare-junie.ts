@@ -4,7 +4,7 @@ import {
     isTriggeredByUserInteraction,
     isPushEvent,
     isJiraWorkflowDispatchEvent,
-    isResolveConflictsWorkflowDispatchEvent
+    isResolveConflictsWorkflowDispatchEvent, isPullRequestEvent
 } from "../context";
 import {checkHumanActor} from "../validation/actor";
 import {postJunieWorkingStatusComment} from "../operations/comments/feedback";
@@ -58,20 +58,30 @@ export async function initializeJunieExecution({
 
     const branchInfo = await initializeJunieWorkspace(octokit, context);
     const mcpServers = context.inputs.allowedMcpServers ? context.inputs.allowedMcpServers.split(',') : []
-    console.log(`MCP Servers: ${mcpServers}`)
+    console.log(`MCP Servers enabled by user: ${mcpServers}`)
 
-    if (mcpServers.length > 0) {
-        await prepareMcpConfig({
-            junieWorkingDir: context.inputs.junieWorkingDir,
-            allowedMcpServers: context.inputs.allowedMcpServers ? context.inputs.allowedMcpServers.split(',') : [],
-            githubToken: tokenConfig.workingToken,
-            owner: context.payload.repository.owner.login,
-            repo: context.payload.repository.name,
-            branchInfo: branchInfo,
-        })
+    // Get PR-specific info
+    let commitSha
+    let prNumber
+    if (isPullRequestEvent(context)) {
+        commitSha = context.payload.pull_request.head.sha;
+        prNumber = context.entityNumber;
     }
 
-    await prepareJunieTask(context, branchInfo, octokit)
+    // Prepare MCP configuration with automatic server activation
+    // - Inline comment server: enabled for PRs (requires commitSha)
+    const mcpConfig = await prepareMcpConfig({
+        junieWorkingDir: context.inputs.junieWorkingDir,
+        allowedMcpServers: mcpServers,
+        githubToken: tokenConfig.workingToken,
+        owner: context.payload.repository.owner.login,
+        repo: context.payload.repository.name,
+        branchInfo: branchInfo,
+        prNumber: prNumber,
+        commitSha: commitSha
+    })
+
+    await prepareJunieTask(context, branchInfo, octokit, mcpConfig.enabledServers)
 }
 
 async function shouldHandle(context: JunieExecutionContext, octokit: Octokits): Promise<boolean> {

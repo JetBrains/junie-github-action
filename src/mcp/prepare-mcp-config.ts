@@ -13,18 +13,22 @@ type PrepareConfigParams = {
     repo: string;
     branchInfo: BranchInfo;
     allowedMcpServers: string[];
+    prNumber?: number;
+    commitSha?: string;
 };
 
 
 export async function prepareMcpConfig(
     params: PrepareConfigParams,
-): Promise<string> {
+): Promise<{ configPath: string; enabledServers: string[] }> {
     const {
         githubToken,
         owner,
         repo,
         branchInfo,
         allowedMcpServers,
+        prNumber,
+        commitSha,
     } = params;
 
     const hasGHCheksServer = allowedMcpServers.some((name) =>
@@ -35,6 +39,29 @@ export async function prepareMcpConfig(
         mcpServers: {},
     };
 
+    // Track which servers are actually enabled
+    const enabledServers: string[] = [];
+
+    // Automatically enable inline comment server for PRs
+    if (prNumber && commitSha) {
+        console.log(`Enabling GitHub Inline Comment MCP Server for PR #${prNumber}`);
+        baseMcpConfig.mcpServers.github_inline_comment = {
+            command: "bun",
+            args: [
+                "run",
+                `${process.env.GITHUB_ACTION_PATH}/src/mcp/github-inline-comment-server.ts`,
+            ],
+            env: {
+                GITHUB_API_URL: GITHUB_API_URL,
+                GITHUB_TOKEN: githubToken,
+                REPO_OWNER: owner,
+                REPO_NAME: repo,
+                PR_NUMBER: String(prNumber),
+                COMMIT_SHA: commitSha,
+            },
+        };
+        enabledServers.push('mcp_github_inline_comment_server');
+    }
 
     if (hasGHCheksServer) {
         const head = branchInfo.isNewBranch ? branchInfo.baseBranch : branchInfo.workingBranch
@@ -52,6 +79,7 @@ export async function prepareMcpConfig(
                 HEAD_SHA: `heads/${head}`,
             },
         };
+        enabledServers.push('mcp_github_checks_server');
     }
 
     const configJsonString = JSON.stringify(baseMcpConfig, null, 2);
@@ -65,5 +93,10 @@ export async function prepareMcpConfig(
     const mcpConfigPath = join(junieCMPDir, 'mcp.json');
     await writeFile(mcpConfigPath, configJsonString, 'utf-8');
 
-    return configJsonString;
+    console.log(`Enabled MCP servers: ${enabledServers.join(', ')}`);
+
+    return {
+        configPath: mcpConfigPath,
+        enabledServers,
+    };
 }
