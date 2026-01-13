@@ -34,6 +34,7 @@ A powerful GitHub Action that integrates [Junie](https://www.jetbrains.com/junie
 - **Single Comment Mode**: Update a single comment instead of creating multiple comments for each run (per workflow)
 - **Comprehensive Feedback**: Updates via GitHub comments with links to PRs and commits
 - **Rich Job Summaries**: Beautiful markdown reports in GitHub Actions with execution details
+- **Security-First Design**: Built-in sanitization against prompt injection and automated redaction of sensitive information like GitHub tokens
 - **MCP Extensibility**: Integrate custom Model Context Protocol servers for enhanced capabilities
 - **Runs on Your Infrastructure**: Executes entirely on your GitHub runners
 
@@ -336,12 +337,12 @@ jobs:
 1. **Trigger Detection**: The action detects triggers (mentions, labels, assignments, or prompts)
 2. **Validation**: Verifies permissions and checks if the actor is human (when applicable - see Security Considerations)
 3. **Branch Management**: Creates or checks out the appropriate working branch
-4. **Task Preparation**: Converts GitHub context into a Junie-compatible task
+4. **Task Preparation**: Converts GitHub context into a Junie-compatible task, applying security sanitization to user-submitted content to prevent prompt injection
 5. **MCP Setup**: Configures enabled MCP servers for enhanced capabilities
    - **Checks Server**: Analyze CI failures if explicitly enabled
    - **Inline Comment Server**: Automatically enabled for PR code review suggestions
 6. **Junie Execution**: Runs Junie CLI with the prepared task and connected MCP tools
-7. **Result Processing**: Analyzes changes and determines the action (commit, PR, or comment)
+7. **Result Processing**: Analyzes changes, determines the action (commit, PR, or comment), and sanitizes Junie's output to redact tokens and prevent self-triggering
 8. **Feedback**: Updates GitHub with results, PR links, and commit information
 
 ## Security Considerations
@@ -356,6 +357,8 @@ jobs:
     - Automated workflows (scheduled, workflow_dispatch, workflow_run)
     - Push events
   - ⚠️ **Important**: When using custom prompts or automated workflows, ensure proper workflow permissions and conditions to prevent unintended execution
+- **Content Sanitization**: Protects against prompt injection by removing malicious instructions hidden in HTML comments, invisible characters, and obfuscated entities
+- **Output Redaction**: Automatically redacts GitHub tokens and replaces trigger phrases in Junie's responses to prevent accidental token exposure and self-triggering loops
 - **Token Management**: Supports custom GitHub tokens for enhanced security
 - **Artifact Retention**: Working directory uploaded as artifact (7-day retention)
 
