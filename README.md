@@ -358,7 +358,7 @@ jobs:
     - Automated workflows (scheduled, workflow_dispatch, workflow_run)
     - Push events
   - ⚠️ **Important**: When using custom prompts or automated workflows, ensure proper workflow permissions and conditions to prevent unintended execution
-- **Content Sanitization**: Protects against prompt injection by removing malicious instructions hidden in HTML comments, invisible characters, image alt text, link titles, and obfuscated entities
+- **Content Sanitization**: Protects against prompt injection by removing malicious instructions hidden in HTML comments, invisible characters, image alt text, link titles, hidden HTML attributes, and obfuscated entities
 - **Output Redaction**: Automatically redacts GitHub tokens and replaces trigger phrases (replaced with "the assistant") in Junie's responses to prevent accidental token exposure and self-triggering loops
 - **Token Management**: Supports custom GitHub tokens for enhanced security
 - **Artifact Retention**: Working directory uploaded as artifact (7-day retention)
@@ -368,7 +368,7 @@ jobs:
 ### Action Doesn't Trigger
 
 - Verify the trigger phrase matches (default: `@junie-agent`)
-- Check workflow `if:` condition includes your event type
+- Check workflow `if:` condition includes your event type and correctly checks for the trigger phrase
 - Ensure actor has write permissions
 - Review GitHub Actions logs for validation errors
 
