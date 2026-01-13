@@ -45,6 +45,7 @@ jobs:
             3. Check if any new features in src/ are documented
             4. Ensure configuration examples match the actual implementation
             5. Ignore minor changes, spelling or syntax errors, etc.
+            6. There is no need to document the internal workings of the code in detail, only the high-level changes that affect users
 
             If you find any discrepancies or improvements needed:
             - Update README.md accordingly
