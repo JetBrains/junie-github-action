@@ -26,16 +26,14 @@ A powerful GitHub Action that integrates [Junie](https://www.jetbrains.com/junie
 - **Issue Resolution**: Automatically implements solutions for GitHub issues
 - **PR Management**: Reviews code changes and implements requested modifications
 - **On-demand Code Review**: Trigger specialized code reviews via `workflow_dispatch` or "review code" comments
-- **Inline Code Reviews**: Create code review comments with GitHub suggestions directly on PR diffs
 - **Conflict Resolution**: Resolve merge conflicts via `@junie-agent` comment, "resolve conflicts" trigger, or automatic detection
 - **CI Failure Analysis**: Investigates failed checks and suggests fixes using MCP integration
 - **Flexible Triggers**: Activate via mentions, assignees, labels, or custom prompts
 - **Smart Branch Management**: Context-aware branch creation and management
 - **Silent Mode**: Run analysis-only workflows without comments or git operations
 - **Single Comment Mode**: Update a single comment instead of creating multiple comments for each run (per workflow)
-- **Comprehensive Feedback**: Updates via GitHub comments with links to PRs and commits
+- **Comprehensive Feedback**: Real-time updates via GitHub comments with links to PRs and commits
 - **Rich Job Summaries**: Beautiful markdown reports in GitHub Actions with execution details
-- **Security-First Design**: Built-in sanitization against prompt injection and automated redaction of sensitive information like GitHub tokens
 - **MCP Extensibility**: Integrate custom Model Context Protocol servers for enhanced capabilities
 - **Runs on Your Infrastructure**: Executes entirely on your GitHub runners
 
@@ -115,7 +113,7 @@ jobs:
 - **Sync Code → Documentation** - Auto-update docs when code changes
 - **Fix Failing CI Tests** - Diagnose and fix test failures automatically
 - **Security Audit for Secrets** - Scan commits for accidentally committed credentials
-- **Automatic Merge Conflict Resolution** - Automatically resolve conflicts when base branch changes
+- **Dependency Update Assistant** - Review and adapt to breaking changes in dependencies
 
 Each recipe includes complete workflows, prompts, and configuration examples you can copy and adapt.
 
@@ -127,7 +125,7 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 
 | Input | Description | Default |
 |-------|-------------|---------|
-| `trigger_phrase` | Phrase to activate Junie in comments/issues. Redacted in Junie's output and replaced with "the assistant" to prevent self-triggering loops. | `@junie-agent` |
+| `trigger_phrase` | Phrase to activate Junie in comments/issues | `@junie-agent` |
 | `assignee_trigger` | Username that triggers when assigned | - |
 | `label_trigger` | Label that triggers the action | `junie` |
 
@@ -146,30 +144,20 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 | `junie_version` | Junie CLI version to install | `576.1` |
 | `junie_work_dir` | Working directory for Junie files | `/tmp/junie-work` |
 | `junie_guidelines_filename` | Filename of the guidelines file (should be in `<project-root>/.junie` dir) | `guidelines.md` |
-| `allowed_mcp_servers` | Comma-separated list of MCP servers to use (e.g., `mcp_github_checks_server`). Note: inline comment server is automatically enabled for PRs. | - |
+| `allowed_mcp_servers` | MCP servers to enable (comma-separated) | - |
 
 **Available MCP Servers**:
-- `mcp_github_checks_server`: Analyze failed GitHub Actions checks and provide detailed error information
-- `mcp_github_inline_comment_server`: Create inline code review comments with GitHub suggestions on PRs (automatically enabled for pull requests)
-
-**Example configuration**:
-```yaml
-- uses: JetBrains/junie-github-action@v0
-  with:
-    junie_api_key: ${{ secrets.JUNIE_API_KEY }}
-    allowed_mcp_servers: "mcp_github_checks_server"
-```
-
-**Note**: The `mcp_github_inline_comment_server` is automatically enabled for `pull_request` events - no manual configuration needed.
+- `mcp_github_checks_server`: Analyze failed GitHub Actions checks
 
 #### Advanced Features
 
 | Input | Description | Default |
 |-------|-------------|---------|
+| `action` | Special action to perform (currently supported: `code-review`) | - |
+| `prNumber` | Pull request number to target (required for `workflow_dispatch` events) | - |
 | `resolve_conflicts` | Enable automatic conflict detection (not needed for manual `@junie-agent` resolution) | `false` |
 | `silent_mode` | Run Junie without comments, branch creation, or commits - only prepare data and output results | `false` |
 | `use_single_comment` | Update a single comment for all runs instead of creating new comments each time | `false` |
-| `attach_github_context_to_custom_prompt` | Attach GitHub context (PR/issue info, commits, reviews, etc.) when using custom prompt | `false` |
 
 #### Jira Integration
 
@@ -229,8 +217,7 @@ permissions:
   contents: write      # Required to create branches, make commits, and push changes
   pull-requests: write # Required to create PRs, add comments to PRs, and update PR status
   issues: write        # Required to add comments to issues and update issue metadata
-  checks: read         # Optional: needed for CI failure analysis with MCP servers
-  actions: read        # Optional: needed for CI failure analysis with MCP servers (to fetch logs)
+  checks: read         # Optional: only needed for CI failure analysis with MCP servers
 ```
 
 **Minimal permissions** for `silent_mode` (read-only operations):
@@ -339,12 +326,10 @@ jobs:
 1. **Trigger Detection**: The action detects triggers (mentions, labels, assignments, or prompts)
 2. **Validation**: Verifies permissions and checks if the actor is human (when applicable - see Security Considerations)
 3. **Branch Management**: Creates or checks out the appropriate working branch
-4. **Task Preparation**: Converts GitHub context into a Junie-compatible task, applying security sanitization to user-submitted content to prevent prompt injection
+4. **Task Preparation**: Converts GitHub context into a Junie-compatible task
 5. **MCP Setup**: Configures enabled MCP servers for enhanced capabilities
-   - **Checks Server**: Analyze CI failures if explicitly enabled
-   - **Inline Comment Server**: Automatically enabled for PR code review suggestions
-6. **Junie Execution**: Runs Junie CLI with the prepared task and connected MCP tools
-7. **Result Processing**: Analyzes changes, determines the action (commit, PR, or comment), and sanitizes Junie's output to redact tokens and prevent self-triggering
+6. **Junie Execution**: Runs Junie CLI with the prepared task
+7. **Result Processing**: Analyzes changes and determines the action (commit, PR, or comment)
 8. **Feedback**: Updates GitHub with results, PR links, and commit information
 
 ## Security Considerations
@@ -359,8 +344,6 @@ jobs:
     - Automated workflows (scheduled, workflow_dispatch, workflow_run)
     - Push events
   - ⚠️ **Important**: When using custom prompts or automated workflows, ensure proper workflow permissions and conditions to prevent unintended execution
-- **Content Sanitization**: Protects against prompt injection by removing malicious instructions hidden in HTML comments, invisible characters, image alt text, link titles, and obfuscated entities
-- **Output Redaction**: Automatically redacts GitHub tokens and replaces trigger phrases (replaced with "the assistant") in Junie's responses to prevent accidental token exposure and self-triggering loops
 - **Token Management**: Supports custom GitHub tokens for enhanced security
 - **Artifact Retention**: Working directory uploaded as artifact (7-day retention)
 

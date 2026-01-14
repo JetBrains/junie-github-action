@@ -94,7 +94,6 @@ name: Code Review
 on:
   pull_request:
     types: [opened, synchronize]
-    branches: [main]
 
 jobs:
   review:
@@ -192,7 +191,8 @@ name: Sync Documentation
 on:
   pull_request:
     types: [closed]
-    branches: [main]
+    branches:
+      - main
 
 jobs:
   update-docs:
@@ -272,7 +272,6 @@ jobs:
       pull-requests: write
       issues: write
       checks: read
-      actions: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -338,7 +337,6 @@ name: Security Audit
 on:
   pull_request:
     types: [opened, synchronize]
-    branches: [main]
 
 jobs:
   audit:
@@ -466,7 +464,7 @@ jobs:
 
       - name: Run Junie
         id: junie
-        uses: JetBrains/junie-github-action@v0
+        uses: JetBrains/junie-github-action@main
         with:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
           resolve_conflicts: true
@@ -485,6 +483,58 @@ jobs:
 - **Auto-resolution after merge:** Merge to main → all conflicted PRs automatically updated
 - **Keep PRs fresh:** Every push to main branch keeps all PRs conflict-free
 - **Reduce manual work:** No need to manually update and resolve conflicts in multiple PRs
+
+---
+
+## 6. On-demand Code Review (Manual Trigger)
+
+**Problem:** You want to request a specialized Junie review on a specific PR without waiting for a trigger or using a custom prompt every time.
+
+**Solution:** Use the specialized `code-review` action via `workflow_dispatch`.
+
+<details>
+<summary>View complete workflow</summary>
+
+```yaml
+# .github/workflows/manual-review.yml
+name: Manual Code Review
+
+on:
+  workflow_dispatch:
+    inputs:
+      prNumber:
+        description: 'Pull Request number to review'
+        required: true
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: JetBrains/junie-github-action@v0
+        with:
+          junie_api_key: ${{ secrets.JUNIE_API_KEY }}
+          action: "code-review"
+          prNumber: ${{ github.event.inputs.prNumber }}
+```
+
+</details>
+
+**How it works:**
+1. Navigate to the **Actions** tab in your repository
+2. Select **Manual Code Review** workflow
+3. Click **Run workflow**, enter the PR number, and click **Run workflow**
+4. Junie will fetch the PR data and perform a specialized review focusing on security, performance, and code quality
+
+**Next steps:**
+- You can also trigger this specialized review by commenting `"review code"` on any PR where Junie is active.
 ---
 
 ## Need Help?
