@@ -73,10 +73,7 @@ export async function prepareJunieTask(
 
         const issue = fetchedData.pullRequest || fetchedData.issue;
 
-        const isCodeReview = isPullRequestReviewEvent(context) || 
-                             isPullRequestReviewCommentEvent(context) || 
-                             isReviewOrCommentHasCodeReviewTrigger(context) || 
-                             isCodeReviewWorkflowDispatchEvent(context);
+        const isCodeReview = isCodeReviewWorkflowDispatchEvent(context);
 
         if (issue && isCodeReview) {
             // For code reviews, we use the issueTask (agent)
