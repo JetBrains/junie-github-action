@@ -94,7 +94,6 @@ name: Code Review
 on:
   pull_request:
     types: [opened, synchronize]
-    branches: [main]
 
 jobs:
   review:
@@ -192,7 +191,8 @@ name: Sync Documentation
 on:
   pull_request:
     types: [closed]
-    branches: [main]
+    branches:
+      - main
 
 jobs:
   update-docs:
@@ -272,7 +272,6 @@ jobs:
       pull-requests: write
       issues: write
       checks: read
-      actions: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -338,7 +337,6 @@ name: Security Audit
 on:
   pull_request:
     types: [opened, synchronize]
-    branches: [main]
 
 jobs:
   audit:
@@ -466,7 +464,7 @@ jobs:
 
       - name: Run Junie
         id: junie
-        uses: JetBrains/junie-github-action@v0
+        uses: JetBrains/junie-github-action@main
         with:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
           resolve_conflicts: true

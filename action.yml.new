@@ -1,0 +1,306 @@
+name: "Official Junie GitHub Action (BETA)"
+description: "Powerful GitHub automation with Junie."
+branding:
+  icon: "cpu"
+  color: "green"
+
+inputs:
+  trigger_phrase:
+    description: "The trigger phrase to look for in comments or issue body"
+    required: false
+    default: "@junie-agent"
+  assignee_trigger:
+    description: "The assignee username that triggers the action (e.g. @junie-agent)"
+    required: false
+  label_trigger:
+    description: "The label that triggers the action (e.g. junie)"
+    required: false
+    default: "junie"
+  base_branch:
+    description: "The branch to use as the source when creating junie working branch"
+    required: false
+  resolve_conflicts:
+    description: "Whether to resolve conflicts automatically"
+    required: false
+    default: "false"
+  create_new_branch_for_pr:
+    description: "Whether to create a new branch for PR instead of pushing to the same branch"
+    required: false
+    default: "false"
+  silent_mode:
+    description: "Silent mode - skip comments, branch creation, commits. Only prepare data and run Junie for output consumption."
+    required: false
+    default: "false"
+  use_single_comment:
+    description: "Use a single comment that gets updated instead of creating new comments for each run(per workflow)"
+    required: false
+    default: "false"
+  attach_github_context_to_custom_prompt:
+    description: "Whether to attach GitHub context (PR/issue info, commits, reviews, etc.) when using custom prompt. Only applies when 'prompt' input is provided."
+    required: false
+    default: "false"
+
+  # Junie configuration
+  prompt:
+    description: "Instructions for Junie. Can be a direct prompt or custom template."
+    required: false
+    default: ""
+  junie_version:
+    description: "Version of Junie to use"
+    required: false
+    default: "576.1"
+  junie_work_dir:
+    description: "Directory to use for Junie working files"
+    required: false
+    default: "/tmp/junie-work"
+  junie_guidelines_filename:
+    description: "Filename(should be in <project-root>/.junie dir) of the guidelines file to use"
+    required: false
+    default: "guidelines.md"
+  allowed_mcp_servers:
+    description: "Comma-separated list of github MCP servers to use. Allowed server names: mcp_github_checks_server"
+    required: false
+
+  # Jira integration configuration (for workflow_dispatch events)
+  jira_base_url:
+    description: "Jira instance base URL (e.g. https://your-company.atlassian.net)"
+    required: false
+  jira_email:
+    description: "Jira account email for API authentication (required for Jira integration)"
+    required: false
+  jira_api_token:
+    description: "Jira API token for authentication (required for Jira integration)"
+    required: false
+  jira_transition_in_progress:
+    description: "Jira transition ID for 'In Progress' status (default: 21)"
+    required: false
+    default: "21"
+  jira_transition_in_review:
+    description: "Jira transition ID for 'In Review' status (default: 31)"
+    required: false
+    default: "31"
+
+  # Auth configuration
+  junie_api_key:
+    description: "Junie API key"
+    required: false
+  custom_github_token:
+    description: "GitHub token with repo and pull request permissions (optional if using GitHub App)"
+    required: false
+
+outputs:
+  branch_name:
+    description: "Junie working branch"
+    value: ${{ steps.prepare.outputs.WORKING_BRANCH }}
+  should_skip:
+    description: "Whether Junie execution was skipped (no trigger matched or no write permissions)"
+    value: ${{ steps.prepare.outputs.SHOULD_SKIP }}
+  commit_sha:
+    description: "SHA of the commit created by Junie (if any)"
+    value: ${{ steps.commit.outputs.commit_long_sha }}
+  pr_url:
+    description: "URL of the pull request created by Junie (if any)"
+    value: ${{ steps.pull-request.outputs.pull-request-url }}
+  junie_title:
+    description: "Title of the task completion from Junie"
+    value: ${{ steps.junie-run-results.outputs.JUNIE_TITLE }}
+  junie_summary:
+    description: "Summary of the changes made by Junie"
+    value: ${{ steps.junie-run-results.outputs.JUNIE_SUMMARY }}
+  github_token:
+    description: "The GitHub token used by the action"
+    value: ${{ steps.prepare.outputs.EJ_AUTH_GITHUB_TOKEN }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install Bun
+      uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: 1.3.0
+
+    - name: Install Dependencies
+      shell: bash
+      run: |
+        cd ${GITHUB_ACTION_PATH}
+        bun install
+
+    - name: Prepare action
+      id: prepare
+      shell: bash
+      run: |
+        bun run ${GITHUB_ACTION_PATH}/src/entrypoints/prepare.ts
+      env:
+        APP_TOKEN: ${{ inputs.junie_api_key }}
+        PROMPT: ${{ inputs.prompt }}
+        TRIGGER_PHRASE: ${{ inputs.trigger_phrase }}
+        ASSIGNEE_TRIGGER: ${{ inputs.assignee_trigger }}
+        LABEL_TRIGGER: ${{ inputs.label_trigger }}
+        BASE_BRANCH: ${{ inputs.base_branch || github.base_ref  }}
+        TARGET_BRANCH: ${{ github.head_ref }}
+        OVERRIDE_GITHUB_TOKEN: ${{ inputs.custom_github_token }}
+        DEFAULT_WORKFLOW_TOKEN: ${{ github.token }}
+        JUNIE_WORKING_DIR: ${{ inputs.junie_work_dir }}
+        ALLOWED_MCP_SERVERS: ${{ inputs.allowed_mcp_servers }}
+        RESOLVE_CONFLICTS: ${{ inputs.resolve_conflicts }}
+        CREATE_NEW_BRANCH_FOR_PR: ${{ inputs.create_new_branch_for_pr }}
+        SILENT_MODE: ${{ inputs.silent_mode }}
+        USE_SINGLE_COMMENT: ${{ inputs.use_single_comment }}
+        ATTACH_GITHUB_CONTEXT_TO_CUSTOM_PROMPT: ${{ inputs.attach_github_context_to_custom_prompt }}
+        JIRA_BASE_URL: ${{ inputs.jira_base_url }}
+        JIRA_EMAIL: ${{ inputs.jira_email }}
+        JIRA_API_TOKEN: ${{ inputs.jira_api_token }}
+        JIRA_TRANSITION_IN_PROGRESS: ${{ inputs.jira_transition_in_progress }}
+        JIRA_TRANSITION_IN_REVIEW: ${{ inputs.jira_transition_in_review }}
+        ALL_INPUTS: ${{ toJson(inputs) }}
+
+
+    - name: Install Junie
+      if: steps.prepare.outputs.SHOULD_SKIP != 'true'
+      shell: bash
+      run: npm install -g @jetbrains/junie-cli@${{ inputs.junie_version }}
+
+    - name: Run Junie
+      if: steps.prepare.outputs.SHOULD_SKIP != 'true'
+      shell: bash
+      id: junie-run
+      env:
+        JUNIE_GUIDELINES_FILENAME: ${{ inputs.junie_guidelines_filename }}
+        CLI_TOKEN: ${{ steps.prepare.outputs.EJ_CLI_TOKEN }}
+        JUNIE_JSON_TASK: ${{ steps.prepare.outputs.JUNIE_JSON_TASK }}
+        EJ_AUTH_GITHUB_TOKEN: ${{ steps.prepare.outputs.EJ_AUTH_GITHUB_TOKEN  }}
+        GH_TOKEN: ${{ steps.prepare.outputs.EJ_AUTH_GITHUB_TOKEN }}
+        MULTI_RUNS: true
+        MATTERHORN_DEBUG_LOG: false
+        WORKING_DIR: ${{ inputs.junie_work_dir }}
+      run: |
+        OUTPUT=$(junie --cache-dir="${WORKING_DIR}" --input-format="json" --output-format="json" --auth="${CLI_TOKEN}" <<<"${JUNIE_JSON_TASK}")
+        echo "json_output<<EOF" >> $GITHUB_OUTPUT
+        echo "$OUTPUT" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+    - name: Handle Junie results
+      if: always() && steps.prepare.outputs.SHOULD_SKIP != 'true'
+      shell: bash
+      id: junie-run-results
+      run: |
+        bun run ${GITHUB_ACTION_PATH}/src/entrypoints/handle-results.ts
+      env:
+        JSON_JUNIE_OUTPUT: ${{ steps.junie-run.outputs.json_output }}
+        PARSED_CONTEXT: ${{ steps.prepare.outputs.PARSED_CONTEXT }}
+        INIT_COMMENT_ID: ${{ steps.prepare.outputs.INIT_COMMENT_ID }}
+        WORKING_BRANCH: ${{ steps.prepare.outputs.WORKING_BRANCH }}
+        BASE_BRANCH: ${{ steps.prepare.outputs.BASE_BRANCH }}
+        IS_NEW_BRANCH: ${{ steps.prepare.outputs.IS_NEW_BRANCH }}
+        WORKING_DIR: ${{ inputs.junie_work_dir }}
+
+    - name: Upload Junie working directory as artifact
+      if: always() && steps.prepare.outputs.SHOULD_SKIP != 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: junie-working-directory
+        path: ${{ inputs.junie_work_dir }}
+        retention-days: 7
+        if-no-files-found: warn
+        include-hidden-files: true
+
+    - name: Upload Junie logs as artifact
+      if: always() && steps.prepare.outputs.SHOULD_SKIP != 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: junie-logs
+        path: ~/.junie/logs
+        retention-days: 7
+        if-no-files-found: warn
+        include-hidden-files: true
+
+    - name: Upload Junie sessions as artifact
+      if: always() && steps.prepare.outputs.SHOULD_SKIP != 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: junie-sessions
+        path: ~/.junie/sessions
+        retention-days: 7
+        if-no-files-found: warn
+        include-hidden-files: true
+
+    - uses: EndBug/add-and-commit@v9
+      name: Commit changes
+      id: commit
+      if: steps.prepare.outputs.SHOULD_SKIP != 'true' && inputs.silent_mode != 'true' && (steps.junie-run-results.outputs.ACTION_TO_DO == 'COMMIT_CHANGES' || steps.junie-run-results.outputs.ACTION_TO_DO == 'CREATE_PR')
+      with:
+        author_name: ${{ steps.prepare.outputs.ACTOR_NAME }}
+        author_email: ${{ steps.prepare.outputs.ACTOR_EMAIL }}
+        message: ${{ steps.junie-run-results.outputs.COMMIT_MESSAGE }}
+        new_branch: ${{ steps.prepare.outputs.WORKING_BRANCH }}
+
+    - name: Push changes
+      id: push
+      if: steps.prepare.outputs.SHOULD_SKIP != 'true' && inputs.silent_mode != 'true' && (steps.junie-run-results.outputs.ACTION_TO_DO == 'PUSH' || steps.junie-run-results.outputs.ACTION_TO_DO == 'CREATE_PR')
+      shell: bash
+      run: |
+        git push --set-upstream origin HEAD
+
+    - name: Make Pull Request for the changes
+      if: steps.prepare.outputs.SHOULD_SKIP != 'true' && inputs.silent_mode != 'true' && steps.junie-run-results.outputs.ACTION_TO_DO == 'CREATE_PR'
+      id: pull-request
+      shell: bash
+      continue-on-error: true
+      run: |
+        bun run ${GITHUB_ACTION_PATH}/src/entrypoints/create-pr.ts
+      env:
+        GITHUB_TOKEN: ${{ steps.prepare.outputs.EJ_AUTH_GITHUB_TOKEN }}
+        PARSED_CONTEXT: ${{ steps.prepare.outputs.PARSED_CONTEXT }}
+        PR_TITLE: ${{ steps.junie-run-results.outputs.PR_TITLE }}
+        PR_BODY: ${{ steps.junie-run-results.outputs.PR_BODY }}
+        BASE_BRANCH: ${{ steps.prepare.outputs.BASE_BRANCH }}
+        WORKING_BRANCH: ${{ steps.prepare.outputs.WORKING_BRANCH }}
+
+    - name: Give feedback and update summary (success)
+      if: success() && steps.prepare.outputs.SHOULD_SKIP != 'true'
+      shell: bash
+      run: |
+        bun run ${GITHUB_ACTION_PATH}/src/entrypoints/give-feedback.ts
+      env:
+        IS_JOB_FAILED: false
+        INIT_COMMENT_ID: ${{ steps.prepare.outputs.INIT_COMMENT_ID }}
+        GITHUB_TOKEN: ${{ steps.prepare.outputs.EJ_AUTH_GITHUB_TOKEN }}
+        PARSED_CONTEXT: ${{ steps.prepare.outputs.PARSED_CONTEXT }}
+        WORKING_BRANCH: ${{ steps.prepare.outputs.WORKING_BRANCH }}
+        BASE_BRANCH: ${{ steps.prepare.outputs.BASE_BRANCH }}
+        ACTION_TO_DO: ${{ steps.junie-run-results.outputs.ACTION_TO_DO }}
+        PR_LINK: ${{ steps.pull-request.outputs.pull-request-url }}
+        COMMIT_SHA: ${{ steps.commit.outputs.commit_long_sha }}
+        JUNIE_TITLE: ${{ steps.junie-run-results.outputs.JUNIE_TITLE }}
+        JUNIE_SUMMARY: ${{ steps.junie-run-results.outputs.JUNIE_SUMMARY }}
+        JSON_JUNIE_OUTPUT: ${{ steps.junie-run.outputs.json_output }}
+        JIRA_BASE_URL: ${{ inputs.jira_base_url }}
+        JIRA_EMAIL: ${{ inputs.jira_email }}
+        JIRA_API_TOKEN: ${{ inputs.jira_api_token }}
+        JIRA_TRANSITION_IN_PROGRESS: ${{ inputs.jira_transition_in_progress }}
+        JIRA_TRANSITION_IN_REVIEW: ${{ inputs.jira_transition_in_review }}
+
+    - name: Give feedback and update summary (failure)
+      if: failure() && steps.prepare.outputs.SHOULD_SKIP != 'true'
+      shell: bash
+      run: |
+        bun run ${GITHUB_ACTION_PATH}/src/entrypoints/give-feedback.ts
+      env:
+        IS_JOB_FAILED: true
+        INIT_COMMENT_ID: ${{ steps.prepare.outputs.INIT_COMMENT_ID }}
+        GITHUB_TOKEN: ${{ steps.prepare.outputs.EJ_AUTH_GITHUB_TOKEN }}
+        PARSED_CONTEXT: ${{ steps.prepare.outputs.PARSED_CONTEXT }}
+        WORKING_BRANCH: ${{ steps.prepare.outputs.WORKING_BRANCH }}
+        BASE_BRANCH: ${{ steps.prepare.outputs.BASE_BRANCH }}
+        ACTION_TO_DO: ${{ steps.junie-run-results.outputs.ACTION_TO_DO }}
+        PR_LINK: ${{ steps.pull-request.outputs.pull-request-url }}
+        COMMIT_SHA: ${{ steps.commit.outputs.commit_long_sha }}
+        JUNIE_TITLE: ${{ steps.junie-run-results.outputs.JUNIE_TITLE }}
+        JUNIE_SUMMARY: ${{ steps.junie-run-results.outputs.JUNIE_SUMMARY }}
+        JSON_JUNIE_OUTPUT: ${{ steps.junie-run.outputs.json_output }}
+        JIRA_BASE_URL: ${{ inputs.jira_base_url }}
+        JIRA_EMAIL: ${{ inputs.jira_email }}
+        JIRA_API_TOKEN: ${{ inputs.jira_api_token }}
+        JIRA_TRANSITION_IN_PROGRESS: ${{ inputs.jira_transition_in_progress }}
+        JIRA_TRANSITION_IN_REVIEW: ${{ inputs.jira_transition_in_review }}
+        ERROR: ${{ steps.prepare.outputs.EXCEPTION || steps.junie-run-results.outputs.EXCEPTION }}
