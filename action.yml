@@ -174,7 +174,13 @@ runs:
         MATTERHORN_DEBUG_LOG: false
         WORKING_DIR: ${{ inputs.junie_work_dir }}
       run: |
+        echo "[DEBUG] Running Junie CLI..."
         OUTPUT=$(junie --cache-dir="${WORKING_DIR}" --input-format="json" --output-format="json" --auth="${CLI_TOKEN}" <<<"${JUNIE_JSON_TASK}")
+        EXIT_CODE=$?
+        echo "[DEBUG] Junie CLI exited with code $EXIT_CODE"
+        if [ $EXIT_CODE -ne 0 ]; then
+          echo "[DEBUG] Junie CLI failed. Output: $OUTPUT"
+        fi
         echo "json_output<<EOF" >> $GITHUB_OUTPUT
         echo "$OUTPUT" >> $GITHUB_OUTPUT
         echo "EOF" >> $GITHUB_OUTPUT

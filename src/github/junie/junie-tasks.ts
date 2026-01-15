@@ -112,7 +112,9 @@ export async function prepareJunieTask(
         throw new Error("No task was created. Please check your inputs.");
     }
 
-    core.setOutput(OUTPUT_VARS.JUNIE_JSON_TASK, JSON.stringify(junieCLITask));
+    const taskJson = JSON.stringify(junieCLITask);
+    console.log(`[DEBUG] Generated Junie JSON Task: ${taskJson}`);
+    core.setOutput(OUTPUT_VARS.JUNIE_JSON_TASK, taskJson);
 
     return junieCLITask;
 }

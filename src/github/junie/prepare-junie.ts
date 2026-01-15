@@ -146,8 +146,9 @@ async function runCodeReviewWorkflow(octokit: Octokits, context: JunieExecutionC
                 prNumber: String(prNumber)
             }
         });
+        console.log(`✓ Dispatch successful for workflow ${fileName} on branch ${branch}`);
     } catch (error: any) {
-        console.error("Failed to trigger Code Review dispatch. Ensure 'workflow_dispatch' is defined in your YAML.", error.message);
+        console.error(`Failed to trigger Code Review dispatch for ${fileName}. Ensure 'workflow_dispatch' is defined in your YAML.`, error.message);
     }
 }
 
