@@ -175,21 +175,30 @@ runs:
         WORKING_DIR: ${{ inputs.junie_work_dir }}
         JUNIE_EXPORT_SESSION: true
         MATTERHORN_VERBOSE_LOG: true
+        JUNIE_SHOW_STEPS: true
+        MATTERHORN_SHOW_STEPS: true
+        JUNIE_PRINT_STEPS: true
       run: |
         echo "[DEBUG] Running Junie CLI..."
         printf "%s" "$JUNIE_JSON_TASK" > task.json
-        OUTPUT=$(junie --cache-dir="${WORKING_DIR}" --input-format="json" --output-format="json" --auth="${CLI_TOKEN}" < task.json)
+        # Capture only the last line of stdout as the JSON output, 
+        # while letting everything else (logs/steps) flow to console (stderr)
+        # We use a temporary file to capture stdout to avoid interleaving issues
+        junie --cache-dir="${WORKING_DIR}" --input-format="json" --output-format="json" --auth="${CLI_TOKEN}" < task.json > output.json
         EXIT_CODE=$?
+        OUTPUT=$(cat output.json)
         echo "[DEBUG] Junie CLI exited with code $EXIT_CODE"
         if [ $EXIT_CODE -ne 0 ]; then
           echo "[DEBUG] Junie CLI failed. Output: $OUTPUT"
         fi
         
-        # Check if a session trajectory was exported
-        if [ -f "session_trajectory.json" ]; then
-          echo "[DEBUG] session_trajectory.json found, moving to working directory"
-          mv session_trajectory.json "${WORKING_DIR}/"
-        fi
+        # Check for session trajectory in common locations
+        echo "[DEBUG] Searching for session_trajectory.json..."
+        find . -name "session_trajectory.json" -exec cp {} "${WORKING_DIR}/" \;
+        find ~/.junie -name "session_trajectory.json" -exec cp {} "${WORKING_DIR}/" \;
+        
+        # Also try to find any trajectory.json in sessions
+        find ~/.junie/sessions -name "trajectory.json" -exec cp {} "${WORKING_DIR}/session_trajectory.json" \;
 
         echo "json_output<<EOF" >> $GITHUB_OUTPUT
         echo "$OUTPUT" >> $GITHUB_OUTPUT
