@@ -76,7 +76,6 @@ export async function initializeJunieExecution({
 }
 
 async function shouldHandle(context: JunieExecutionContext, octokit: Octokits): Promise<boolean> {
-    console.log(`[DEBUG] shouldHandle called for event: ${context.eventName}, action: ${context.eventAction}`);
     if (isTriggeredByUserInteraction(context)) {
         const hasWritePermissions = await verifyRepositoryAccess(
             octokit.rest,
@@ -92,7 +91,6 @@ async function shouldHandle(context: JunieExecutionContext, octokit: Octokits): 
     if (isCodeReviewWorkflowDispatchEvent(context)) { console.log("✓ Code Review dispatch detected, proceeding with review.");
         return true;
     }
-    console.log(`[DEBUG] isCodeReviewWorkflowDispatchEvent(context) returned false. Action: ${'action' in context.payload ? context.payload.action : 'N/A'}`);
 
     // 2. Automatic PR triggering: redirects to workflow_dispatch
     if (isPullRequestEvent(context) && (context.eventAction === "opened" || context.eventAction === "synchronize")) {

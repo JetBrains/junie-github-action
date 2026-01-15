@@ -41,7 +41,7 @@ Your task is to:
 
 2. Review ONLY these unstaged changes against the Core Review Areas below, prioritizing repository style/guidelines adherence and avoiding overcomplication.
 3. You may open files or search the project to understand context. Do NOT run tests, build, or make any modifications.
-4. Terminate by calling the \`answer\` tool with \`full_answer\` containing a single bullet list of comments. Do not include headers, summaries, or any other text. Do NOT call \`submit\`.
+4. Terminate by calling the 'answer' tool with 'full_answer' containing a single bullet list of comments. Do not include headers, summaries, or any other text. Do NOT call 'submit'.
 
 ### Core Review Areas
 

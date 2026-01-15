@@ -175,7 +175,8 @@ runs:
         WORKING_DIR: ${{ inputs.junie_work_dir }}
       run: |
         echo "[DEBUG] Running Junie CLI..."
-        OUTPUT=$(junie --cache-dir="${WORKING_DIR}" --input-format="json" --output-format="json" --auth="${CLI_TOKEN}" <<<"${JUNIE_JSON_TASK}")
+        printf "%s" "$JUNIE_JSON_TASK" > task.json
+        OUTPUT=$(junie --cache-dir="${WORKING_DIR}" --input-format="json" --output-format="json" --auth="${CLI_TOKEN}" < task.json)
         EXIT_CODE=$?
         echo "[DEBUG] Junie CLI exited with code $EXIT_CODE"
         if [ $EXIT_CODE -ne 0 ]; then
@@ -186,7 +187,7 @@ runs:
         echo "EOF" >> $GITHUB_OUTPUT
 
     - name: Handle Junie results
-      if: always() && steps.prepare.outputs.SHOULD_SKIP != 'true'
+      if: steps.prepare.outputs.SHOULD_SKIP != 'true'
       shell: bash
       id: junie-run-results
       run: |

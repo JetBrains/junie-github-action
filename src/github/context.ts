@@ -143,7 +143,6 @@ export type JunieExecutionContext = UserInitiatedEventContext | AutomationEventC
  */
 export function extractJunieWorkflowContext(tokenOwner: TokenOwner): JunieExecutionContext {
     const context = github.context;
-    console.log(`[DEBUG] extractJunieWorkflowContext: eventName=${context.eventName}, action=${context.payload.action}`);
     const commonFields = {
         runId: process.env.GITHUB_RUN_ID!,
         workflow: process.env.GITHUB_WORKFLOW || "Junie",
@@ -251,11 +250,8 @@ export function extractJunieWorkflowContext(tokenOwner: TokenOwner): JunieExecut
         }
         case "workflow_dispatch": {
             const payload = context.payload as WorkflowDispatchEvent;
-            console.log(`[DEBUG] workflow_dispatch detected. Raw payload inputs: ${JSON.stringify(payload.inputs)}`);
-            console.log(`[DEBUG] Target CODE_REVIEW_ACTION: ${CODE_REVIEW_ACTION}`);
 
             if (payload.inputs?.action == RESOLVE_CONFLICTS_ACTION) {
-                console.log(`[DEBUG] Matched RESOLVE_CONFLICTS_ACTION`);
                 parsedContext = {
                     ...commonFields,
                     isPR: true,
@@ -270,7 +266,6 @@ export function extractJunieWorkflowContext(tokenOwner: TokenOwner): JunieExecut
             }
 
             if (payload.inputs?.action == CODE_REVIEW_ACTION) {
-                console.log(`[DEBUG] Matched CODE_REVIEW_ACTION. prNumber: ${payload.inputs?.prNumber}`);
                 parsedContext = {
                     ...commonFields,
                     isPR: true,
@@ -286,12 +281,10 @@ export function extractJunieWorkflowContext(tokenOwner: TokenOwner): JunieExecut
 
             // Handle Jira integration event
             if (payload.inputs?.action == JIRA_EVENT_ACTION) {
-                console.log(`[DEBUG] Matched JIRA_EVENT_ACTION`);
                 parsedContext = extractJiraEventData(payload, commonFields)
                 break;
             }
 
-            console.log(`[DEBUG] No special action matched for workflow_dispatch. inputs.action: ${payload.inputs?.action}`);
             parsedContext = {
                 ...commonFields,
                 eventName: context.eventName,

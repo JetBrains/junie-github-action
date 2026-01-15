@@ -76,31 +76,11 @@ export async function prepareJunieTask(
         const isCodeReview = isCodeReviewWorkflowDispatchEvent(context);
 
         if (issue && isCodeReview) {
-            // For code reviews, we use the issueTask (agent)
-            // We use the hardcoded prompt from inputs, or a default one.
-            // We ignore the comment/review body as instructions.
+            // For code reviews, we use the legacy task string for now to avoid JSON parsing issues with large objects
+            // and ensure compatibility with the Junie CLI version.
             const instructions = context.inputs.prompt || DEFAULT_CODE_REVIEW_PROMPT;
-            const validatedInstructions = await getValidatedTextTask(instructions, "task");
-
-            junieCLITask.issueTask = {
-                issue,
-                owner,
-                repo,
-                instructions: validatedInstructions,
-                targetBranch: branchInfo.workingBranch,
-                baseBranch: branchInfo.baseBranch,
-                bannedTools: [
-                    "apply_patch",
-                    "search_replace",
-                    "create_file",
-                    "rename_element",
-                    "undo_edit",
-                    "bash",
-                    "run_test",
-                    "build",
-                    "submit"
-                ]
-            };
+            const promptText = await formatter.generatePrompt(context, fetchedData, instructions, true);
+            junieCLITask.task = await getValidatedTextTask(promptText, "task");
         } else {
             // Fallback to legacy task string for other events (like issue_comment "fix this")
             const promptText = await formatter.generatePrompt(context, fetchedData, customPrompt, context.inputs.attachGithubContextToCustomPrompt);
@@ -113,7 +93,6 @@ export async function prepareJunieTask(
     }
 
     const taskJson = JSON.stringify(junieCLITask);
-    console.log(`[DEBUG] Generated Junie JSON Task: ${taskJson}`);
     core.setOutput(OUTPUT_VARS.JUNIE_JSON_TASK, taskJson);
 
     return junieCLITask;
