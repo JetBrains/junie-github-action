@@ -168,7 +168,7 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 | `resolve_conflicts` | Enable automatic conflict detection (not needed for manual `@junie-agent` resolution) | `false` |
 | `silent_mode` | Run Junie without comments, branch creation, or commits - only prepare data and output results | `false` |
 | `use_single_comment` | Update a single comment for all runs instead of creating new comments each time | `false` |
-| `attach_github_context_to_custom_prompt` | Attach GitHub context (PR/issue info, commits, reviews, etc.) when using custom prompt. Only applies when `prompt` input is provided. | `false` |
+| `attach_github_context_to_custom_prompt` | Whether to include GitHub context (PR/issue info, commits, reviews, etc.) when using a custom `prompt`. Default is `false` to keep prompts focused, but set to `true` if your custom prompt needs information about the current PR or issue. | `false` |
 
 #### Jira Integration
 
