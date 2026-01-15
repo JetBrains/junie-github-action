@@ -171,8 +171,10 @@ runs:
         EJ_AUTH_GITHUB_TOKEN: ${{ steps.prepare.outputs.EJ_AUTH_GITHUB_TOKEN  }}
         GH_TOKEN: ${{ steps.prepare.outputs.EJ_AUTH_GITHUB_TOKEN }}
         MULTI_RUNS: true
-        MATTERHORN_DEBUG_LOG: false
+        MATTERHORN_DEBUG_LOG: true
         WORKING_DIR: ${{ inputs.junie_work_dir }}
+        JUNIE_EXPORT_SESSION: true
+        MATTERHORN_VERBOSE_LOG: true
       run: |
         echo "[DEBUG] Running Junie CLI..."
         printf "%s" "$JUNIE_JSON_TASK" > task.json
@@ -182,6 +184,13 @@ runs:
         if [ $EXIT_CODE -ne 0 ]; then
           echo "[DEBUG] Junie CLI failed. Output: $OUTPUT"
         fi
+        
+        # Check if a session trajectory was exported
+        if [ -f "session_trajectory.json" ]; then
+          echo "[DEBUG] session_trajectory.json found, moving to working directory"
+          mv session_trajectory.json "${WORKING_DIR}/"
+        fi
+
         echo "json_output<<EOF" >> $GITHUB_OUTPUT
         echo "$OUTPUT" >> $GITHUB_OUTPUT
         echo "EOF" >> $GITHUB_OUTPUT
