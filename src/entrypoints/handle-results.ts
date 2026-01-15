@@ -39,6 +39,14 @@ export async function handleResults() {
                 `Review the errors above and check the Junie execution logs for more details.`
             );
         }
+        const rawResult = junieJsonOutput.result
+        if (rawResult === "Empty" || !rawResult || rawResult.trim() === "") {
+            throw new Error(
+                `❌ Junie execution returned an empty result.\n\n` +
+                `This typically indicates an error during task processing.\n` +
+                `Please check the Junie execution logs for details.`
+            );
+        }
         const actionToDo = await getActionToDo(context);
         // Sanitize Junie's output to prevent token leakage and self-triggering
         const rawTitle = junieJsonOutput.taskName || (isResolveConflict ? `Resolve conflicts for ${context.entityNumber} PR` : 'Junie finished task successfully')
