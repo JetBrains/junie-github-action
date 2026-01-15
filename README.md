@@ -168,7 +168,7 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 | `resolve_conflicts` | Enable automatic conflict detection (not needed for manual `@junie-agent` resolution) | `false` |
 | `silent_mode` | Run Junie without comments, branch creation, or commits - only prepare data and output results | `false` |
 | `use_single_comment` | Update a single comment for all runs instead of creating new comments each time | `false` |
-| `attach_github_context_to_custom_prompt` | Attach GitHub context (PR/issue info, commits, reviews, etc.) when using custom prompt | `false` |
+| `attach_github_context_to_custom_prompt` | Attach GitHub context (PR/issue info, commits, reviews, etc.) when using custom prompt. Only applies when `prompt` input is provided. | `false` |
 
 #### Jira Integration
 
@@ -378,6 +378,7 @@ jobs:
 - Check Junie version compatibility (`junie_version` input)
 - Review uploaded artifacts for Junie working directory logs
 - Ensure runner has internet access for API calls
+- **Empty Result Error**: If you see "Junie execution returned an empty result", check the execution logs in artifacts to see why no changes were produced. This often happens if the AI determines no changes are necessary or encounters an error during processing.
 
 ### No PR Created
 
