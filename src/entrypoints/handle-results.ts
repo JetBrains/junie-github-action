@@ -17,6 +17,7 @@ export enum ActionType {
 export async function handleResults() {
     try {
         const stringJunieJsonOutput = process.env[ENV_VARS.JSON_JUNIE_OUTPUT]
+        console.log(`[DEBUG] handleResults: JSON_JUNIE_OUTPUT length: ${stringJunieJsonOutput?.length || 0}`);
         if (!stringJunieJsonOutput) {
             throw new Error(
                 `❌ Failed to retrieve Junie execution results. ` +
