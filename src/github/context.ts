@@ -250,6 +250,7 @@ export function extractJunieWorkflowContext(tokenOwner: TokenOwner): JunieExecut
         }
         case "workflow_dispatch": {
             const payload = context.payload as WorkflowDispatchEvent;
+            console.log(`[DEBUG] workflow_dispatch detected. inputs: ${JSON.stringify(payload.inputs)}`);
 
             if (payload.inputs?.action == RESOLVE_CONFLICTS_ACTION) {
                 parsedContext = {
