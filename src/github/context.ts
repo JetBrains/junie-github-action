@@ -143,6 +143,7 @@ export type JunieExecutionContext = UserInitiatedEventContext | AutomationEventC
  */
 export function extractJunieWorkflowContext(tokenOwner: TokenOwner): JunieExecutionContext {
     const context = github.context;
+    console.log(`[DEBUG] extractJunieWorkflowContext: eventName=${context.eventName}, action=${context.payload.action}`);
     const commonFields = {
         runId: process.env.GITHUB_RUN_ID!,
         workflow: process.env.GITHUB_WORKFLOW || "Junie",
