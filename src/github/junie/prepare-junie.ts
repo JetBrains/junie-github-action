@@ -34,7 +34,7 @@ export async function initializeJunieExecution({
     const handle = await shouldHandle(context, octokit)
 
     if (!handle) {
-        console.log("No need to run junie")
+        console.log("No trigger detected, skipping junie run.")
         core.setOutput(OUTPUT_VARS.SHOULD_SKIP, 'true');
         return;
     }
@@ -88,14 +88,14 @@ async function shouldHandle(context: JunieExecutionContext, octokit: Octokits): 
     }
 
     // 1. Allow explicit Code Review dispatch (the actual review run)
-    if (isCodeReviewWorkflowDispatchEvent(context)) {
+    if (isCodeReviewWorkflowDispatchEvent(context)) { console.log("✓ Code Review dispatch detected, proceeding with review.");
         return true;
     }
 
     // 2. Automatic PR triggering: redirects to workflow_dispatch
     if (isPullRequestEvent(context) && (context.eventAction === "opened" || context.eventAction === "synchronize")) {
         if (await checkHumanActor(octokit.rest, context)) {
-            await runCodeReviewWorkflow(octokit, context);
+            await runCodeReviewWorkflow(octokit, context); console.log("✓ Pull Request event handled. Junie will perform the review in the dispatched workflow run. Skipping this run to avoid duplicate comments.");
         }
         // Always return false for the original PR event to avoid double execution
         return false;
