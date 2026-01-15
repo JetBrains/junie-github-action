@@ -74,16 +74,21 @@ export async function prepareJunieTask(
         const issue = fetchedData.pullRequest || fetchedData.issue;
 
         const isCodeReview = isCodeReviewWorkflowDispatchEvent(context);
+        console.log(`[DEBUG] isCodeReview: ${isCodeReview}`);
 
         if (issue && isCodeReview) {
+            console.log(`[DEBUG] Using DEFAULT_CODE_REVIEW_PROMPT`);
             // For code reviews, we use the legacy task string for now to avoid JSON parsing issues with large objects
             // and ensure compatibility with the Junie CLI version.
             const instructions = context.inputs.prompt || DEFAULT_CODE_REVIEW_PROMPT;
             const promptText = await formatter.generatePrompt(context, fetchedData, instructions, true);
+            console.log(`[DEBUG] Generated prompt length: ${promptText.length}`);
             junieCLITask.task = await getValidatedTextTask(promptText, "task");
         } else {
+            console.log(`[DEBUG] Using custom prompt or fallback task`);
             // Fallback to legacy task string for other events (like issue_comment "fix this")
             const promptText = await formatter.generatePrompt(context, fetchedData, customPrompt, context.inputs.attachGithubContextToCustomPrompt);
+            console.log(`[DEBUG] Generated prompt length: ${promptText.length}`);
             junieCLITask.task = await getValidatedTextTask(promptText, "task");
         }
     }
