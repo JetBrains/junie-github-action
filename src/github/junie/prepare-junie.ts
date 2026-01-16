@@ -12,6 +12,7 @@ import {checkHumanActor} from "../validation/actor";
 import {postJunieWorkingStatusComment} from "../operations/comments/feedback";
 import {initializeJunieWorkspace} from "../operations/branch";
 import {PrepareJunieOptions} from "./types/junie";
+import {detectJunieTriggerPhrase} from "../validation/trigger";
 import {configureGitCredentials} from "../operations/auth";
 import {prepareMcpConfig} from "../../mcp/prepare-mcp-config";
 import {verifyRepositoryAccess} from "../validation/permissions";
@@ -34,7 +35,7 @@ export async function initializeJunieExecution({
     const handle = await shouldHandle(context, octokit)
 
     if (!handle) {
-        console.log("No trigger detected, skipping junie run.")
+        console.log("No need to run junie")
         core.setOutput(OUTPUT_VARS.SHOULD_SKIP, 'true');
         return;
     }
@@ -88,14 +89,16 @@ async function shouldHandle(context: JunieExecutionContext, octokit: Octokits): 
     }
 
     // 1. Allow explicit Code Review dispatch (the actual review run)
-    if (isCodeReviewWorkflowDispatchEvent(context)) { console.log("✓ Code Review dispatch detected, proceeding with review.");
+    if (isCodeReviewWorkflowDispatchEvent(context)) {
+        console.log("✓ Code Review dispatch detected, proceeding with review.");
         return true;
     }
 
     // 2. Automatic PR triggering: redirects to workflow_dispatch
     if (isPullRequestEvent(context) && (context.eventAction === "opened" || context.eventAction === "synchronize")) {
         if (await checkHumanActor(octokit.rest, context)) {
-            await runCodeReviewWorkflow(octokit, context); console.log("✓ Pull Request event handled. Junie will perform the review in the dispatched workflow run. Skipping this run to avoid duplicate comments.");
+            await runCodeReviewWorkflow(octokit, context);
+            console.log("✓ Pull Request event handled. Junie will perform the review in the dispatched workflow run. Skipping this run to avoid duplicate comments.");
         }
         // Always return false for the original PR event to avoid double execution
         return false;
@@ -113,7 +116,7 @@ async function shouldHandle(context: JunieExecutionContext, octokit: Octokits): 
         return true;
     }
 
-    return false;
+    return isTriggeredByUserInteraction(context) && detectJunieTriggerPhrase(context) && checkHumanActor(octokit.rest, context);
 }
 
 async function runCodeReviewWorkflow(octokit: Octokits, context: JunieExecutionContext & { payload: any }) {

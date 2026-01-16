@@ -11,7 +11,6 @@ import {
 import * as core from "@actions/core";
 import {BranchInfo} from "../operations/branch";
 import {
-    isReviewOrCommentHasCodeReviewTrigger,
     isReviewOrCommentHasResolveConflictsTrigger
 } from "../validation/trigger";
 import {OUTPUT_VARS} from "../../constants/environment";
@@ -57,7 +56,7 @@ export async function prepareJunieTask(
     const customPrompt = context.inputs.prompt || undefined;
     let junieCLITask: CliInput = {}
 
-    if (context.inputs.resolveConflicts || isReviewOrCommentHasResolveConflictsTrigger(context) || isResolveConflictsWorkflowDispatchEvent(context)) {
+    if (context.inputs.resolveConflicts || isReviewOrCommentHasResolveConflictsTrigger(context)) {
         junieCLITask.mergeTask = {branch: branchInfo.prBaseBranch || branchInfo.baseBranch}
     } else {
         const formatter = new NewGitHubPromptFormatter();
@@ -74,31 +73,22 @@ export async function prepareJunieTask(
         const issue = fetchedData.pullRequest || fetchedData.issue;
 
         const isCodeReview = isCodeReviewWorkflowDispatchEvent(context);
-        console.log(`[DEBUG] isCodeReview: ${isCodeReview}`);
 
         if (issue && isCodeReview) {
-            console.log(`[DEBUG] Using DEFAULT_CODE_REVIEW_PROMPT`);
-            // For code reviews, we use the legacy task string for now to avoid JSON parsing issues with large objects
-            // and ensure compatibility with the Junie CLI version.
             const instructions = context.inputs.prompt || DEFAULT_CODE_REVIEW_PROMPT;
             const promptText = await formatter.generatePrompt(context, fetchedData, instructions, true);
-            console.log(`[DEBUG] Generated prompt length: ${promptText.length}`);
             junieCLITask.task = await getValidatedTextTask(promptText, "task");
         } else {
-            console.log(`[DEBUG] Using custom prompt or fallback task`);
-            // Fallback to legacy task string for other events (like issue_comment "fix this")
             const promptText = await formatter.generatePrompt(context, fetchedData, customPrompt, context.inputs.attachGithubContextToCustomPrompt);
-            console.log(`[DEBUG] Generated prompt length: ${promptText.length}`);
             junieCLITask.task = await getValidatedTextTask(promptText, "task");
         }
     }
 
-    if (!junieCLITask.task && !junieCLITask.mergeTask && !junieCLITask.issueTask) {
+    if (!junieCLITask.task && !junieCLITask.mergeTask) {
         throw new Error("No task was created. Please check your inputs.");
     }
 
-    const taskJson = JSON.stringify(junieCLITask);
-    core.setOutput(OUTPUT_VARS.JUNIE_JSON_TASK, taskJson);
+    core.setOutput(OUTPUT_VARS.JUNIE_JSON_TASK, JSON.stringify(junieCLITask));
 
     return junieCLITask;
 }

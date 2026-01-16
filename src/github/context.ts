@@ -255,14 +255,14 @@ export function extractJunieWorkflowContext(tokenOwner: TokenOwner): JunieExecut
                 parsedContext = {
                     ...commonFields,
                     isPR: true,
-                    entityNumber: payload.inputs?.prNumber ? Number(payload.inputs.prNumber) : undefined,
+                    entityNumber: payload.inputs?.prNumber as number,
                     eventName: context.eventName,
                     payload: {
                         ...payload,
                         action: RESOLVE_CONFLICTS_ACTION
                     },
                 };
-                break;
+                break
             }
 
             if (payload.inputs?.action == CODE_REVIEW_ACTION) {

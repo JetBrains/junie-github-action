@@ -171,84 +171,16 @@ runs:
         EJ_AUTH_GITHUB_TOKEN: ${{ steps.prepare.outputs.EJ_AUTH_GITHUB_TOKEN  }}
         GH_TOKEN: ${{ steps.prepare.outputs.EJ_AUTH_GITHUB_TOKEN }}
         MULTI_RUNS: true
-        MATTERHORN_DEBUG_LOG: true
+        MATTERHORN_DEBUG_LOG: false
         WORKING_DIR: ${{ inputs.junie_work_dir }}
-        JUNIE_EXPORT_SESSION: true
-        MATTERHORN_VERBOSE_LOG: true
-        JUNIE_SHOW_STEPS: true
-        MATTERHORN_SHOW_STEPS: true
-        JUNIE_PRINT_STEPS: true
-        JUNIE_LOG_LEVEL: DEBUG
-        LOG_LEVEL: DEBUG
-        JUNIE_DEBUG: true
-        MATTERHORN_LOG_LEVEL: DEBUG
       run: |
-        echo "[DEBUG] Running Junie CLI..."
-        printf "%s" "$JUNIE_JSON_TASK" > task.json
-        echo "[DEBUG] Full Junie Task (Prompt):"
-        cat task.json
-        echo ""
-        # Capture only the last line of stdout as the JSON output, 
-        # while letting everything else (logs/steps) flow to console (stderr)
-        # We use a temporary file to capture stdout to avoid interleaving issues
-        junie --cache-dir="${WORKING_DIR}" --input-format="json" --output-format="json" --auth="${CLI_TOKEN}" < task.json > output.json
-        EXIT_CODE=$?
-        OUTPUT=$(cat output.json)
-        echo "[DEBUG] Junie CLI exited with code $EXIT_CODE"
-        if [ $EXIT_CODE -ne 0 ]; then
-          echo "[DEBUG] Junie CLI failed. Output: $OUTPUT"
-        fi
-        
-        # Check for session trajectory in common locations
-        echo "[DEBUG] Searching for session_trajectory.json..."
-        find . -name "session_trajectory.json" -exec cp {} "${WORKING_DIR}/" \;
-        find ~/.junie -name "session_trajectory.json" -exec cp {} "${WORKING_DIR}/" \;
-        
-        # Also try to find any trajectory.json in sessions
-        find ~/.junie/sessions -name "trajectory.json" -exec cp {} "${WORKING_DIR}/session_trajectory.json" \;
-
-        # Diagnostic: list all files in working dir and ~/.junie to see what we have
-        echo "[DEBUG] Files in WORKING_DIR (${WORKING_DIR}):"
-        ls -R "${WORKING_DIR}"
-        echo "[DEBUG] Files in ~/.junie:"
-        ls -R ~/.junie || echo "No ~/.junie directory"
-
-        if [ -f "${WORKING_DIR}/session_trajectory.json" ]; then
-          echo "[DEBUG] Trajectory found. Printing steps..."
-          node -e "
-            try {
-              const fs = require('fs');
-              const content = fs.readFileSync('${WORKING_DIR}/session_trajectory.json', 'utf8');
-              const t = JSON.parse(content);
-              const steps = Array.isArray(t) ? t : (t.steps || []);
-              steps.forEach((s, i) => {
-                const thought = s.thought || s.reasoning || '';
-                const tool = s.toolCall?.name || s.tool_call?.name || s.action?.name;
-                const summary = s.summary || '';
-                console.log('Step ' + (i+1) + ': ' + (thought || summary || (tool ? 'Executing ' + tool : 'No info')));
-              });
-            } catch (e) {
-              console.log('Error parsing trajectory: ' + e.message);
-              process.exit(0);
-            }
-          " || cat "${WORKING_DIR}/session_trajectory.json"
-        else
-          # Check if there are other interesting files to cat
-          if ls "${WORKING_DIR}"/session_*.json >/dev/null 2>&1; then
-            echo "[DEBUG] Printing other session files..."
-            for f in "${WORKING_DIR}"/session_*.json; do
-              echo "[DEBUG] Content of $f:"
-              cat "$f"
-            done
-          fi
-        fi
-
+        OUTPUT=$(junie --cache-dir="${WORKING_DIR}" --input-format="json" --output-format="json" --auth="${CLI_TOKEN}" <<<"${JUNIE_JSON_TASK}")
         echo "json_output<<EOF" >> $GITHUB_OUTPUT
         echo "$OUTPUT" >> $GITHUB_OUTPUT
         echo "EOF" >> $GITHUB_OUTPUT
 
     - name: Handle Junie results
-      if: steps.prepare.outputs.SHOULD_SKIP != 'true'
+      if: always() && steps.prepare.outputs.SHOULD_SKIP != 'true'
       shell: bash
       id: junie-run-results
       run: |
