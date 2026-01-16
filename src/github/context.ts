@@ -269,7 +269,7 @@ export function extractJunieWorkflowContext(tokenOwner: TokenOwner): JunieExecut
                 parsedContext = {
                     ...commonFields,
                     isPR: true,
-                    entityNumber: payload.inputs?.prNumber as number,
+                    entityNumber: payload.inputs?.prNumber ? Number(payload.inputs.prNumber) : undefined,
                     eventName: context.eventName,
                     payload: {
                         ...payload,
