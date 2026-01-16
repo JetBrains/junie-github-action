@@ -382,6 +382,31 @@ describe("prepareJunieTask", () => {
             expect(result.task).toContain("Changes needed");
             expect(result.task).toContain("<repository>");
         });
+
+        test("should use task string with default prompt for Code Review dispatch", async () => {
+            const context = createMockContext({
+                eventName: "workflow_dispatch",
+                isPR: true,
+                entityNumber: 123,
+                payload: {
+                    inputs: {
+                        action: "code-review",
+                        prNumber: "123"
+                    },
+                    repository: {
+                        owner: {login: "owner"},
+                        name: "repo"
+                    }
+                } as any
+            });
+            const octokit = createMockOctokit();
+
+            const result = await prepareJunieTask(context, branchInfo, octokit);
+
+            expect(result).toBeDefined();
+            expect(result.task).toBeDefined();
+            expect(result.task).toContain("Review the Pull Request changes");
+        });
     });
 
     describe("PR review comment event", () => {

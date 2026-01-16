@@ -1,4 +1,6 @@
 import {
+    isCodeReviewWorkflowDispatchEvent,
+    isResolveConflictsWorkflowDispatchEvent,
     JunieExecutionContext,
     isIssueCommentEvent,
     isIssuesEvent,
@@ -8,8 +10,11 @@ import {
 } from "../context";
 import * as core from "@actions/core";
 import {BranchInfo} from "../operations/branch";
-import {isReviewOrCommentHasResolveConflictsTrigger} from "../validation/trigger";
+import {
+    isReviewOrCommentHasResolveConflictsTrigger
+} from "../validation/trigger";
 import {OUTPUT_VARS} from "../../constants/environment";
+import {DEFAULT_CODE_REVIEW_PROMPT} from "../../constants/github";
 import {Octokits} from "../api/client";
 import {NewGitHubPromptFormatter} from "./new-prompt-formatter";
 import {validateInputSize} from "../validation/input-size";
@@ -65,9 +70,18 @@ export async function prepareJunieTask(
             fetchedData = await fetcher.fetchIssueData(owner, repo, context.entityNumber, triggerTime);
         }
 
-        // Generate prompt using formatter
-        const promptText = await formatter.generatePrompt(context, fetchedData, customPrompt, context.inputs.attachGithubContextToCustomPrompt);
-        junieCLITask.task = await getValidatedTextTask(promptText, "task");
+        const issue = fetchedData.pullRequest || fetchedData.issue;
+
+        const isCodeReview = isCodeReviewWorkflowDispatchEvent(context);
+
+        if (issue && isCodeReview) {
+            const instructions = context.inputs.prompt || DEFAULT_CODE_REVIEW_PROMPT;
+            const promptText = await formatter.generatePrompt(context, fetchedData, instructions, true);
+            junieCLITask.task = await getValidatedTextTask(promptText, "task");
+        } else {
+            const promptText = await formatter.generatePrompt(context, fetchedData, customPrompt, context.inputs.attachGithubContextToCustomPrompt);
+            junieCLITask.task = await getValidatedTextTask(promptText, "task");
+        }
     }
 
     if (!junieCLITask.task && !junieCLITask.mergeTask) {
