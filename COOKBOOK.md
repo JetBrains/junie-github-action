@@ -82,25 +82,33 @@ jobs:
 
 **Problem:** PRs sit waiting for review, slowing down delivery. You want consistent feedback on code quality, security issues, and best practices before human reviewers look at the code.
 
-**Solution:** Junie automatically reviews every PR, leaving structured feedback with actionable suggestions.
+**Solution:** Junie automatically reviews every PR using its built-in code review feature, providing structured feedback and actionable inline suggestions.
 
 <details>
 <summary>View complete workflow</summary>
 
 ```yaml
-# .github/workflows/code-review.yml
-name: Code Review
+# .github/workflows/junie.yml
+name: Junie
 
 on:
   pull_request:
     types: [opened, synchronize]
-    branches: [main]
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: false
+      prNumber:
+        description: 'PR number'
+        required: false
 
 jobs:
-  review:
+  junie:
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       pull-requests: write
       issues: write
     steps:
@@ -112,67 +120,15 @@ jobs:
         with:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
           use_single_comment: "true"
-          prompt: |
-            Your task is to:
-            1. Download the Pull Request diff using `gh pr diff ${{ github.event.pull_request.head.ref }}`
-            2. Review the downloaded diff according to the criteria below
-            3. Output summary following the template below using `submit` action
-            
-            ## Review Criteria
-            
-            ```
-            **Security:**
-            - SQL injection, XSS, exposed secrets
-              - Authentication/authorization issues
-              - Input validation vulnerabilities
-            
-            **Performance:**
-            - N+1 queries, memory leaks
-              - Inefficient algorithms (nested loops, etc.)
-              - Blocking operations
-            
-            **Code Quality:**
-            - Complexity, duplication, naming
-              - Missing tests for new logic
-              - Undocumented complex logic
-            ```
-            
-            ## Summary template
-            
-            ```
-            ## 🎯 Summary
-            [2-3 sentences overall assessment]
-            
-            ## ⚠️ Issues Found
-            [Each issue: File:line, Severity (Critical/High/Medium/Low), Description, Suggested fix with code example]
-            
-            ## ✨ Highlights
-            [1-2 things done well]
-            
-            ## 📋 Checklist
-            - [ ] Security: No vulnerabilities
-              - [ ] Tests: Adequate coverage
-              - [ ] Performance: No bottlenecks
-              - [ ] Documentation: Complex logic explained
-
-            ## Additional instructions
-            - Strictly follow the plan above (`Your task is to:` section)
-            - You are not expected to explore the repo. Do review solely based on the downloaded diff
-            - You are not expected to run any code or any commands except `gh pr diff`
 ```
 
 </details>
 
 **How it works:**
-1. Triggers on PR open/update or when someone replies `@junie-agent`
-2. Analyzes all changed files in the PR diff
-3. Leaves a structured review comment with severity levels
-4. Updates the same comment on subsequent runs (via `use_single_comment`)
-
-**Next steps:**
-- Add blocking reviews for critical issues (require approval before merge)
-- Integrate with your team's style guide by adding project-specific rules
-- Combine with CI checks: only run if tests pass
+1. Triggers automatically when a PR is opened or updated.
+2. Dispatches a background job that uses Junie's optimized code review prompt.
+3. Places inline comments with `suggestion` blocks directly on the code.
+4. Updates a single summary comment for all subsequent runs.
 
 ---
 

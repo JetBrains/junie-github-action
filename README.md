@@ -22,9 +22,10 @@ A powerful GitHub Action that integrates [Junie](https://www.jetbrains.com/junie
 
 ## Features
 
+- **Automated Code Review**: Automatically reviews every new PR and update, leaving structured feedback with actionable suggestions
 - **Interactive Code Assistant**: Responds to @junie-agent mentions in comments, issues, and PRs
 - **Issue Resolution**: Automatically implements solutions for GitHub issues
-- **PR Management**: Reviews code changes and implements requested modifications
+- **PR Management**: Addresses review feedback and implements requested modifications
 - **Inline Code Reviews**: Create code review comments with GitHub suggestions directly on PR diffs
 - **Conflict Resolution**: Resolve merge conflicts via `@junie-agent` comment or automatic detection
 - **CI Failure Analysis**: Investigates failed checks and suggests fixes using MCP integration
@@ -61,16 +62,28 @@ name: Junie
 on:
   issue_comment:
     types: [created]
+  pull_request:
+    types: [opened, synchronize]
   pull_request_review_comment:
     types: [created]
   issues:
     types: [opened, assigned]
   pull_request_review:
     types: [submitted]
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: false
+      prNumber:
+        description: 'PR number'
+        required: false
 
 jobs:
   junie:
     if: |
+      github.event_name == 'pull_request' ||
+      github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@junie-agent')) ||
       (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@junie-agent')) ||
       (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@junie-agent')) ||
@@ -335,8 +348,9 @@ jobs:
 
 ## How It Works
 
-1. **Trigger Detection**: The action detects triggers (mentions, labels, assignments, or prompts)
-2. **Validation**: Verifies permissions and checks if the actor is human (when applicable - see Security Considerations)
+1. **Trigger Detection**: The action detects triggers (mentions, labels, assignments, or prompts).
+   - **Automated Code Review**: Automatically triggers on `pull_request` (opened, synchronize) events by dispatching a background `workflow_dispatch` run to perform the review.
+2. **Validation**: Verifies permissions and checks if the actor is human (when applicable - see Security Considerations).
 3. **Branch Management**: Creates or checks out the appropriate working branch
 4. **Task Preparation**: Converts GitHub context into a Junie-compatible task, applying security sanitization to user-submitted content to prevent prompt injection
 5. **MCP Setup**: Configures enabled MCP servers for enhanced capabilities
