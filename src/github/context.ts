@@ -16,7 +16,7 @@ import {
 } from "@octokit/webhooks-types";
 import type {TokenOwner} from "./operations/auth";
 import {OUTPUT_VARS} from "../constants/environment";
-import {CODE_REVIEW_ACTION, DEFAULT_TRIGGER_PHRASE, JIRA_EVENT_ACTION, RESOLVE_CONFLICTS_ACTION} from "../constants/github";
+import {DEFAULT_TRIGGER_PHRASE, JIRA_EVENT_ACTION, RESOLVE_CONFLICTS_ACTION} from "../constants/github";
 
 // Jira integration types
 export type JiraComment = {
@@ -44,10 +44,6 @@ export type JiraIssuePayload = WorkflowDispatchEvent & {
 // Jira integration types
 export type ResolveConflictsEventPayload = WorkflowDispatchEvent & {
     action: typeof RESOLVE_CONFLICTS_ACTION;
-};
-
-export type CodeReviewEventPayload = WorkflowDispatchEvent & {
-    action: typeof CODE_REVIEW_ACTION;
 };
 
 export type ScheduleEvent = {
@@ -129,8 +125,7 @@ export type AutomationEventContext = JunieWorkflowContext & {
         | ScheduleEvent
         | WorkflowRunEvent
         | JiraIssuePayload
-        | ResolveConflictsEventPayload
-        | CodeReviewEventPayload;
+        | ResolveConflictsEventPayload;
 };
 
 // Union type representing all possible Junie execution contexts
@@ -265,20 +260,6 @@ export function extractJunieWorkflowContext(tokenOwner: TokenOwner): JunieExecut
                 break
             }
 
-            if (payload.inputs?.action == CODE_REVIEW_ACTION) {
-                parsedContext = {
-                    ...commonFields,
-                    isPR: true,
-                    entityNumber: payload.inputs?.prNumber ? Number(payload.inputs.prNumber) : undefined,
-                    eventName: context.eventName,
-                    payload: {
-                        ...payload,
-                        action: CODE_REVIEW_ACTION
-                    },
-                };
-                break;
-            }
-
             // Handle Jira integration event
             if (payload.inputs?.action == JIRA_EVENT_ACTION) {
                 parsedContext = extractJiraEventData(payload, commonFields)
@@ -379,10 +360,6 @@ export function isJiraWorkflowDispatchEvent(context: JunieExecutionContext): con
 
 export function isResolveConflictsWorkflowDispatchEvent(context: JunieExecutionContext): context is AutomationEventContext & { payload: ResolveConflictsEventPayload }  {
     return context.eventName === "workflow_dispatch" && 'action' in context.payload && context.payload.action === RESOLVE_CONFLICTS_ACTION;
-}
-
-export function isCodeReviewWorkflowDispatchEvent(context: JunieExecutionContext): context is AutomationEventContext & { payload: CodeReviewEventPayload }  {
-    return context.eventName === "workflow_dispatch" && 'action' in context.payload && context.payload.action === CODE_REVIEW_ACTION;
 }
 
 export function isCheckSuiteEvent(context: JunieExecutionContext): context is AutomationEventContext & {

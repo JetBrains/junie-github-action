@@ -84,8 +84,53 @@ jobs:
 
 **Solution:** Junie automatically reviews every PR, leaving structured feedback with actionable suggestions.
 
+### Option A: Use Built-in Code Review (Recommended)
+
+Use the built-in `code-review` prompt for a structured, opinionated review focused on repository style, avoiding overcomplications, and catching obvious issues:
+
 <details>
 <summary>View complete workflow</summary>
+
+```yaml
+# .github/workflows/code-review.yml
+name: Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: JetBrains/junie-github-action@v0
+        with:
+          junie_api_key: ${{ secrets.JUNIE_API_KEY }}
+          use_single_comment: "true"
+          prompt: "code-review"
+```
+
+</details>
+
+The built-in review focuses on:
+- **Repository style adherence** - naming, formatting, package structure
+- **Avoiding overcomplications** - premature abstractions, unnecessary indirection
+- **Security, performance, error handling** - only for obviously applicable cases
+
+### Option B: Custom Review Prompt
+
+For custom review criteria, provide your own detailed prompt:
+
+<details>
+<summary>View complete workflow with custom prompt</summary>
 
 ```yaml
 # .github/workflows/code-review.yml
@@ -116,38 +161,38 @@ jobs:
             1. Download the Pull Request diff using `gh pr diff ${{ github.event.pull_request.head.ref }}`
             2. Review the downloaded diff according to the criteria below
             3. Output summary following the template below using `submit` action
-            
+
             ## Review Criteria
-            
+
             ```
             **Security:**
             - SQL injection, XSS, exposed secrets
               - Authentication/authorization issues
               - Input validation vulnerabilities
-            
+
             **Performance:**
             - N+1 queries, memory leaks
               - Inefficient algorithms (nested loops, etc.)
               - Blocking operations
-            
+
             **Code Quality:**
             - Complexity, duplication, naming
               - Missing tests for new logic
               - Undocumented complex logic
             ```
-            
+
             ## Summary template
-            
+
             ```
             ## 🎯 Summary
             [2-3 sentences overall assessment]
-            
+
             ## ⚠️ Issues Found
             [Each issue: File:line, Severity (Critical/High/Medium/Low), Description, Suggested fix with code example]
-            
+
             ## ✨ Highlights
             [1-2 things done well]
-            
+
             ## 📋 Checklist
             - [ ] Security: No vulnerabilities
               - [ ] Tests: Adequate coverage

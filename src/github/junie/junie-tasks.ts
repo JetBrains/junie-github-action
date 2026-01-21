@@ -1,5 +1,4 @@
 import {
-    isCodeReviewWorkflowDispatchEvent,
     isResolveConflictsWorkflowDispatchEvent,
     JunieExecutionContext,
     isIssueCommentEvent,
@@ -14,7 +13,7 @@ import {
     isReviewOrCommentHasResolveConflictsTrigger
 } from "../validation/trigger";
 import {OUTPUT_VARS} from "../../constants/environment";
-import {DEFAULT_CODE_REVIEW_PROMPT} from "../../constants/github";
+import {CODE_REVIEW_ACTION, DEFAULT_CODE_REVIEW_PROMPT} from "../../constants/github";
 import {Octokits} from "../api/client";
 import {NewGitHubPromptFormatter} from "./new-prompt-formatter";
 import {validateInputSize} from "../validation/input-size";
@@ -72,10 +71,12 @@ export async function prepareJunieTask(
 
         const issue = fetchedData.pullRequest || fetchedData.issue;
 
-        const isCodeReview = isCodeReviewWorkflowDispatchEvent(context);
+        // Check if prompt contains CODE_REVIEW_ACTION phrase
+        const isCodeReview = customPrompt?.includes(CODE_REVIEW_ACTION);
 
         if (issue && isCodeReview) {
-            const instructions = context.inputs.prompt || DEFAULT_CODE_REVIEW_PROMPT;
+            // Replace CODE_REVIEW_ACTION with default code review prompt
+            const instructions = customPrompt!.replace(CODE_REVIEW_ACTION, DEFAULT_CODE_REVIEW_PROMPT);
             const promptText = await formatter.generatePrompt(context, fetchedData, instructions, true);
             junieCLITask.task = await getValidatedTextTask(promptText, "task");
         } else {

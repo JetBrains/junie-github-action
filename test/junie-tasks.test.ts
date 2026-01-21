@@ -383,15 +383,19 @@ describe("prepareJunieTask", () => {
             expect(result.task).toContain("<repository>");
         });
 
-        test("should use task string with default prompt for Code Review dispatch", async () => {
+        test("should replace CODE_REVIEW_ACTION phrase with default code review prompt", async () => {
             const context = createMockContext({
-                eventName: "workflow_dispatch",
+                eventName: "pull_request",
                 isPR: true,
                 entityNumber: 123,
+                inputs: {
+                    prompt: "code-review"
+                },
                 payload: {
-                    inputs: {
-                        action: "code-review",
-                        prNumber: "123"
+                    pull_request: {
+                        number: 123,
+                        title: "Test PR",
+                        updated_at: "2024-01-01T00:00:00Z"
                     },
                     repository: {
                         owner: {login: "owner"},
