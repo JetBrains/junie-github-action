@@ -94,7 +94,18 @@ name: Code Review
 on:
   pull_request:
     types: [opened, synchronize]
-    branches: [main]
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Action to perform"
+        required: true
+        default: "code-review"
+      prNumber:
+        description: "PR number"
+        required: true
+      commitSha:
+        description: "Commit SHA"
+        required: false
 
 jobs:
   review:
@@ -164,10 +175,11 @@ jobs:
 </details>
 
 **How it works:**
-1. Triggers on PR open/update or when someone replies `@junie-agent`
-2. Analyzes all changed files in the PR diff
-3. Leaves a structured review comment with severity levels
-4. Updates the same comment on subsequent runs (via `use_single_comment`)
+1. Triggers on PR open/synchronize events or manual `workflow_dispatch`
+2. Automatically redirects to a dispatched run for better execution isolation and reliability
+3. Analyzes all changed files in the PR diff using MCP tools or CLI
+4. Leaves a structured review comment with findings and actionable suggestions
+5. Updates the same comment on subsequent runs (via `use_single_comment`)
 
 **Next steps:**
 - Add blocking reviews for critical issues (require approval before merge)
@@ -338,7 +350,18 @@ name: Security Audit
 on:
   pull_request:
     types: [opened, synchronize]
-    branches: [main]
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Action to perform"
+        required: true
+        default: "code-review"
+      prNumber:
+        description: "PR number"
+        required: true
+      commitSha:
+        description: "Commit SHA"
+        required: false
 
 jobs:
   audit:
@@ -412,10 +435,11 @@ jobs:
 </details>
 
 **How it works:**
-1. Runs on every push and PR
-2. Uses `silent_mode` to analyze without creating comments
-3. Outputs structured report with findings
-4. Fails CI if secrets are detected (checks for "SECRETS_FOUND" status)
+1. Runs on every PR opened or synchronized
+2. Automatically redirects to a dispatched run for better execution isolation
+3. Uses `silent_mode` to analyze without creating comments
+4. Outputs structured report with findings
+5. Fails CI if secrets are detected (checks for "SECRETS_FOUND" status)
 
 **Integration:**
 - Add to required status checks to block PRs with secrets
