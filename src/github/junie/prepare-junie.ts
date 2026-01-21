@@ -4,7 +4,7 @@ import {
     isTriggeredByUserInteraction,
     isPushEvent,
     isJiraWorkflowDispatchEvent,
-    isResolveConflictsWorkflowDispatchEvent, isPullRequestEvent
+    isResolveConflictsWorkflowDispatchEvent, isPullRequestEvent, isPullRequestReviewEvent, isIssueCommentEvent
 } from "../context";
 import {checkHumanActor} from "../validation/actor";
 import {postJunieWorkingStatusComment} from "../operations/comments/feedback";
@@ -63,9 +63,21 @@ export async function initializeJunieExecution({
     // Get PR-specific info
     let commitSha
     let prNumber
-    if (isPullRequestEvent(context)) {
+    if (isPullRequestEvent(context)
+        || isPullRequestReviewEvent(context)
+        || isPullRequestReviewEvent(context)) {
         commitSha = context.payload.pull_request.head.sha;
         prNumber = context.entityNumber;
+    }
+    if (isIssueCommentEvent(context) && context.isPR) {
+        prNumber = context.entityNumber;
+        // Fetch PR details to get the commit SHA
+        const {data: pr} = await octokit.rest.pulls.get({
+            owner: context.payload.repository.owner.login,
+            repo: context.payload.repository.name,
+            pull_number: prNumber!,
+        });
+        commitSha = pr.head.sha;
     }
 
     // Prepare MCP configuration with automatic server activation
