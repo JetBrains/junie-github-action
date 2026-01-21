@@ -32,11 +32,14 @@ export const DEFAULT_TRIGGER_PHRASE = "@junie-agent";
 // Templates and Messages
 // ============================================================================
 
-export const DEFAULT_CODE_REVIEW_PROMPT = `
+export function createCodeReviewPrompt(branchName: string): string {
+    const diffCommand = `gh pr diff ${branchName}`
+    return `
 Your task is to:
-1. Review the Pull Request changes.
-2. For each specific finding, use the 'post_inline_review_comment' tool (if available) to provide feedback directly on the code.
-3. Once all findings are posted (or if the tool is unavailable), call the 'answer' tool with your review as a bullet point list in the 'full_answer' field.
+1. Get the Pull Request diff using \`${diffCommand}\`.
+2. Review this diff according to the criteria below.
+3. For each specific finding, use the 'post_inline_review_comment' tool (if available) to provide feedback directly on the code.
+4. Once all findings are posted (or if the tool is unavailable), call the 'answer' tool with your review as a bullet point list in the 'full_answer' field.
 
 Additional instructions:
 1. Review ONLY the changed lines against the Core Review Areas below, prioritizing repository style/guidelines adherence and avoiding overcomplication.
@@ -74,6 +77,7 @@ Additional instructions:
 - If unsure whether a comment applies, omit it. If no feedback is warranted, answer \`LGTM\` only .
 - For small changes, max 3 comments; medium 6–8; large 8–12.
 `;
+}
 
 /**
  * Creates a hidden marker for identifying Junie comments from a specific workflow.

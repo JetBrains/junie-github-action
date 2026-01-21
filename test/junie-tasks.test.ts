@@ -16,6 +16,23 @@ mock.module("../src/github/junie/attachment-downloader", () => ({
 
 describe("prepareJunieTask", () => {
     const createMockContext = (overrides: Partial<JunieExecutionContext> = {}): JunieExecutionContext => {
+        const defaultInputs = {
+            resolveConflicts: false,
+            createNewBranchForPR: false,
+            silentMode: false,
+            useSingleComment: false,
+            attachGithubContextToCustomPrompt: true,
+            junieWorkingDir: "/tmp",
+            appToken: "token",
+            prompt: "",
+            triggerPhrase: "@junie-agent",
+            assigneeTrigger: "",
+            labelTrigger: "",
+            allowedMcpServers: ""
+        };
+
+        const { inputs: _, ...restOverrides } = overrides;
+
         return {
             eventName: "issue_comment",
             runId: "123",
@@ -23,20 +40,7 @@ describe("prepareJunieTask", () => {
             actorEmail: "test@example.com",
             tokenOwner: "user",
             isPR: false,
-            inputs: {
-                resolveConflicts: false,
-                createNewBranchForPR: false,
-                silentMode: false,
-                useSingleComment: false,
-                attachGithubContextToCustomPrompt: true,
-                junieWorkingDir: "/tmp",
-                appToken: "token",
-                prompt: "",
-                triggerPhrase: "@junie-agent",
-                assigneeTrigger: "",
-                labelTrigger: "",
-                allowedMcpServers: ""
-            },
+            inputs: overrides.inputs ? { ...defaultInputs, ...overrides.inputs } : defaultInputs,
             payload: {
                 action: "created",
                 issue: {
@@ -58,7 +62,7 @@ describe("prepareJunieTask", () => {
                     name: "repo"
                 }
             } as any,
-            ...overrides
+            ...restOverrides
         } as JunieExecutionContext;
     };
 
@@ -409,7 +413,7 @@ describe("prepareJunieTask", () => {
 
             expect(result).toBeDefined();
             expect(result.task).toBeDefined();
-            expect(result.task).toContain("Review the Pull Request changes");
+            expect(result.task).toContain("Get the Pull Request diff");
         });
 
         test("should use default code review prompt when code-review is in comment", async () => {
@@ -442,7 +446,7 @@ describe("prepareJunieTask", () => {
 
             expect(result).toBeDefined();
             expect(result.task).toBeDefined();
-            expect(result.task).toContain("Review the Pull Request changes");
+            expect(result.task).toContain("Get the Pull Request diff");
         });
     });
 

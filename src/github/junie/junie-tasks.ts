@@ -14,7 +14,7 @@ import {
     isReviewOrCommentHasResolveConflictsTrigger
 } from "../validation/trigger";
 import {OUTPUT_VARS} from "../../constants/environment";
-import {CODE_REVIEW_ACTION, DEFAULT_CODE_REVIEW_PROMPT} from "../../constants/github";
+import {CODE_REVIEW_ACTION, createCodeReviewPrompt} from "../../constants/github";
 import {Octokits} from "../api/client";
 import {NewGitHubPromptFormatter} from "./new-prompt-formatter";
 import {validateInputSize} from "../validation/input-size";
@@ -82,7 +82,9 @@ export async function prepareJunieTask(
         let promptText: string;
         if (issue && isCodeReview) {
             // Use default code review prompt when code-review trigger is detected
-            promptText = await formatter.generatePrompt(context, fetchedData, DEFAULT_CODE_REVIEW_PROMPT, true);
+            const branchName = branchInfo.prBaseBranch || branchInfo.baseBranch;
+            const codeReviewPrompt = createCodeReviewPrompt(branchName);
+            promptText = await formatter.generatePrompt(context, fetchedData, codeReviewPrompt, true);
         } else {
             promptText = await formatter.generatePrompt(context, fetchedData, customPrompt, context.inputs.attachGithubContextToCustomPrompt);
         }
