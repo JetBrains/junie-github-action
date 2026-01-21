@@ -22,6 +22,7 @@ A powerful GitHub Action that integrates [Junie](https://www.jetbrains.com/junie
 
 ## Features
 
+- **Built-in Code Reviews**: Automate structured PR reviews with inline feedback and suggestions using the built-in `code-review` prompt
 - **Interactive Code Assistant**: Responds to @junie-agent mentions in comments, issues, and PRs
 - **Issue Resolution**: Automatically implements solutions for GitHub issues
 - **PR Management**: Reviews code changes and implements requested modifications
@@ -101,6 +102,7 @@ jobs:
 3. Start using Junie:
    - Comment `@junie-agent help me fix this bug` on an issue
    - Mention `@junie-agent review this change` in a PR
+   - Use `@junie-agent code-review` for a structured, opinionated review in a PR comment or review
 
 ## Jira Integration
 
@@ -141,7 +143,7 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 
 | Input | Description | Default |
 |-------|-------------|---------|
-| `prompt` | Custom instructions for Junie | - |
+| `prompt` | Custom instructions for Junie. Use `code-review` to trigger the built-in structured review prompt. | - |
 | `junie_version` | Junie CLI version to install | `576.1` |
 | `junie_work_dir` | Working directory for Junie files | `/tmp/junie-work` |
 | `junie_guidelines_filename` | Filename of the guidelines file (should be in `<project-root>/.junie` dir) | `guidelines.md` |
@@ -335,7 +337,7 @@ jobs:
 
 ## How It Works
 
-1. **Trigger Detection**: The action detects triggers (mentions, labels, assignments, or prompts)
+1. **Trigger Detection**: The action detects triggers (mentions, labels, assignments, or special phrases like `code-review`)
 2. **Validation**: Verifies permissions and checks if the actor is human (when applicable - see Security Considerations)
 3. **Branch Management**: Creates or checks out the appropriate working branch
 4. **Task Preparation**: Converts GitHub context into a Junie-compatible task, applying security sanitization to user-submitted content to prevent prompt injection
