@@ -20,6 +20,8 @@ export const RESOLVE_CONFLICTS_TRIGGER_PHRASE_REGEXP = new RegExp(RESOLVE_CONFLI
 
 export const CODE_REVIEW_ACTION = "code-review";
 
+export const CODE_REVIEW_TRIGGER_PHRASE_REGEXP = new RegExp(CODE_REVIEW_ACTION, 'i')
+
 export const JIRA_EVENT_ACTION = "jira_event";
 
 export const WORKING_BRANCH_PREFIX = "junie/";

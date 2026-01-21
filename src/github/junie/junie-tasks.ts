@@ -10,6 +10,7 @@ import {
 import * as core from "@actions/core";
 import {BranchInfo} from "../operations/branch";
 import {
+    isReviewOrCommentHasCodeReviewTrigger,
     isReviewOrCommentHasResolveConflictsTrigger
 } from "../validation/trigger";
 import {OUTPUT_VARS} from "../../constants/environment";
@@ -71,12 +72,17 @@ export async function prepareJunieTask(
 
         const issue = fetchedData.pullRequest || fetchedData.issue;
 
-        // Check if prompt contains CODE_REVIEW_ACTION phrase
-        const isCodeReview = customPrompt?.includes(CODE_REVIEW_ACTION);
+        // Check if prompt contains CODE_REVIEW_ACTION phrase or if comment/review has code-review trigger
+        const isCodeReviewInPrompt = customPrompt?.includes(CODE_REVIEW_ACTION);
+        const isCodeReviewInComment = isReviewOrCommentHasCodeReviewTrigger(context);
+        const isCodeReview = isCodeReviewInPrompt || isCodeReviewInComment;
 
         if (issue && isCodeReview) {
-            // Replace CODE_REVIEW_ACTION with default code review prompt
-            const instructions = customPrompt!.replace(CODE_REVIEW_ACTION, DEFAULT_CODE_REVIEW_PROMPT);
+            // Replace CODE_REVIEW_ACTION with default code review prompt if it's in custom prompt
+            // Otherwise just use the default prompt
+            const instructions = isCodeReviewInPrompt
+                ? customPrompt!.replace(CODE_REVIEW_ACTION, DEFAULT_CODE_REVIEW_PROMPT)
+                : DEFAULT_CODE_REVIEW_PROMPT;
             const promptText = await formatter.generatePrompt(context, fetchedData, instructions, true);
             junieCLITask.task = await getValidatedTextTask(promptText, "task");
         } else {

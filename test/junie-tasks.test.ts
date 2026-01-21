@@ -411,6 +411,39 @@ describe("prepareJunieTask", () => {
             expect(result.task).toBeDefined();
             expect(result.task).toContain("Review the Pull Request changes");
         });
+
+        test("should use default code review prompt when code-review is in comment", async () => {
+            const context = createMockContext({
+                eventName: "issue_comment",
+                isPR: true,
+                entityNumber: 123,
+                payload: {
+                    issue: {
+                        number: 123,
+                        title: "Test PR",
+                        pull_request: {},
+                        updated_at: "2024-01-01T00:00:00Z"
+                    },
+                    comment: {
+                        id: 1,
+                        body: "@junie-agent code-review",
+                        user: {login: "reviewer"},
+                        created_at: "2024-01-01T00:00:00Z"
+                    },
+                    repository: {
+                        owner: {login: "owner"},
+                        name: "repo"
+                    }
+                } as any
+            });
+            const octokit = createMockOctokit();
+
+            const result = await prepareJunieTask(context, branchInfo, octokit);
+
+            expect(result).toBeDefined();
+            expect(result.task).toBeDefined();
+            expect(result.task).toContain("Review the Pull Request changes");
+        });
     });
 
     describe("PR review comment event", () => {

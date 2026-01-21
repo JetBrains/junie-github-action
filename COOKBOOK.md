@@ -207,8 +207,18 @@ jobs:
 
 </details>
 
+### Option C: On-Demand Code Review via Comments
+
+You can also trigger code reviews on-demand by commenting on a PR with the `code-review` phrase:
+
+```
+@junie-agent code-review
+```
+
+This works with any workflow that has issue/PR comment triggers configured. The same built-in code review prompt will be used automatically.
+
 **How it works:**
-1. Triggers on PR open/update or when someone replies `@junie-agent`
+1. Triggers on PR open/update or when someone replies `@junie-agent` or uses `@junie-agent code-review`
 2. Analyzes all changed files in the PR diff
 3. Leaves a structured review comment with severity levels
 4. Updates the same comment on subsequent runs (via `use_single_comment`)
