@@ -125,7 +125,7 @@ jobs:
           use_single_comment: "true"
           prompt: |
             Your task is to:
-            1. Download the Pull Request diff using `gh pr diff ${{ github.event.pull_request.head.ref }}`
+            1. Download the Pull Request diff using `gh pr diff ${{ github.event.pull_request.number || github.event.inputs.prNumber }}`
             2. Review the downloaded diff according to the criteria below
             3. Output summary following the template below using `submit` action
             
@@ -176,10 +176,9 @@ jobs:
 
 **How it works:**
 1. Triggers on PR open/synchronize events or manual `workflow_dispatch`
-2. Automatically redirects to a dispatched run for better execution isolation and reliability
-3. Analyzes all changed files in the PR diff using MCP tools or CLI
-4. Leaves a structured review comment with findings and actionable suggestions
-5. Updates the same comment on subsequent runs (via `use_single_comment`)
+2. Analyzes all changed files in the PR diff using MCP tools or CLI
+3. Leaves a structured review comment with findings and actionable suggestions
+4. Updates the same comment on subsequent runs (via `use_single_comment`)
 
 **Next steps:**
 - Add blocking reviews for critical issues (require approval before merge)
@@ -239,7 +238,7 @@ jobs:
             - If nothing to update, don't make changes
 
             Procedure:
-            Use gh pr diff ${{ github.event.pull_request.head.ref }} to get a diff of the PR.
+            Use gh pr diff ${{ github.event.pull_request.number || github.event.inputs.prNumber }} to get a diff of the PR.
 ```
 
 </details>
@@ -417,7 +416,7 @@ jobs:
             No secrets detected in this commit.
 
             Procedure:
-            Use gh pr diff ${{ github.event.pull_request.head.ref }} to get a diff of the PR. 
+            Use gh pr diff ${{ github.event.pull_request.number || github.event.inputs.prNumber }} to get a diff of the PR. 
 
             Only provide feedback without modifying files.
 
@@ -436,10 +435,9 @@ jobs:
 
 **How it works:**
 1. Runs on every PR opened or synchronized
-2. Automatically redirects to a dispatched run for better execution isolation
-3. Uses `silent_mode` to analyze without creating comments
-4. Outputs structured report with findings
-5. Fails CI if secrets are detected (checks for "SECRETS_FOUND" status)
+2. Uses `silent_mode` to analyze without creating comments
+3. Outputs structured report with findings
+4. Fails CI if secrets are detected (checks for "SECRETS_FOUND" status)
 
 **Integration:**
 - Add to required status checks to block PRs with secrets

@@ -335,14 +335,14 @@ jobs:
 
 ## How It Works
 
-1. **Trigger Detection**: The action detects triggers (mentions, labels, assignments, or prompts). For automated flows like **Code Review**, it also detects Pull Request events and automatically redirects to a dispatched workflow run for isolated execution.
+1. **Trigger Detection**: The action detects triggers (mentions, labels, assignments, or prompts).
 2. **Validation**: Verifies permissions and checks if the actor is human (when applicable - see Security Considerations)
 3. **Branch Management**: Creates or checks out the appropriate working branch
 4. **Task Preparation**: Converts GitHub context into a Junie-compatible task, applying security sanitization to user-submitted content to prevent prompt injection
 5. **MCP Setup**: Configures enabled MCP servers for enhanced capabilities
    - **Checks Server**: Analyze CI failures if explicitly enabled
    - **Inline Comment Server**: Automatically enabled for PR code review suggestions
-6. **Junie Execution**: Runs Junie CLI with the prepared task (using built-in prompts for features like Code Review or custom user prompts) and connected MCP tools
+6. **Junie Execution**: Runs Junie CLI with the prepared task and connected MCP tools
 7. **Result Processing**: Analyzes changes, determines the action (commit, PR, or comment), and sanitizes Junie's output to redact tokens and prevent self-triggering
 8. **Feedback**: Updates GitHub with results, PR links, and commit information
 

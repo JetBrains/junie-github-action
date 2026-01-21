@@ -4,7 +4,11 @@ import {
     isTriggeredByUserInteraction,
     isPushEvent,
     isJiraWorkflowDispatchEvent,
-    isResolveConflictsWorkflowDispatchEvent, isPullRequestEvent, isPullRequestReviewEvent, isIssueCommentEvent
+    isResolveConflictsWorkflowDispatchEvent,
+    isPullRequestEvent,
+    isPullRequestReviewEvent,
+    isPullRequestReviewCommentEvent,
+    isIssueCommentEvent
 } from "../context";
 import {checkHumanActor} from "../validation/actor";
 import {postJunieWorkingStatusComment} from "../operations/comments/feedback";
@@ -65,12 +69,20 @@ export async function initializeJunieExecution({
     let prNumber
     if (isPullRequestEvent(context)
         || isPullRequestReviewEvent(context)
-        || isPullRequestReviewEvent(context)) {
+        || isPullRequestReviewCommentEvent(context)) {
         commitSha = context.payload.pull_request.head.sha;
         prNumber = context.entityNumber;
+    } else if (context.eventName === 'workflow_dispatch') {
+        const payload = context.payload as any;
+        if (payload.inputs?.prNumber) {
+            prNumber = Number(payload.inputs.prNumber);
+        }
+        if (payload.inputs?.commitSha) {
+            commitSha = payload.inputs.commitSha;
+        }
     }
-    if (isIssueCommentEvent(context) && context.isPR) {
-        prNumber = context.entityNumber;
+    if (isIssueCommentEvent(context) && context.isPR || (context.eventName === 'workflow_dispatch' && prNumber && !commitSha)) {
+        prNumber = prNumber || context.entityNumber;
         // Fetch PR details to get the commit SHA
         const {data: pr} = await octokit.rest.pulls.get({
             owner: context.payload.repository.owner.login,

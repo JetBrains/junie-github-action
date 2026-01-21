@@ -270,6 +270,8 @@ export function extractJunieWorkflowContext(tokenOwner: TokenOwner): JunieExecut
                 ...commonFields,
                 eventName: context.eventName,
                 payload: context.payload as unknown as WorkflowDispatchEvent,
+                entityNumber: payload.inputs?.prNumber ? Number(payload.inputs.prNumber) : undefined,
+                isPR: Boolean(payload.inputs?.prNumber),
             };
             break;
         }
