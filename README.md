@@ -25,7 +25,7 @@ A powerful GitHub Action that integrates [Junie](https://www.jetbrains.com/junie
 - **Interactive Code Assistant**: Responds to @junie-agent mentions in comments, issues, and PRs
 - **Issue Resolution**: Automatically implements solutions for GitHub issues
 - **PR Management**: Reviews code changes and implements requested modifications
-- **Inline Code Reviews**: Create code review comments with GitHub suggestions directly on PR diffs
+- **Inline Code Reviews**: Create code review comments with GitHub suggestions directly on PR diffs using the built-in `code-review` prompt or on-demand via `@junie-agent code-review`
 - **Conflict Resolution**: Resolve merge conflicts via `@junie-agent` comment or automatic detection
 - **CI Failure Analysis**: Investigates failed checks and suggests fixes using MCP integration
 - **Flexible Triggers**: Activate via mentions, assignees, labels, or custom prompts
@@ -141,7 +141,7 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 
 | Input | Description | Default |
 |-------|-------------|---------|
-| `prompt` | Custom instructions for Junie | - |
+| `prompt` | Custom instructions for Junie. Use `"code-review"` for the built-in structured review. | - |
 | `junie_version` | Junie CLI version to install | `576.1` |
 | `junie_work_dir` | Working directory for Junie files | `/tmp/junie-work` |
 | `junie_guidelines_filename` | Filename of the guidelines file (should be in `<project-root>/.junie` dir) | `guidelines.md` |
@@ -335,7 +335,7 @@ jobs:
 
 ## How It Works
 
-1. **Trigger Detection**: The action detects triggers (mentions, labels, assignments, or prompts)
+1. **Trigger Detection**: The action detects triggers (mentions, labels, assignments, or prompts). Now supports the `code-review` keyword in comments or as a `prompt` input.
 2. **Validation**: Verifies permissions and checks if the actor is human (when applicable - see Security Considerations)
 3. **Branch Management**: Creates or checks out the appropriate working branch
 4. **Task Preparation**: Converts GitHub context into a Junie-compatible task, applying security sanitization to user-submitted content to prevent prompt injection

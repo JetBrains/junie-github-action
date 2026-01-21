@@ -1,0 +1,492 @@
+diff --git a/COOKBOOK.md b/COOKBOOK.md
+index 003c1ce..0c04461 100644
+--- a/COOKBOOK.md
++++ b/COOKBOOK.md
+@@ -84,6 +84,10 @@ jobs:
+ 
+ **Solution:** Junie automatically reviews every PR, leaving structured feedback with actionable suggestions.
+ 
++### Option A: Use Built-in Code Review (Recommended)
++
++Use the built-in `code-review` prompt for a structured, opinionated review focused on repository style, avoiding overcomplications, and catching obvious issues:
++
+ <details>
+ <summary>View complete workflow</summary>
+ 
+@@ -96,6 +100,47 @@ on:
+     types: [opened, synchronize]
+     branches: [main]
+ 
++jobs:
++  review:
++    runs-on: ubuntu-latest
++    permissions:
++      contents: read
++      pull-requests: write
++      issues: write
++    steps:
++      - uses: actions/checkout@v4
++        with:
++          fetch-depth: 1
++
++      - uses: JetBrains/junie-github-action@v0
++        with:
++          junie_api_key: ${{ secrets.JUNIE_API_KEY }}
++          use_single_comment: "true"
++          prompt: "code-review"
++```
++
++</details>
++
++The built-in review focuses on:
++- **Repository style adherence** - naming, formatting, package structure
++- **Avoiding overcomplications** - premature abstractions, unnecessary indirection
++- **Security, performance, error handling** - only for obviously applicable cases
++
++### Option B: Custom Review Prompt
++
++For custom review criteria, provide your own detailed prompt:
++
++<details>
++<summary>View complete workflow with custom prompt</summary>
++
++```yaml
++# .github/workflows/code-review.yml
++name: Code Review
++
++on:
++  pull_request:
++    types: [opened, synchronize]
++
+ jobs:
+   review:
+     runs-on: ubuntu-latest
+@@ -117,38 +162,38 @@ jobs:
+             1. Download the Pull Request diff using `gh pr diff ${{ github.event.pull_request.head.ref }}`
+             2. Review the downloaded diff according to the criteria below
+             3. Output summary following the template below using `submit` action
+-            
++
+             ## Review Criteria
+-            
++
+             ```
+             **Security:**
+             - SQL injection, XSS, exposed secrets
+               - Authentication/authorization issues
+               - Input validation vulnerabilities
+-            
++
+             **Performance:**
+             - N+1 queries, memory leaks
+               - Inefficient algorithms (nested loops, etc.)
+               - Blocking operations
+-            
++
+             **Code Quality:**
+             - Complexity, duplication, naming
+               - Missing tests for new logic
+               - Undocumented complex logic
+             ```
+-            
++
+             ## Summary template
+-            
++
+             ```
+             ## 🎯 Summary
+             [2-3 sentences overall assessment]
+-            
++
+             ## ⚠️ Issues Found
+             [Each issue: File:line, Severity (Critical/High/Medium/Low), Description, Suggested fix with code example]
+-            
++
+             ## ✨ Highlights
+             [1-2 things done well]
+-            
++
+             ## 📋 Checklist
+             - [ ] Security: No vulnerabilities
+               - [ ] Tests: Adequate coverage
+@@ -163,8 +208,18 @@ jobs:
+ 
+ </details>
+ 
++### Option C: On-Demand Code Review via Comments
++
++You can also trigger code reviews on-demand by commenting on a PR with the `code-review` phrase:
++
++```
++@junie-agent code-review
++```
++
++This works with any workflow that has issue/PR comment triggers configured. The same built-in code review prompt will be used automatically.
++
+ **How it works:**
+-1. Triggers on PR open/update or when someone replies `@junie-agent`
++1. Triggers on PR open/update or when someone replies `@junie-agent` or uses `@junie-agent code-review`
+ 2. Analyzes all changed files in the PR diff
+ 3. Leaves a structured review comment with severity levels
+ 4. Updates the same comment on subsequent runs (via `use_single_comment`)
+diff --git a/src/constants/github.ts b/src/constants/github.ts
+index 4c77598..e1caac8 100644
+--- a/src/constants/github.ts
++++ b/src/constants/github.ts
+@@ -18,6 +18,10 @@ export const RESOLVE_CONFLICTS_TRIGGER_PHRASE = "resolve conflicts"
+ 
+ export const RESOLVE_CONFLICTS_TRIGGER_PHRASE_REGEXP = new RegExp(RESOLVE_CONFLICTS_TRIGGER_PHRASE, 'i')
+ 
++export const CODE_REVIEW_ACTION = "code-review";
++
++export const CODE_REVIEW_TRIGGER_PHRASE_REGEXP = new RegExp(CODE_REVIEW_ACTION, 'i')
++
+ export const JIRA_EVENT_ACTION = "jira_event";
+ 
+ export const WORKING_BRANCH_PREFIX = "junie/";
+@@ -28,6 +32,49 @@ export const DEFAULT_TRIGGER_PHRASE = "@junie-agent";
+ // Templates and Messages
+ // ============================================================================
+ 
++export const DEFAULT_CODE_REVIEW_PROMPT = `
++Your task is to:
++1. Review the Pull Request changes.
++2. For each specific finding, use the 'post_inline_review_comment' tool (if available) to provide feedback directly on the code.
++3. Once all findings are posted (or if the tool is unavailable), call the 'answer' tool with your review as a bullet point list in the 'full_answer' field.
++
++Additional instructions:
++1. Review ONLY the changed lines against the Core Review Areas below, prioritizing repository style/guidelines adherence and avoiding overcomplication.
++2. You may open files or search the project to understand context. Do NOT run tests, build, or make any modifications.
++3. Do NOT call 'submit'.
++
++### Core Review Areas
++
++1. **Adherence with this repository style and guidelines**
++   - Naming, formatting, and package structure consistency with existing code and modules.
++   - Reuse of existing utilities/patterns; avoiding introduction of new dependencies.
++
++2. **Avoiding overcomplications**
++   - Avoid new abstractions, frameworks, premature generalization, or unnecessarily complicated solutions.
++   - Avoid touching of unrelated files.
++   - Avoid unnecessary indirection (wrappers, flags, configuration) and ensure straightforward control flow.
++   - Do not allow duplicate logic.
++
++### If obviously applicable to the CHANGED lines only
++- Security: newly introduced unsafe input handling, command execution, or data exposure.
++- Performance: unnecessary allocations/loops/heavy work on UI thread introduced by the change.
++- Error handling: swallowing exceptions or deviating from existing error-handling patterns.
++
++### Output Format
++- If the 'post_inline_review_comment' tool is available, use it for each specific finding.
++- **Use the tool parameters correctly**:
++    - \`filePath\`: The relative path to the file.
++    - \`lineNumber\`: The line (or end of range) where the comment applies.
++    - \`startLineNumber\`: Use this for multi-line comments to cover a range.
++    - \`commentBody\`: Your explanation. Use the \`\`\`suggestion syntax here for code changes.
++- Once all inline comments are posted, call the 'answer' tool with your review as a bullet point list in the 'full_answer' field.
++- If the tool is NOT available, use the fallback format in 'full_answer' only: -\`File.ts:Line: Comment\`.
++- Comment ONLY on lines added in this diff (\`+\` lines). Do not comment on pre-existing code.
++- Keep it concise (15–25 words per comment). No praise, questions, or speculation; omit low-impact nits.
++- If unsure whether a comment applies, omit it. If no feedback is warranted, answer \`LGTM\` only .
++- For small changes, max 3 comments; medium 6–8; large 8–12.
++`;
++
+ /**
+  * Creates a hidden marker for identifying Junie comments from a specific workflow.
+  * This HTML comment is invisible to users but allows finding Junie comments
+diff --git a/src/github/junie/junie-tasks.ts b/src/github/junie/junie-tasks.ts
+index 2032a4f..e0269cf 100644
+--- a/src/github/junie/junie-tasks.ts
++++ b/src/github/junie/junie-tasks.ts
+@@ -1,4 +1,5 @@
+ import {
++    isResolveConflictsWorkflowDispatchEvent,
+     JunieExecutionContext,
+     isIssueCommentEvent,
+     isIssuesEvent,
+@@ -8,8 +9,12 @@ import {
+ } from "../context";
+ import * as core from "@actions/core";
+ import {BranchInfo} from "../operations/branch";
+-import {isReviewOrCommentHasResolveConflictsTrigger} from "../validation/trigger";
++import {
++    isReviewOrCommentHasCodeReviewTrigger,
++    isReviewOrCommentHasResolveConflictsTrigger
++} from "../validation/trigger";
+ import {OUTPUT_VARS} from "../../constants/environment";
++import {CODE_REVIEW_ACTION, DEFAULT_CODE_REVIEW_PROMPT} from "../../constants/github";
+ import {Octokits} from "../api/client";
+ import {NewGitHubPromptFormatter} from "./new-prompt-formatter";
+ import {validateInputSize} from "../validation/input-size";
+@@ -67,8 +72,20 @@ export async function prepareJunieTask(
+             fetchedData = await fetcher.fetchIssueData(owner, repo, context.entityNumber, triggerTime);
+         }
+ 
+-        // Generate prompt using formatter
+-        let promptText = await formatter.generatePrompt(context, fetchedData, customPrompt, context.inputs.attachGithubContextToCustomPrompt);
++        const issue = fetchedData.pullRequest || fetchedData.issue;
++
++        // Check if prompt contains CODE_REVIEW_ACTION phrase or if comment/review has code-review trigger
++        const isCodeReviewInPrompt = customPrompt?.includes(CODE_REVIEW_ACTION);
++        const isCodeReviewInComment = isReviewOrCommentHasCodeReviewTrigger(context);
++        const isCodeReview = isCodeReviewInPrompt || isCodeReviewInComment;
++
++        let promptText: string;
++        if (issue && isCodeReview) {
++            // Use default code review prompt when code-review trigger is detected
++            promptText = await formatter.generatePrompt(context, fetchedData, DEFAULT_CODE_REVIEW_PROMPT, true);
++        } else {
++            promptText = await formatter.generatePrompt(context, fetchedData, customPrompt, context.inputs.attachGithubContextToCustomPrompt);
++        }
+ 
+         // Append MCP tools information if any MCP servers are enabled
+         const mcpToolsPrompt = generateMcpToolsPrompt(enabledMcpServers);
+diff --git a/src/github/junie/prepare-junie.ts b/src/github/junie/prepare-junie.ts
+index 6b65719..f197c85 100644
+--- a/src/github/junie/prepare-junie.ts
++++ b/src/github/junie/prepare-junie.ts
+@@ -5,7 +5,6 @@ import {
+     isPushEvent,
+     isJiraWorkflowDispatchEvent,
+     isResolveConflictsWorkflowDispatchEvent, isPullRequestEvent, isPullRequestReviewEvent, isIssueCommentEvent,
+-    isPullRequestReviewCommentEvent
+ } from "../context";
+ import {checkHumanActor} from "../validation/actor";
+ import {postJunieWorkingStatusComment} from "../operations/comments/feedback";
+@@ -61,25 +60,9 @@ export async function initializeJunieExecution({
+     const mcpServers = context.inputs.allowedMcpServers ? context.inputs.allowedMcpServers.split(',') : []
+     console.log(`MCP Servers enabled by user: ${mcpServers}`)
+ 
+-    // Get PR-specific info
+-    let commitSha
+-    let prNumber
+-    if (isPullRequestEvent(context)
+-        || isPullRequestReviewEvent(context)
+-        || isPullRequestReviewCommentEvent(context)) {
+-        commitSha = context.payload.pull_request.head.sha;
+-        prNumber = context.entityNumber;
+-    }
+-    if (isIssueCommentEvent(context) && context.isPR) {
+-        prNumber = context.entityNumber;
+-        // Fetch PR details to get the commit SHA
+-        const {data: pr} = await octokit.rest.pulls.get({
+-            owner: context.payload.repository.owner.login,
+-            repo: context.payload.repository.name,
+-            pull_number: prNumber!,
+-        });
+-        commitSha = pr.head.sha;
+-    }
++    // Get PR-specific info for MCP servers
++    const prNumber = context.isPR ? context.entityNumber : undefined;
++    const commitSha = branchInfo.headSha;
+ 
+     // Prepare MCP configuration with automatic server activation
+     // - Inline comment server: enabled for PRs (requires commitSha)
+@@ -124,7 +107,6 @@ async function shouldHandle(context: JunieExecutionContext, octokit: Octokits):
+     return isTriggeredByUserInteraction(context) && detectJunieTriggerPhrase(context) && checkHumanActor(octokit.rest, context);
+ }
+ 
+-
+ async function shouldResolveConflicts(context: JunieExecutionContext, octokit: Octokits): Promise<boolean> {
+     console.log('Checking for conflicts...')
+     if (isResolveConflictsWorkflowDispatchEvent(context)) {
+diff --git a/src/github/operations/branch.ts b/src/github/operations/branch.ts
+index b344d46..5451daa 100644
+--- a/src/github/operations/branch.ts
++++ b/src/github/operations/branch.ts
+@@ -19,6 +19,7 @@ export type BranchInfo = {
+     workingBranch: string;
+     isNewBranch: boolean;
+     prBaseBranch?: string;
++    headSha?: string;
+ };
+ 
+ /**
+@@ -91,7 +92,7 @@ function shouldUseExistingPRBranch(
+  * @returns Branch information object with base, working branch names and isNewBranch flag
+  * @throws {Error} if git operations fail (branch doesn't exist, network issues, etc.)
+  */
+-async function createNewBranch(baseBranch: string, branchName: string, prBaseBranch: string | undefined) {
++async function createNewBranch(baseBranch: string, branchName: string, prBaseBranch: string | undefined, headSha?: string) {
+     // Normalize branch name: lowercase and limit to 50 chars for git compatibility
+     const newBranch = branchName.toLowerCase().substring(0, 50);
+ 
+@@ -105,7 +106,8 @@ async function createNewBranch(baseBranch: string, branchName: string, prBaseBra
+             baseBranch: baseBranch,
+             workingBranch: newBranch,
+             isNewBranch: true,
+-            prBaseBranch
++            prBaseBranch,
++            headSha
+         };
+     } catch (error) {
+         console.error(`❌ Failed to create branch "${newBranch}" from "${baseBranch}":`, error);
+@@ -124,6 +126,7 @@ async function createNewBranch(baseBranch: string, branchName: string, prBaseBra
+ async function prepareWorkingBranchForJunie(context: JunieExecutionContext, octokit: Octokits): Promise<BranchInfo> {
+     let baseBranch = context.inputs.baseBranch || context.payload.repository.default_branch
+     let prBaseBranch: string | undefined;
++    let headSha: string | undefined;
+     const entityNumber = context.entityNumber;
+     const isPR = context.isPR;
+     const createNewBranchForPR = context.inputs.createNewBranchForPR;
+@@ -133,6 +136,7 @@ async function prepareWorkingBranchForJunie(context: JunieExecutionContext, octo
+         let sourceBranch: string
+         let state: string;
+         let prAuthor: string;
++
+         if (isPullRequestEvent(context)
+             || isPullRequestReviewEvent(context)
+             || isPullRequestReviewCommentEvent(context)) {
+@@ -140,6 +144,7 @@ async function prepareWorkingBranchForJunie(context: JunieExecutionContext, octo
+             sourceBranch = context.payload.pull_request.head.ref;
+             state = context.payload.pull_request.state;
+             prAuthor = context.payload.pull_request.user.login;
++            headSha = context.payload.pull_request.head.sha;
+         } else {
+             try {
+                 const data = (await octokit.rest.pulls.get({
+@@ -151,6 +156,7 @@ async function prepareWorkingBranchForJunie(context: JunieExecutionContext, octo
+                 sourceBranch = data.head.ref
+                 state = data.state;
+                 prAuthor = data.user.login;
++                headSha = data.head.sha;
+             } catch (error) {
+                 const repoFullName = `${context.payload.repository.owner.login}/${context.payload.repository.name}`;
+                 throw new Error(
+@@ -189,6 +195,7 @@ async function prepareWorkingBranchForJunie(context: JunieExecutionContext, octo
+                     baseBranch: baseBranch,
+                     workingBranch: sourceBranch!,
+                     isNewBranch: false,
++                    headSha: headSha
+                 };
+             } catch (error) {
+                 throw new Error(
+@@ -217,7 +224,7 @@ async function prepareWorkingBranchForJunie(context: JunieExecutionContext, octo
+         const entityType = isPR ? "pr" : entityNumber ? "issue" : "run";
+         const branchName = `${WORKING_BRANCH_PREFIX}${entityType}${entityNumber ? `-${entityNumber}` : ""}-${context.runId}`;
+ 
+-        return await createNewBranch(baseBranch, branchName, prBaseBranch)
++        return await createNewBranch(baseBranch, branchName, prBaseBranch, headSha)
+     }
+ 
+     await $`git checkout -B ${baseBranch} origin/${baseBranch}`;
+@@ -226,7 +233,8 @@ async function prepareWorkingBranchForJunie(context: JunieExecutionContext, octo
+         baseBranch: baseBranch,
+         workingBranch: baseBranch,
+         isNewBranch: false,
+-        prBaseBranch
++        prBaseBranch,
++        headSha
+     }
+ }
+ 
+diff --git a/src/github/validation/trigger.ts b/src/github/validation/trigger.ts
+index fa51d2e..0c0eb0f 100644
+--- a/src/github/validation/trigger.ts
++++ b/src/github/validation/trigger.ts
+@@ -9,7 +9,7 @@ import {
+     isPullRequestReviewCommentEvent,
+     isPullRequestReviewEvent,
+ } from "../context";
+-import {RESOLVE_CONFLICTS_TRIGGER_PHRASE_REGEXP} from "../../constants/github";
++import {CODE_REVIEW_TRIGGER_PHRASE_REGEXP, RESOLVE_CONFLICTS_TRIGGER_PHRASE_REGEXP} from "../../constants/github";
+ 
+ /**
+  * Detects if the Junie trigger phrase is present in the workflow context
+@@ -91,6 +91,10 @@ export function isReviewOrCommentHasResolveConflictsTrigger(context: JunieExecut
+     return isReviewOrCommentHasTrigger(context, RESOLVE_CONFLICTS_TRIGGER_PHRASE_REGEXP)
+ }
+ 
++export function isReviewOrCommentHasCodeReviewTrigger(context: JunieExecutionContext) {
++    return isReviewOrCommentHasTrigger(context, CODE_REVIEW_TRIGGER_PHRASE_REGEXP)
++}
++
+ export function isReviewOrCommentHasTrigger(context: JunieExecutionContext, regExp: RegExp) {
+     if (
+         isPullRequestReviewEvent(context) &&
+diff --git a/src/mcp/mcp-prompts.ts b/src/mcp/mcp-prompts.ts
+index 1efdcfe..adbb3bd 100644
+--- a/src/mcp/mcp-prompts.ts
++++ b/src/mcp/mcp-prompts.ts
+@@ -9,7 +9,7 @@
+ 
+ export const MCP_TOOL_PROMPTS = {
+     mcp_github_checks_server: 'Use get_pr_failed_checks_info to retrieve detailed information about failed CI/CD checks if needed.',
+-    mcp_github_inline_comment_server: 'Use post_inline_review_comment to provide inline code review comments where applicable. Use it only if you need to provide suggestions or improvements for code changes.',
++    mcp_github_inline_comment_server: 'MANDATORY for code reviews: Use post_inline_review_comment to provide inline code review comments. Supports GitHub suggestion syntax (```suggestion) for proposing code changes. Use it for every specific finding to ensure comments appear exactly where the code changed.',
+ };
+ 
+ /**
+diff --git a/test/junie-tasks.test.ts b/test/junie-tasks.test.ts
+index 7e02635..337ec87 100644
+--- a/test/junie-tasks.test.ts
++++ b/test/junie-tasks.test.ts
+@@ -382,6 +382,68 @@ describe("prepareJunieTask", () => {
+             expect(result.task).toContain("Changes needed");
+             expect(result.task).toContain("<repository>");
+         });
++
++        test("should replace CODE_REVIEW_ACTION phrase with default code review prompt", async () => {
++            const context = createMockContext({
++                eventName: "pull_request",
++                isPR: true,
++                entityNumber: 123,
++                inputs: {
++                    prompt: "code-review"
++                },
++                payload: {
++                    pull_request: {
++                        number: 123,
++                        title: "Test PR",
++                        updated_at: "2024-01-01T00:00:00Z"
++                    },
++                    repository: {
++                        owner: {login: "owner"},
++                        name: "repo"
++                    }
++                } as any
++            });
++            const octokit = createMockOctokit();
++
++            const result = await prepareJunieTask(context, branchInfo, octokit);
++
++            expect(result).toBeDefined();
++            expect(result.task).toBeDefined();
++            expect(result.task).toContain("Review the Pull Request changes");
++        });
++
++        test("should use default code review prompt when code-review is in comment", async () => {
++            const context = createMockContext({
++                eventName: "issue_comment",
++                isPR: true,
++                entityNumber: 123,
++                payload: {
++                    issue: {
++                        number: 123,
++                        title: "Test PR",
++                        pull_request: {},
++                        updated_at: "2024-01-01T00:00:00Z"
++                    },
++                    comment: {
++                        id: 1,
++                        body: "@junie-agent code-review",
++                        user: {login: "reviewer"},
++                        created_at: "2024-01-01T00:00:00Z"
++                    },
++                    repository: {
++                        owner: {login: "owner"},
++                        name: "repo"
++                    }
++                } as any
++            });
++            const octokit = createMockOctokit();
++
++            const result = await prepareJunieTask(context, branchInfo, octokit);
++
++            expect(result).toBeDefined();
++            expect(result.task).toBeDefined();
++            expect(result.task).toContain("Review the Pull Request changes");
++        });
+     });
+ 
+     describe("PR review comment event", () => {
