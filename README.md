@@ -25,6 +25,7 @@ A powerful GitHub Action that integrates [Junie](https://www.jetbrains.com/junie
 - **Interactive Code Assistant**: Responds to @junie-agent mentions in comments, issues, and PRs
 - **Issue Resolution**: Automatically implements solutions for GitHub issues
 - **PR Management**: Reviews code changes and implements requested modifications
+- **Built-in Commands**: Specialized triggers for `code-review` and `resolve conflicts`
 - **Inline Code Reviews**: Create code review comments with GitHub suggestions directly on PR diffs
 - **Conflict Resolution**: Resolve merge conflicts via `@junie-agent` comment or automatic detection
 - **CI Failure Analysis**: Investigates failed checks and suggests fixes using MCP integration
@@ -101,6 +102,18 @@ jobs:
 3. Start using Junie:
    - Comment `@junie-agent help me fix this bug` on an issue
    - Mention `@junie-agent review this change` in a PR
+   - Use `@junie-agent code-review` for a structured review with inline suggestions
+
+## Built-in Commands
+
+Junie has built-in support for specific tasks. You can trigger them by including these phrases in your comment:
+
+| Command | Description |
+|---------|-------------|
+| `code-review` | Triggers a structured code review of the PR changes with inline suggestions. Can be used in comments or passed via the `prompt` input. |
+| `resolve conflicts` | Triggers automatic resolution of merge conflicts in the current PR. |
+
+**Example:** `@junie-agent code-review`
 
 ## Jira Integration
 
