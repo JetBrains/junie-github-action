@@ -4,7 +4,8 @@ import {
     isTriggeredByUserInteraction,
     isPushEvent,
     isJiraWorkflowDispatchEvent,
-    isResolveConflictsWorkflowDispatchEvent, isPullRequestEvent, isPullRequestReviewEvent, isIssueCommentEvent
+    isResolveConflictsWorkflowDispatchEvent, isPullRequestEvent, isPullRequestReviewEvent, isIssueCommentEvent,
+    isPullRequestReviewCommentEvent
 } from "../context";
 import {checkHumanActor} from "../validation/actor";
 import {postJunieWorkingStatusComment} from "../operations/comments/feedback";
@@ -65,7 +66,7 @@ export async function initializeJunieExecution({
     let prNumber
     if (isPullRequestEvent(context)
         || isPullRequestReviewEvent(context)
-        || isPullRequestReviewEvent(context)) {
+        || isPullRequestReviewCommentEvent(context)) {
         commitSha = context.payload.pull_request.head.sha;
         prNumber = context.entityNumber;
     }

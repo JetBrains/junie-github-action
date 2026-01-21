@@ -8,12 +8,6 @@ on:
       - 'src/**'
       - 'action.yml'
       - 'README.md'
-  push:
-    branches: [main]
-    paths:
-      - 'src/**'
-      - 'action.yml'
-      - 'README.md'
 
 jobs:
   check-readme:
