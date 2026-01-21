@@ -25,6 +25,7 @@ A powerful GitHub Action that integrates [Junie](https://www.jetbrains.com/junie
 - **Interactive Code Assistant**: Responds to @junie-agent mentions in comments, issues, and PRs
 - **Issue Resolution**: Automatically implements solutions for GitHub issues
 - **PR Management**: Reviews code changes and implements requested modifications
+- **Built-in Code Review**: Specialized review mode for structured feedback and style adherence
 - **Inline Code Reviews**: Create code review comments with GitHub suggestions directly on PR diffs
 - **Conflict Resolution**: Resolve merge conflicts via `@junie-agent` comment or automatic detection
 - **CI Failure Analysis**: Investigates failed checks and suggests fixes using MCP integration
@@ -101,6 +102,7 @@ jobs:
 3. Start using Junie:
    - Comment `@junie-agent help me fix this bug` on an issue
    - Mention `@junie-agent review this change` in a PR
+   - Comment `@junie-agent code-review` in a PR for a structured review using the built-in prompt.
 
 ## Jira Integration
 
@@ -141,7 +143,7 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 
 | Input | Description | Default |
 |-------|-------------|---------|
-| `prompt` | Custom instructions for Junie | - |
+| `prompt` | Instructions for Junie. Use `code-review` for built-in structured code review, or provide your own custom prompt. | - |
 | `junie_version` | Junie CLI version to install | `576.1` |
 | `junie_work_dir` | Working directory for Junie files | `/tmp/junie-work` |
 | `junie_guidelines_filename` | Filename of the guidelines file (should be in `<project-root>/.junie` dir) | `guidelines.md` |
@@ -149,7 +151,7 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 
 **Available MCP Servers**:
 - `mcp_github_checks_server`: Analyze failed GitHub Actions checks and provide detailed error information
-- `mcp_github_inline_comment_server`: Create inline code review comments with GitHub suggestions on PRs (automatically enabled for pull requests)
+- `mcp_github_inline_comment_server`: Create inline code review comments with GitHub suggestions on PRs. Automatically enabled for PRs and the built-in `code-review` mode.
 
 **Example configuration**:
 ```yaml
@@ -159,7 +161,7 @@ Each recipe includes complete workflows, prompts, and configuration examples you
     allowed_mcp_servers: "mcp_github_checks_server"
 ```
 
-**Note**: The `mcp_github_inline_comment_server` is automatically enabled for `pull_request` events - no manual configuration needed.
+**Note**: The `mcp_github_inline_comment_server` is automatically enabled for `pull_request` events and `code-review` mode - no manual configuration needed.
 
 #### Advanced Features
 
