@@ -32,8 +32,8 @@ export const DEFAULT_TRIGGER_PHRASE = "@junie-agent";
 // Templates and Messages
 // ============================================================================
 
-export function createCodeReviewPrompt(branchName: string): string {
-    const diffCommand = `gh pr diff ${branchName}`
+export function createCodeReviewPrompt(diffPoint: string): string {
+    const diffCommand = `gh pr diff ${diffPoint}`
     return `
 Your task is to:
 1. Get the Pull Request diff using \`${diffCommand}\`.

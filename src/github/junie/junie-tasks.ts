@@ -81,9 +81,9 @@ export async function prepareJunieTask(
 
         let promptText: string;
         if (issue && isCodeReview) {
-            // Use default code review prompt when code-review trigger is detected
             const branchName = branchInfo.prBaseBranch || branchInfo.baseBranch;
-            const codeReviewPrompt = createCodeReviewPrompt(branchName);
+            const diffPoint = context.isPR ? String(context.entityNumber) : branchName;
+            const codeReviewPrompt = createCodeReviewPrompt(diffPoint);
             promptText = await formatter.generatePrompt(context, fetchedData, codeReviewPrompt, true);
         } else {
             promptText = await formatter.generatePrompt(context, fetchedData, customPrompt, context.inputs.attachGithubContextToCustomPrompt);
