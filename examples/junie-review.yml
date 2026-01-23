@@ -22,3 +22,4 @@ jobs:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
           use_single_comment: "true"
           prompt: "code-review"
+          # model: "claude-opus-4-5-20251101"  # Optional: specify which model to use
