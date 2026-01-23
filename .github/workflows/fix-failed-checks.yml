@@ -25,6 +25,7 @@ jobs:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
           allowed_mcp_servers: mcp_github_checks_server
           use_single_comment: true
+          model: "claude-sonnet-4-5-20250929"
           prompt: |
             CI workflow "${{ github.event.workflow_run.name }}" failed on branch ${{ github.event.workflow_run.head_branch }}.
 
@@ -33,4 +34,5 @@ jobs:
             2. Investigate the root cause of the failures
             3. Suggest fixes for the failing tests or type errors
             
-            Do not change code, just suggest fixes
+            Prohibitions:
+            It's important to not modify any files, just suggest fixes
