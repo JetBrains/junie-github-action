@@ -1,14 +1,15 @@
 import {describe, test, beforeAll, afterAll} from "bun:test";
 import {INIT_COMMENT_BODY, SUCCESS_FEEDBACK_COMMENT} from "../../src/constants/github";
-import { e2eConfig } from "../config/test-config";
+import {e2eConfig} from "../config/test-config";
 import {
-    octokit,
     waitForJunieComment,
     waitForPR,
     createTestRepo,
     setupWorkflow,
-    deleteTestRepo
-} from "../utils/test-utils";
+    deleteTestRepo,
+    createIssue,
+    conditionIncludes
+} from "../client/client";
 
 describe("Trigger Junie in Issue", () => {
     let repoName: string;
@@ -33,24 +34,16 @@ describe("Trigger Junie in Issue", () => {
 
         console.log(`Creating issue: "${issueTitle}" in ${e2eConfig.org}/${repoName}`);
 
-        const {data: issue} = await octokit.issues.create({
-            owner: e2eConfig.org,
-            repo: repoName,
-            title: issueTitle,
-            body: issueBody,
-        });
+        const {data: issue} = await createIssue(issueTitle, issueBody, repoName)
 
         const issueNumber = issue.number;
         console.log(`Issue created: #${issue.number}`);
 
         await waitForJunieComment(issueNumber, INIT_COMMENT_BODY);
 
-        await waitForPR({
-            expectedFiles: [functionFile, requirementsFile],
-            fileContentChecks: {
-                [functionFile]: `def ${functionName}:`,
-            }
-        });
+        const titleKeywords = ["greeting", "hello", "requirements"]
+
+        await waitForPR(await conditionIncludes(titleKeywords), {[functionFile]: `def ${functionName}:`, [requirementsFile]: ``});
 
         await waitForJunieComment(issueNumber, SUCCESS_FEEDBACK_COMMENT);
     }, 900000);
