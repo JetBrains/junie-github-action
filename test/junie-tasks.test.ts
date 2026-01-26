@@ -413,7 +413,7 @@ describe("prepareJunieTask", () => {
 
             expect(result).toBeDefined();
             expect(result.task).toBeDefined();
-            expect(result.task).toContain("Review the Pull Request changes");
+            expect(result.task).toContain("Get the Pull Request diff");
         });
 
         test("should use default code review prompt when code-review is in comment", async () => {
@@ -446,7 +446,7 @@ describe("prepareJunieTask", () => {
 
             expect(result).toBeDefined();
             expect(result.task).toBeDefined();
-            expect(result.task).toContain("Review the Pull Request changes");
+            expect(result.task).toContain("Get the Pull Request diff");
         });
     });
 
