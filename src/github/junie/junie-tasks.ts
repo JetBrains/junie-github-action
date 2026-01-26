@@ -1,11 +1,10 @@
 import {
-    isResolveConflictsWorkflowDispatchEvent,
-    JunieExecutionContext,
     isIssueCommentEvent,
     isIssuesEvent,
     isPullRequestEvent,
     isPullRequestReviewCommentEvent,
-    isPullRequestReviewEvent
+    isPullRequestReviewEvent,
+    JunieExecutionContext
 } from "../context";
 import * as core from "@actions/core";
 import {BranchInfo} from "../operations/branch";
@@ -17,7 +16,6 @@ import {OUTPUT_VARS} from "../../constants/environment";
 import {CODE_REVIEW_ACTION, createCodeReviewPrompt} from "../../constants/github";
 import {Octokits} from "../api/client";
 import {NewGitHubPromptFormatter} from "./new-prompt-formatter";
-import {validateInputSize} from "../validation/input-size";
 import {downloadAttachmentsAndRewriteText} from "./attachment-downloader";
 import {GraphQLGitHubDataFetcher} from "../api/graphql-data-fetcher";
 import {FetchedData} from "../api/queries";
@@ -26,9 +24,7 @@ import {generateMcpToolsPrompt} from "../../mcp/mcp-prompts";
 
 async function getValidatedTextTask(text: string, taskType: string): Promise<string> {
     // Download attachments and rewrite URLs in the text
-    const textWithLocalAttachments = await downloadAttachmentsAndRewriteText(text);
-    validateInputSize(textWithLocalAttachments, taskType);
-    return textWithLocalAttachments
+    return await downloadAttachmentsAndRewriteText(text)
 }
 
 function getTriggerTime(context: JunieExecutionContext): string | undefined {
@@ -80,14 +76,13 @@ export async function prepareJunieTask(
         const isCodeReview = isCodeReviewInPrompt || isCodeReviewInComment;
 
         let promptText: string;
+        let finalCustomPrompt = customPrompt;
         if (issue && isCodeReview) {
             const branchName = branchInfo.prBaseBranch || branchInfo.baseBranch;
             const diffPoint = context.isPR ? String(context.entityNumber) : branchName;
-            const codeReviewPrompt = createCodeReviewPrompt(diffPoint);
-            promptText = await formatter.generatePrompt(context, fetchedData, codeReviewPrompt, true);
-        } else {
-            promptText = await formatter.generatePrompt(context, fetchedData, customPrompt, context.inputs.attachGithubContextToCustomPrompt);
+            finalCustomPrompt = createCodeReviewPrompt(diffPoint);
         }
+        promptText = await formatter.generatePrompt(context, fetchedData, finalCustomPrompt, context.inputs.attachGithubContextToCustomPrompt);
 
         // Append MCP tools information if any MCP servers are enabled
         const mcpToolsPrompt = generateMcpToolsPrompt(enabledMcpServers);

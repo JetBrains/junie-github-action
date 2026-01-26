@@ -597,22 +597,6 @@ describe("prepareJunieTask", () => {
         });
     });
 
-    describe("input size validation", () => {
-        test("should validate input size after downloading attachments", async () => {
-            const largePrompt = "a".repeat(25000); // Exceeds 19KB limit
-            const context = createMockContext({
-                inputs: {
-                    ...createMockContext().inputs,
-                    prompt: largePrompt
-                }
-            });
-            const octokit = createMockOctokit();
-
-            // This should throw an error from validateInputSize
-            await expect(prepareJunieTask(context, branchInfo, octokit)).rejects.toThrow();
-        });
-    });
-
     describe("integration", () => {
         test("should handle multiple event types in sequence", async () => {
             const octokit = createMockOctokit();
