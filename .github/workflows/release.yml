@@ -38,7 +38,7 @@ jobs:
         run: bun run typecheck
 
       - name: Run tests
-        run: bun test
+        run: bun test test/*.test.ts
 
       - name: Get latest tag
         id: get_latest_tag
