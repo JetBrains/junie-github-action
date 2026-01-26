@@ -13,7 +13,7 @@ import {
     isReviewOrCommentHasResolveConflictsTrigger
 } from "../validation/trigger";
 import {OUTPUT_VARS} from "../../constants/environment";
-import {CODE_REVIEW_ACTION, createCodeReviewPrompt} from "../../constants/github";
+import {CODE_REVIEW_ACTION, DEFAULT_CODE_REVIEW_PROMPT} from "../../constants/github";
 import {Octokits} from "../api/client";
 import {NewGitHubPromptFormatter} from "./new-prompt-formatter";
 import {downloadAttachmentsAndRewriteText} from "./attachment-downloader";
@@ -76,13 +76,11 @@ export async function prepareJunieTask(
         const isCodeReview = isCodeReviewInPrompt || isCodeReviewInComment;
 
         let promptText: string;
-        let finalCustomPrompt = customPrompt;
         if (issue && isCodeReview) {
-            const branchName = branchInfo.prBaseBranch || branchInfo.baseBranch;
-            const diffPoint = context.isPR ? String(context.entityNumber) : branchName;
-            finalCustomPrompt = createCodeReviewPrompt(diffPoint);
+            promptText = await formatter.generatePrompt(context, fetchedData, DEFAULT_CODE_REVIEW_PROMPT, true);
+        } else {
+            promptText = await formatter.generatePrompt(context, fetchedData, customPrompt, context.inputs.attachGithubContextToCustomPrompt);
         }
-        promptText = await formatter.generatePrompt(context, fetchedData, finalCustomPrompt, context.inputs.attachGithubContextToCustomPrompt);
 
         // Append MCP tools information if any MCP servers are enabled
         const mcpToolsPrompt = generateMcpToolsPrompt(enabledMcpServers);
