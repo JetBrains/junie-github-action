@@ -36,8 +36,8 @@ export function createCodeReviewPrompt(diffPoint: string): string {
     const diffCommand = `gh pr diff ${diffPoint}`
     return `
 Your task is to:
-1. Get the Pull Request diff using \`${diffCommand}\`.
-2. Review this diff according to the criteria below.
+1. Read the Pull Request diff by using \`${diffCommand} | grep \"^diff --git\" \`. Do not write the diff to file.
+2. Review the downloaded diff according to the criteria below
 3. For each specific finding, use the 'post_inline_review_comment' tool (if available) to provide feedback directly on the code.
 4. Once all findings are posted (or if the tool is unavailable), call the 'answer' tool with your review as a bullet point list in the 'full_answer' field.
 
