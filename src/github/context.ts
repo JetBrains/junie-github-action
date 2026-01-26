@@ -320,20 +320,39 @@ function extractJiraEventData(workflowPayload: WorkflowDispatchEvent, context: J
     }
 
     // Parse comments and attachments JSON arrays (default to empty arrays)
-    const comments = workflowPayload.inputs?.issue_comments
-        ? JSON.parse(workflowPayload.inputs.issue_comments as string)
-        : [];
+    let comments: JiraComment[] = [];
+    let attachments: JiraAttachment[] = [];
 
-    const attachments = workflowPayload.inputs?.issue_attachments
-        ? JSON.parse(workflowPayload.inputs.issue_attachments as string)
-        : [];
-
-    if (comments.length > 0) {
-        console.log(`✓ Parsed ${comments.length} comment(s) from Jira issue`);
+    // Parse comments with error handling
+    if (workflowPayload.inputs?.issue_comments) {
+        try {
+            const rawComments = workflowPayload.inputs.issue_comments as string;
+            comments = JSON.parse(rawComments);
+            console.log(`✓ Parsed ${comments.length} comment(s) from Jira issue`);
+        } catch (error) {
+            console.error('❌ Failed to parse issue_comments JSON:', error);
+            console.error('Raw comments data:', workflowPayload.inputs.issue_comments);
+            throw new Error(
+                `Failed to parse issue_comments from Jira. This may be due to special characters in comments. ` +
+                `Original error: ${error}`
+            );
+        }
     }
 
-    if (attachments.length > 0) {
-        console.log(`✓ Parsed ${attachments.length} attachment(s) from Jira issue`);
+    // Parse attachments with error handling
+    if (workflowPayload.inputs?.issue_attachments) {
+        try {
+            const rawAttachments = workflowPayload.inputs.issue_attachments as string;
+            attachments = JSON.parse(rawAttachments);
+            console.log(`✓ Parsed ${attachments.length} attachment(s) from Jira issue`);
+        } catch (error) {
+            console.error('❌ Failed to parse issue_attachments JSON:', error);
+            console.error('Raw attachments data:', workflowPayload.inputs.issue_attachments);
+            throw new Error(
+                `Failed to parse issue_attachments from Jira. This may be due to special characters in attachment metadata.\n` +
+                `Original error: ${error}`
+            );
+        }
     }
 
     console.log(`✓ Jira issue detected: ${issueKey} - ${issueSummary}`);
