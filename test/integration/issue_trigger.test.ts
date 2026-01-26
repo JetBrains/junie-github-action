@@ -1,27 +1,19 @@
 import {describe, test, beforeAll, afterAll} from "bun:test";
 import {INIT_COMMENT_BODY, SUCCESS_FEEDBACK_COMMENT} from "../../src/constants/github";
 import {e2eConfig} from "../config/test-config";
-import {
-    waitForJunieComment,
-    waitForPR,
-    createTestRepo,
-    setupWorkflow,
-    deleteTestRepo,
-    createIssue,
-    conditionIncludes
-} from "../client/client";
+import { testClient } from "../client/client";
 
 describe("Trigger Junie in Issue", () => {
     let repoName: string;
 
     beforeAll(async () => {
-        repoName = await createTestRepo();
-        await setupWorkflow(repoName);
+        repoName = await testClient.createTestRepo();
+        await testClient.setupWorkflow(repoName);
     });
 
     afterAll(async () => {
       if (repoName) {
-        await deleteTestRepo(repoName);
+        await testClient.deleteTestRepo(repoName);
       }
     });
 
@@ -34,17 +26,17 @@ describe("Trigger Junie in Issue", () => {
 
         console.log(`Creating issue: "${issueTitle}" in ${e2eConfig.org}/${repoName}`);
 
-        const {data: issue} = await createIssue(issueTitle, issueBody, repoName)
+        const {data: issue} = await testClient.createIssue(issueTitle, issueBody, repoName)
 
         const issueNumber = issue.number;
         console.log(`Issue created: #${issue.number}`);
 
-        await waitForJunieComment(issueNumber, INIT_COMMENT_BODY);
+        await testClient.waitForJunieComment(issueNumber, INIT_COMMENT_BODY);
 
         const titleKeywords = ["greeting", "hello", "requirements"]
 
-        await waitForPR(await conditionIncludes(titleKeywords), {[functionFile]: `def ${functionName}:`, [requirementsFile]: ``});
+        await testClient.waitForPR(testClient.conditionIncludes(titleKeywords), {[functionFile]: `def ${functionName}:`, [requirementsFile]: ``});
 
-        await waitForJunieComment(issueNumber, SUCCESS_FEEDBACK_COMMENT);
+        await testClient.waitForJunieComment(issueNumber, SUCCESS_FEEDBACK_COMMENT);
     }, 900000);
 });
