@@ -310,6 +310,53 @@ export function extractJunieWorkflowContext(tokenOwner: TokenOwner): JunieExecut
     return parsedContext;
 }
 
+/**
+ * Safely parses JSON from Jira with fallback sanitization for unescaped characters
+ * Jira's .jsonEncode doesn't always properly escape newlines and quotes in nested JSON
+ * @param rawJson - Raw JSON string from Jira
+ * @param fieldName - Name of the field being parsed (for error messages)
+ * @returns Parsed JSON object
+ */
+export function safeParseJiraJson<T>(rawJson: string, fieldName: string): T {
+    // First attempt: try parsing as-is
+    try {
+        return JSON.parse(rawJson);
+    } catch (firstError) {
+        console.warn(`⚠️  Initial ${fieldName} parsing failed, attempting sanitization...`);
+
+        // Second attempt: sanitize common problematic characters
+        try {
+            // Fix unescaped newlines and quotes that break JSON parsing
+            // This handles cases where Jira's .jsonEncode doesn't properly escape characters
+            let sanitized = rawJson
+                // Replace literal \n with space (common in Jira comments)
+                .replace(/\\n/g, ' ')
+                // Replace literal \r with space
+                .replace(/\\r/g, ' ')
+                // Remove escaped quotes that weren't properly handled
+                .replace(/\\"/g, '"')
+                // Replace actual newlines with spaces
+                .replace(/\n/g, ' ')
+                .replace(/\r/g, ' ');
+
+            const result = JSON.parse(sanitized);
+            console.log(`✓ Successfully parsed ${fieldName} after sanitization`);
+            return result;
+        } catch (secondError) {
+            console.error(`❌ Failed to parse ${fieldName} even after sanitization`);
+            console.error('Original error:', firstError);
+            console.error('Sanitization error:', secondError);
+            console.error('Raw data:', rawJson.substring(0, 500) + (rawJson.length > 500 ? '...' : ''));
+
+            throw new Error(
+                `Failed to parse ${fieldName} from Jira. ` +
+                `This may be due to special characters that couldn't be automatically sanitized. ` +
+                `Original error: ${firstError instanceof Error ? firstError.message : String(firstError)}`
+            );
+        }
+    }
+}
+
 function extractJiraEventData(workflowPayload: WorkflowDispatchEvent, context: JunieWorkflowContext): JunieExecutionContext {
     const issueKey = workflowPayload.inputs?.issue_key as string;
     const issueSummary = workflowPayload.inputs?.issue_summary as string;
@@ -323,36 +370,18 @@ function extractJiraEventData(workflowPayload: WorkflowDispatchEvent, context: J
     let comments: JiraComment[] = [];
     let attachments: JiraAttachment[] = [];
 
-    // Parse comments with error handling
+    // Parse comments with safe parsing (handles unescaped characters from Jira)
     if (workflowPayload.inputs?.issue_comments) {
-        try {
-            const rawComments = workflowPayload.inputs.issue_comments as string;
-            comments = JSON.parse(rawComments);
-            console.log(`✓ Parsed ${comments.length} comment(s) from Jira issue`);
-        } catch (error) {
-            console.error('❌ Failed to parse issue_comments JSON:', error);
-            console.error('Raw comments data:', workflowPayload.inputs.issue_comments);
-            throw new Error(
-                `Failed to parse issue_comments from Jira. This may be due to special characters in comments. ` +
-                `Original error: ${error}`
-            );
-        }
+        const rawComments = workflowPayload.inputs.issue_comments as string;
+        comments = safeParseJiraJson<JiraComment[]>(rawComments, 'issue_comments');
+        console.log(`✓ Parsed ${comments.length} comment(s) from Jira issue`);
     }
 
-    // Parse attachments with error handling
+    // Parse attachments with safe parsing (handles unescaped characters from Jira)
     if (workflowPayload.inputs?.issue_attachments) {
-        try {
-            const rawAttachments = workflowPayload.inputs.issue_attachments as string;
-            attachments = JSON.parse(rawAttachments);
-            console.log(`✓ Parsed ${attachments.length} attachment(s) from Jira issue`);
-        } catch (error) {
-            console.error('❌ Failed to parse issue_attachments JSON:', error);
-            console.error('Raw attachments data:', workflowPayload.inputs.issue_attachments);
-            throw new Error(
-                `Failed to parse issue_attachments from Jira. This may be due to special characters in attachment metadata.\n` +
-                `Original error: ${error}`
-            );
-        }
+        const rawAttachments = workflowPayload.inputs.issue_attachments as string;
+        attachments = safeParseJiraJson<JiraAttachment[]>(rawAttachments, 'issue_attachments');
+        console.log(`✓ Parsed ${attachments.length} attachment(s) from Jira issue`);
     }
 
     console.log(`✓ Jira issue detected: ${issueKey} - ${issueSummary}`);

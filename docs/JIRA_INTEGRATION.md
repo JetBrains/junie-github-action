@@ -149,3 +149,25 @@ Junie will receive all comments and attachments from the Jira issue. This allows
 - Read user discussions and clarifications in comments
 - Access screenshots, diagrams, and other files attached to the issue
 - Better understand the context and requirements
+
+#### Handling Special Characters
+
+**Automatic Sanitization**: The action automatically handles unescaped special characters (newlines, quotes, etc.) that may not be properly encoded by Jira's `jsonEncode`. This means the basic configuration above will work in most cases without additional modifications.
+
+**Optional Optimization** (for better reliability): If you experience issues or want to ensure maximum compatibility, you can add explicit character replacement in your Jira automation:
+
+```json
+{
+  "ref": "main",
+  "inputs": {
+    "action": "jira_event",
+    "issue_key": "{{issue.key}}",
+    "issue_summary": "{{issue.summary.jsonEncode}}",
+    "issue_description": "{{issue.description.jsonEncode}}",
+    "issue_comments": "[{{#issue.comments}}{\"author\":\"{{author.displayName.jsonEncode}}\",\"body\":\"{{body.jsonEncode.replace(\"\\n\",\" \").replace(\"\\\"\",\"\")}}\",\"created\":\"{{created}}\"}{{^last}},{{/}}{{/}}]",
+    "issue_attachments": "[{{#attachment}}{\"filename\":\"{{filename.jsonEncode}}\",\"mimeType\":\"{{mimeType}}\",\"size\":{{size}},\"content\":\"{{content}}\"}{{^last}},{{/}}{{/}}]"
+  }
+}
+```
+
+The `.replace("\\n"," ").replace("\\"","")` addition removes newlines and quotes that could break JSON parsing.
