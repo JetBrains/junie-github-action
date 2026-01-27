@@ -96,6 +96,12 @@ export function createJunieCommentMarker(workflowName: string): string {
     return `<!-- junie-bot-comment:${sanitized} -->`;
 }
 
+/**
+ * Important note about git operations to be added to all prompts.
+ * Reminds the AI not to commit or push changes as the system handles it automatically.
+ */
+export const GIT_OPERATIONS_NOTE = "\n\nIMPORTANT: Do NOT commit or push changes. The system will handle all git operations (staging, committing, and pushing) automatically.";
+
 export const INIT_COMMENT_BODY = "Hey, it's Junie by JetBrains! I started working..."
 
 export const PR_BODY_TEMPLATE = (junieBody: string, issueId?: number) => `

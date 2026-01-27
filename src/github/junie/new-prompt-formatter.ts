@@ -22,13 +22,14 @@ import {
 } from "../context";
 import {downloadJiraAttachmentsAndRewriteText} from "./attachment-downloader";
 import {sanitizeContent} from "../../utils/sanitizer";
+import {GIT_OPERATIONS_NOTE} from "../../constants/github";
 
 export class NewGitHubPromptFormatter {
 
     async generatePrompt(context: JunieExecutionContext, fetchedData: FetchedData, userPrompt?: string, attachGithubContextToCustomPrompt: boolean = true) {
         // If user provided custom prompt and doesn't want GitHub context, sanitize and return it
         if (userPrompt && !attachGithubContextToCustomPrompt) {
-            return sanitizeContent(userPrompt);
+            return sanitizeContent(userPrompt + GIT_OPERATIONS_NOTE);
         }
 
         // Handle Jira issue integration
@@ -56,6 +57,7 @@ ${timelineInfo ? timelineInfo : ""}
 ${reviewsInfo ? reviewsInfo : ""}
 ${changedFilesInfo ? changedFilesInfo : ""}
 ${actorInfo ? actorInfo : ""}
+${GIT_OPERATIONS_NOTE}
 `;
 
         // Sanitize the entire prompt once to prevent prompt injection attacks
@@ -89,6 +91,7 @@ Summary: ${jira.issueSummary}
 
 Description: ${jira.issueDescription}${commentsInfo}
 </jira_issue>
+${GIT_OPERATIONS_NOTE}
 `;
 
         // Download all attachments referenced in text (single pass), then sanitize

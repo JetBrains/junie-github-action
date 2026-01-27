@@ -298,8 +298,9 @@ describe("NewGitHubPromptFormatter", () => {
 
         const prompt = await formatter.generatePrompt(context, fetchedData, customPrompt, false);
 
-        // Should contain only the custom prompt
-        expect(prompt).toBe("Please fix this specific bug");
+        // Should contain the custom prompt + git operations note
+        expect(prompt).toContain("Please fix this specific bug");
+        expect(prompt).toContain("Do NOT commit or push changes");
 
         // Should NOT contain any GitHub context
         expect(prompt).not.toContain("<repository>");

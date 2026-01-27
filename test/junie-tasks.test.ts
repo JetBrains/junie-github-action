@@ -251,7 +251,8 @@ describe("prepareJunieTask", () => {
 
             expect(result).toBeDefined();
             expect(result.task).toBeDefined();
-            expect(result.task?.trim()).toBe("Do something");
+            expect(result.task).toContain("Do something");
+            expect(result.task).toContain("Do NOT commit or push changes");
             expect(result.mergeTask).toBeUndefined();
             expect(core.setOutput).toHaveBeenCalledWith("JUNIE_JSON_TASK", expect.any(String));
         });
