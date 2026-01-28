@@ -8,13 +8,30 @@ on:
   workflow_dispatch:
 
 jobs:
+  find-tests:
+    runs-on: ubuntu-latest
+    outputs:
+      tests: ${{ steps.find.outputs.tests }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: find
+        run: |
+          TESTS=$(find test/integration -name "*.test.ts" | jq -R -s -c 'split("\n")[:-1]')
+          echo "tests=$TESTS" >> $GITHUB_OUTPUT
+
   integration-tests:
+    needs: find-tests
     runs-on: ubuntu-latest
     if: ${{ !startsWith(github.ref, 'refs/heads/dependabot/') }}
     permissions:
       contents: write
       pull-requests: write
       issues: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        test: ${{ fromJson(needs.find-tests.outputs.tests) }}
 
     steps:
       - name: Checkout repository
@@ -28,19 +45,19 @@ jobs:
       - name: Install dependencies
         run: bun install
 
-      - name: Run Integration Tests
+      - name: Run Test - ${{ matrix.test }}
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
           TEST_ORG: melotria
         run: |
           mkdir -p test-results
-          bun test test/integration/*.test.ts
+          bun test ${{ matrix.test }}
 
       - name: Upload Test Report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: integration-test-report
+          name: test-report-${{ hashFiles(matrix.test) }}
           if-no-files-found: ignore
           path: ./test-results/
           retention-days: 2
