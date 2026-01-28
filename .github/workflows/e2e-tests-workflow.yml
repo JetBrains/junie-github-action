@@ -28,13 +28,25 @@ jobs:
       - name: Install dependencies
         run: bun install
 
-      - name: Run Integration Tests
+      - name: Run Integration Tests in Parallel
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
           TEST_ORG: melotria
         run: |
           mkdir -p test-results
-          bun test test/integration/*.test.ts
+          
+          exit_code=0
+          for test_file in test/integration/*.test.ts; do
+            echo "Starting $test_file"
+            bun test "$test_file" &
+          done
+          
+          for job in $(jobs -p); do
+            wait $job || exit_code=$?
+          done
+          
+          echo "All tests completed"
+          exit $exit_code
 
       - name: Upload Test Report
         if: always()
