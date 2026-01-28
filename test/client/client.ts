@@ -110,41 +110,55 @@ export class Client {
         fileContentChecks: { [filename: string]: string }
     ): Promise<void> {
         console.log(`Waiting for Junie to create a PR in ${this.currentRepo}...`);
-
+        let foundPR: PullRequest | undefined;
         await startPoll(
-            `Junie didn't create a PR in ${this.currentRepo} with expected files/content`,
+            `Junie didn't create a PR in ${this.currentRepo}`,
             {},
             async () => {
                 const { data: pulls } = await this.getAllPRs();
                 for (const pull of pulls) {
                     if (await condition(pull)) {
                         console.log(`PR found: ${pull.html_url}`);
-                        await this.checkPRFiles(pull, fileContentChecks);
+                        foundPR = pull;
                         return true;
                     }
                 }
                 return false;
             }
         );
+        if (foundPR) {
+            const hasExpectedContent = await this.checkPRFiles(foundPR, fileContentChecks);
+            if (!hasExpectedContent) {
+                throw new Error(`PR files don't match expected content`);
+            }
+        }
     }
 
     async waitForPRUpdate(
         prNumber: number,
-        fileContentChecks: { [filename: string]: string }
+        fileContentChecks: { [filename: string]: string },
+        fileCount: number
     ): Promise<void> {
         console.log(`Waiting for Junie to update PR #${prNumber} in ${this.currentRepo}...`);
-
+        let foundPR: PullRequest | undefined;
         await startPoll(
-            `Junie didn't update PR #${prNumber} in ${this.currentRepo} with expected files/content`,
+            `Junie didn't update PR #${prNumber} in ${this.currentRepo}`,
             {},
             async () => {
                 const pr  = await this.getPRByNumber(prNumber);
-
-                console.log(`Checking PR #${prNumber} for updates...`);
-                const hasExpectedContent = await this.checkPRFiles(pr, fileContentChecks);
-                return hasExpectedContent;
+                foundPR = pr;
+                const { data: files } = await this.getAllPRFiles(pr);
+                const fileCountNew = files.length;
+                return fileCountNew > fileCount;
             }
         );
+        if (foundPR) {
+            console.log(`Checking PR #${prNumber} for updates...`);
+            const hasExpectedContent = await this.checkPRFiles(foundPR, fileContentChecks);
+            if (!hasExpectedContent) {
+                throw new Error(`PR #${prNumber} files don't match expected content`);
+            }
+        }
     }
 
     createIssue(issueTitle: string, issueBody: string, repoName?: string) {
@@ -173,6 +187,7 @@ export class Client {
 
             if ("content" in contentData && typeof contentData.content === "string") {
                 const decodedContent = Buffer.from(contentData.content, "base64").toString("utf-8");
+                console.log(`Content of ${expectedSnippet} doesn't match expected snippet.`);
                 if (!decodedContent.includes(expectedSnippet)) {
                     console.log(`Content of ${file.filename} doesn't match expected snippet.`);
                     return false;
