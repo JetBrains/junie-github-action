@@ -5,6 +5,7 @@ import {testClient} from "../client/client";
 
 describe("Trigger Junie in PR comment", () => {
     let repoName: string;
+    let testPassed = false;
 
     beforeAll(async () => {
         repoName = await testClient.createTestRepo();
@@ -12,8 +13,10 @@ describe("Trigger Junie in PR comment", () => {
     });
 
     afterAll(async () => {
-        if (repoName) {
+        if (repoName && testPassed) {
             await testClient.deleteTestRepo(repoName);
+        } else if (repoName) {
+            console.log(`⚠️ Keeping failed test repo: ${e2eConfig.org}/${repoName}`);
         }
     });
 
@@ -52,5 +55,6 @@ describe("Trigger Junie in PR comment", () => {
         await testClient.waitForPRUpdate(prNumber, {[filename]: "zero", ["README.md"]: ""}, fileCount);
 
         await testClient.waitForJunieComment(prNumber, SUCCESS_FEEDBACK_COMMENT);
+        testPassed = true;
     }, 900000);
 });
