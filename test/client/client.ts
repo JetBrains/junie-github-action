@@ -37,6 +37,7 @@ export class Client {
             org: this.org,
             name: repoName,
             auto_init: true,
+            private: true,
         });
 
         this.currentRepo = repoName;
