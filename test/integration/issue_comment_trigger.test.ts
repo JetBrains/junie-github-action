@@ -25,7 +25,7 @@ describe("Trigger Junie in Issue Comment", () => {
         const issueBody = "We need some basic math utilities in this project.";
         const filename = "math_ops.ts";
         const functionName = "calculate_factorial(n)";
-        
+
         console.log(`Creating issue: "${issueTitle}" in ${e2eConfig.org}/${repoName}`);
         const {data: issue} = await testClient.createIssue(issueTitle, issueBody, repoName);
         const issueNumber = issue.number;
@@ -34,17 +34,19 @@ describe("Trigger Junie in Issue Comment", () => {
         const commentBody = `@junie-agent please implement a function ${functionName} in a new file ${filename}. The function should return the factorial of n. Also add a README.md file.`;
         console.log(`Commenting on Issue #${issueNumber}: "${commentBody}"`);
 
-        const { data: comment } = await testClient.createCommentToPROrIssue(repoName, issueNumber, commentBody);
+        const {data: comment} = await testClient.createCommentToPROrIssue(repoName, issueNumber, commentBody);
 
         await testClient.waitForCommentReaction(comment.id);
 
         await testClient.waitForJunieComment(issueNumber, INIT_COMMENT_BODY);
 
         const titleKeywords = ["factorial", "math", "README"];
-        await testClient.waitForPR(testClient.conditionIncludes(titleKeywords), {
+        const foundPR = await testClient.waitForPR(testClient.conditionIncludes(titleKeywords));
+
+        await testClient.checkPRFiles(foundPR, testClient.conditionPRFilesInclude({
             [filename]: "calculate_factorial",
             "README.md": ""
-        });
+        }));
 
         await testClient.waitForJunieComment(issueNumber, SUCCESS_FEEDBACK_COMMENT);
 

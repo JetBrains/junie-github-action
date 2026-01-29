@@ -41,7 +41,7 @@ describe("Trigger Junie in PR comment", () => {
 
         const prNumber = pr.number;
         console.log(`PR created: #${prNumber}`);
-        const fileCount = pr.changed_files
+        const filesCount = pr.changed_files
 
         const commentBody = `@junie-agent add error handling to the divide function in ${filename} to handle division by zero. Add README.md`;
         console.log(`Commenting on PR #${prNumber}: "${commentBody}"`);
@@ -52,7 +52,12 @@ describe("Trigger Junie in PR comment", () => {
 
         await testClient.waitForJunieComment(prNumber, INIT_COMMENT_BODY);
 
-        await testClient.waitForPRUpdate(prNumber, {[filename]: "zero", ["README.md"]: ""}, fileCount);
+        const foundPR = await testClient.waitForPR(async (pr) => {
+            return await testClient.conditionPRNumberEquals(prNumber)(pr) &&
+                await testClient.checkPRFiles(pr, testClient.conditionPRFilesCountIncrease(filesCount));
+        });
+
+        await testClient.checkPRFiles(foundPR, testClient.conditionPRFilesInclude({[filename]: "zero", ["README.md"]: ""}));
 
         await testClient.waitForJunieComment(prNumber, SUCCESS_FEEDBACK_COMMENT);
         testPassed = true;
