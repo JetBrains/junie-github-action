@@ -38,7 +38,9 @@ describe("Trigger Junie in Issue", () => {
 
         const titleKeywords = ["greeting", "hello", "requirements"]
 
-        await testClient.waitForPR(testClient.conditionIncludes(titleKeywords), {[functionFile]: `def ${functionName}:`, [requirementsFile]: ``});
+        const foundPR = await testClient.waitForPR(testClient.conditionIncludes(titleKeywords));
+
+        await testClient.checkPRFiles(foundPR, testClient.conditionPRFilesInclude({[functionFile]: `def ${functionName}:`, [requirementsFile]: ``}));
 
         await testClient.waitForJunieComment(issueNumber, SUCCESS_FEEDBACK_COMMENT);
         testPassed = true;

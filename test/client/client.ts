@@ -107,9 +107,8 @@ export class Client {
     }
 
     async waitForPR(
-        condition: (pr: PullRequest) => boolean | Promise<boolean>,
-        fileContentChecks: { [filename: string]: string }
-    ): Promise<void> {
+        condition: (pr: PullRequest) => boolean | Promise<boolean>
+    ): Promise<PullRequest> {
         console.log(`Waiting for Junie to create a PR in ${this.currentRepo}...`);
         let foundPR: PullRequest | undefined;
         await startPoll(
@@ -127,39 +126,11 @@ export class Client {
                 return false;
             }
         );
-        if (foundPR) {
-            const hasExpectedContent = await this.checkPRFiles(foundPR, fileContentChecks);
-            if (!hasExpectedContent) {
-                throw new Error(`PR files don't match expected content`);
-            }
+        if (!foundPR) {
+            throw new Error(`PR not found after polling in ${this.currentRepo}`);
         }
-    }
 
-    async waitForPRUpdate(
-        prNumber: number,
-        fileContentChecks: { [filename: string]: string },
-        fileCount: number
-    ): Promise<void> {
-        console.log(`Waiting for Junie to update PR #${prNumber} in ${this.currentRepo}...`);
-        let foundPR: PullRequest | undefined;
-        await startPoll(
-            `Junie didn't update PR #${prNumber} in ${this.currentRepo}`,
-            {},
-            async () => {
-                const pr  = await this.getPRByNumber(prNumber);
-                foundPR = pr;
-                const { data: files } = await this.getAllPRFiles(pr);
-                const fileCountNew = files.length;
-                return fileCountNew > fileCount;
-            }
-        );
-        if (foundPR) {
-            console.log(`Checking PR #${prNumber} for updates...`);
-            const hasExpectedContent = await this.checkPRFiles(foundPR, fileContentChecks);
-            if (!hasExpectedContent) {
-                throw new Error(`PR #${prNumber} files don't match expected content`);
-            }
-        }
+        return foundPR;
     }
 
     createIssue(issueTitle: string, issueBody: string, repoName?: string) {
@@ -171,31 +142,49 @@ export class Client {
         });
     }
 
-    private async checkPRFiles(
+    async checkPRFiles(
         pr: PullRequest,
-        fileContentChecks: { [filename: string]: string }
+        condition: (files: GitHubFile[], pr: PullRequest) => boolean | Promise<boolean>
     ): Promise<boolean> {
         const { data: files } = await this.getAllPRFiles(pr);
+        return await condition(files, pr);
+    }
 
-        for (const [filename, expectedSnippet] of Object.entries(fileContentChecks)) {
-            const file = files.find(f => f.filename.includes(filename));
-            if (!file) {
-                console.log(`PR found but missing file for content check: ${filename}`);
-                return false;
-            }
-
-            const { data: contentData } = await this.getFileContent(pr.head.sha, file);
-
-            if ("content" in contentData && typeof contentData.content === "string") {
-                const decodedContent = Buffer.from(contentData.content, "base64").toString("utf-8");
-                console.log(`Content of ${expectedSnippet} doesn't match expected snippet.`);
-                if (!decodedContent.includes(expectedSnippet)) {
-                    console.log(`Content of ${file.filename} doesn't match expected snippet.`);
+    conditionPRFilesInclude(fileContentChecks: { [filename: string]: string }) {
+        return async (files: GitHubFile[], pr: PullRequest) => {
+            for (const [filename, expectedSnippet] of Object.entries(fileContentChecks)) {
+                const file = files.find(f => f.filename.includes(filename));
+                if (!file) {
+                    console.log(`PR found but missing file for content check: ${filename}`);
                     return false;
                 }
+
+                const {data: contentData} = await this.getFileContent(pr.head.sha, file);
+
+                if ("content" in contentData && typeof contentData.content === "string") {
+                    const decodedContent = Buffer.from(contentData.content, "base64").toString("utf-8");
+                    console.log(`Content of ${expectedSnippet} doesn't match expected snippet.`);
+                    if (!decodedContent.includes(expectedSnippet)) {
+                        console.log(`Content of ${file.filename} doesn't match expected snippet.`);
+                        return false;
+                    }
+                }
             }
+            return true;
+        };
+    }
+
+    conditionPRNumberEquals(prNumber: number){
+        console.log(`Checking PR number is ${prNumber}`);
+        return async (pr: PullRequest):Promise<boolean> => {
+            return pr.number === prNumber;
         }
-        return true;
+    }
+
+    conditionPRFilesCountIncrease(filesCount: number){
+        return async (files: GitHubFile[]):Promise<boolean> => {
+            return files.length > filesCount;
+        }
     }
 
     private async getAllPRs() {
