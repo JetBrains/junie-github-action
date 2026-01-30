@@ -339,37 +339,30 @@ jobs:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
           allowed_mcp_servers: "mcp_github_checks_server"
           use_single_comment: "true"
-          prompt: |
-            CI workflow "${{ github.event.workflow_run.name }}" failed. Diagnose, provide analytics and suggest fix.
-
-            **Analysis:**
-            1. Retrieve detailed information about failed CI/CD checks
-            2. Identify failing step and error message
-            3. Determine root cause (test/build error, timeout, flaky test)
-            4. Check recent commits that might have caused it
-
-            **Provide diagnosis:**
-            ## 🔴 CI Failure Analysis
-            **Failed step:** [name]
-            **Error:** [message]
-            **Root cause:** [1-2 sentences]
-
-            ## 🔧 Proposed Fix
-            [Description]
-
-            ## 📝 Files to Change
-            - `path/file`: [what needs to change]
-
-            Only provide analysis and suggest fix without modifying files.
+          # Note: prompt is optional - the action automatically generates
+          # a CI failure analysis prompt when workflow_run has failure conclusion
 ```
 
 </details>
 
 **How it works:**
 1. Triggers when your CI workflow completes with failure
-2. Uses MCP GitHub Checks Server to fetch error logs
-3. Analyzes the failure and identifies root cause
-4. Provides detailed analysis
+2. **Automatically generates a CI failure analysis prompt** (no custom prompt needed)
+3. Uses MCP GitHub Checks Server to fetch error logs
+4. Analyzes the failure and identifies root cause
+5. Provides detailed analysis with suggested fixes
+
+**Alternative triggers:**
+- Add `fix-ci` in a comment on a PR: `@junie-agent fix-ci`
+- Use `fix-ci` in a custom prompt for workflow_dispatch events
+
+**Custom prompt (optional):**
+If you want to customize the analysis format, you can provide a custom prompt:
+```yaml
+prompt: |
+  CI workflow "${{ github.event.workflow_run.name }}" failed. 
+  Analyze the failure and provide a detailed diagnosis with suggested fixes.
+```
 
 **Advanced:**
 - Integrate with issue tracker (create bug report if fix is complex)
