@@ -27,7 +27,7 @@ A powerful GitHub Action that integrates [Junie](https://www.jetbrains.com/junie
 - **PR Management**: Reviews code changes and implements requested modifications
 - **Inline Code Reviews**: Create code review comments with GitHub suggestions directly on PR diffs
 - **Conflict Resolution**: Resolve merge conflicts via `@junie-agent` comment or automatic detection
-- **CI Failure Analysis**: Investigates failed checks and suggests fixes using MCP integration
+- **CI Failure Analysis**: Investigates failed checks and suggests fixes using MCP integration. Can be triggered by including "fix-ci" in comments or automatically on workflow_run failures
 - **Flexible Triggers**: Activate via mentions, assignees, labels, or custom prompts
 - **Smart Branch Management**: Context-aware branch creation and management
 - **Silent Mode**: Run analysis-only workflows without comments or git operations
