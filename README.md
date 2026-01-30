@@ -27,7 +27,7 @@ A powerful GitHub Action that integrates [Junie](https://www.jetbrains.com/junie
 - **PR Management**: Reviews code changes and implements requested modifications
 - **Inline Code Reviews**: Create code review comments with GitHub suggestions directly on PR diffs
 - **Conflict Resolution**: Resolve merge conflicts via `@junie-agent` comment or automatic detection
-- **CI Failure Analysis**: Investigates failed checks and suggests fixes using MCP integration
+- **CI Failure Analysis**: Automatically investigates failed checks when CI fails, or trigger manually with `fix-ci` in comments. Uses MCP integration to analyze logs and suggest fixes
 - **Flexible Triggers**: Activate via mentions, assignees, labels, or custom prompts
 - **Smart Branch Management**: Context-aware branch creation and management
 - **Silent Mode**: Run analysis-only workflows without comments or git operations
@@ -67,6 +67,9 @@ on:
     types: [opened, assigned]
   pull_request_review:
     types: [submitted]
+  workflow_run:
+    workflows: ["CI"]  # Replace with your CI workflow name(s)
+    types: [completed]
 
 jobs:
   junie:
@@ -74,16 +77,20 @@ jobs:
       (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@junie-agent')) ||
       (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@junie-agent')) ||
       (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@junie-agent')) ||
-      (github.event_name == 'issues' && (contains(github.event.issue.body, '@junie-agent') || contains(github.event.issue.title, '@junie-agent')))
+      (github.event_name == 'issues' && (contains(github.event.issue.body, '@junie-agent') || contains(github.event.issue.title, '@junie-agent'))) ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'failure')
     runs-on: ubuntu-latest
     permissions:
       contents: write
       pull-requests: write
       issues: write
+      checks: read    # Required for CI failure analysis
+      actions: read   # Required for CI failure analysis
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.ref }}
           fetch-depth: 1
 
       - name: Run Junie
@@ -91,6 +98,7 @@ jobs:
         uses: JetBrains/junie-github-action@v0
         with:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
+          allowed_mcp_servers: ${{ github.event_name == 'workflow_run' && 'mcp_github_checks_server' || '' }}
 ```
 
 **Version Tags:**
@@ -101,6 +109,8 @@ jobs:
 3. Start using Junie:
    - Comment `@junie-agent help me fix this bug` on an issue
    - Mention `@junie-agent review this change` in a PR
+   - CI failures are automatically analyzed when they occur (via workflow_run trigger)
+   - Use `@junie-agent fix-ci` in PR comments to manually trigger CI failure analysis
 
 ## Jira Integration
 

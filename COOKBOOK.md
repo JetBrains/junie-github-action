@@ -306,6 +306,8 @@ jobs:
 
 **Solution:** Junie analyzes failed CI runs, identifies root causes, and proposes fixes.
 
+**Automatic Detection:** When using `workflow_run` trigger with failure condition, Junie automatically analyzes CI failures without requiring a custom prompt. Alternatively, use `@junie-agent fix-ci` in PR comments to manually trigger analysis.
+
 <details>
 <summary>View complete workflow</summary>
 
