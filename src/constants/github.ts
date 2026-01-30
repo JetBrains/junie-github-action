@@ -8,6 +8,12 @@ export const GITHUB_ACTIONS_BOT = {
     type: "Bot" as const,
 } as const;
 
+export const JUNIE_AGENT = {
+    login: "junie-agent",
+    id: 247260674, // Junie agent GitHub account ID
+    email: "247260674+junie-agent@users.noreply.github.com",
+} as const;
+
 // ============================================================================
 // Actions and Triggers
 // ============================================================================
@@ -119,8 +125,16 @@ ${junieBody}
 export const PR_TITLE_TEMPLATE = (junieTitle: string) =>
     `[Junie]: ${junieTitle}`
 
-export const COMMIT_MESSAGE_TEMPLATE = (junieTitle: string, issueId?: number) =>
-    `${issueId ? `[issue-${issueId}]\n\n` : ""}${junieTitle}`;
+export const COMMIT_MESSAGE_TEMPLATE = (junieTitle: string, issueId?: number, actor?: string, actorEmail?: string) => {
+    const baseMessage = `${issueId ? `[issue-${issueId}]\n\n` : ""}${junieTitle}`;
+
+    // Add co-author if actor information is provided
+    if (actor && actorEmail) {
+        return `${baseMessage}\n\nCo-authored-by: ${actor} <${actorEmail}>`;
+    }
+
+    return baseMessage;
+};
 
 // ============================================================================
 // Feedback Comments

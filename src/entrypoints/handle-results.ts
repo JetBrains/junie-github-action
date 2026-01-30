@@ -58,7 +58,7 @@ export async function handleResults() {
         if (isTriggeredByUserInteraction(context)) {
             issueId = context.entityNumber
         }
-        const commitMessage = COMMIT_MESSAGE_TEMPLATE(title, issueId)
+        const commitMessage = COMMIT_MESSAGE_TEMPLATE(title, issueId, context.actor, context.actorEmail)
 
         // Export outputs based on action type
         switch (actionToDo) {

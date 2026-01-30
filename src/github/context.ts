@@ -16,7 +16,7 @@ import {
 } from "@octokit/webhooks-types";
 import type {TokenOwner} from "./operations/auth";
 import {OUTPUT_VARS} from "../constants/environment";
-import {DEFAULT_TRIGGER_PHRASE, JIRA_EVENT_ACTION, RESOLVE_CONFLICTS_ACTION} from "../constants/github";
+import {DEFAULT_TRIGGER_PHRASE, JIRA_EVENT_ACTION, JUNIE_AGENT, RESOLVE_CONFLICTS_ACTION} from "../constants/github";
 
 // Jira integration types
 export type JiraComment = {
@@ -304,8 +304,14 @@ export function extractJunieWorkflowContext(tokenOwner: TokenOwner): JunieExecut
         default:
             throw new Error(`Unsupported event type: ${context.eventName}`);
     }
+    // Set actor information (user who triggered the workflow) - used for co-author
     core.setOutput(OUTPUT_VARS.ACTOR_NAME, parsedContext.actor);
     core.setOutput(OUTPUT_VARS.ACTOR_EMAIL, parsedContext.actorEmail);
+
+    // Set junie-agent information - used as commit author
+    core.setOutput(OUTPUT_VARS.JUNIE_AGENT_NAME, JUNIE_AGENT.login);
+    core.setOutput(OUTPUT_VARS.JUNIE_AGENT_EMAIL, JUNIE_AGENT.email);
+
     core.setOutput(OUTPUT_VARS.PARSED_CONTEXT, JSON.stringify(parsedContext));
     return parsedContext;
 }
