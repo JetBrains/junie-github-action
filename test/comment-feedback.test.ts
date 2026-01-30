@@ -39,7 +39,12 @@ describe("Comment Feedback Operations", () => {
           createReplyForReviewComment: mock(async () => ({ data: { id: 67890 } })),
           updateReviewComment: mock(async () => ({ data: { id: 67890 } })),
           listReviewComments: mock(async () => ({ data: [] })),
+          listCommentsForReview: mock(async () => ({ data: [] })),
         },
+        reactions: {
+          createForIssueComment: mock(async () => ({ data: {} })),
+          createForPullRequestReviewComment: mock(async () => ({ data: {} })),
+        }
       },
     } as any;
 

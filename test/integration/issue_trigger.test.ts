@@ -3,7 +3,9 @@ import {INIT_COMMENT_BODY, SUCCESS_FEEDBACK_COMMENT} from "../../src/constants/g
 import {e2eConfig} from "../config/test-config";
 import { testClient } from "../client/client";
 
-describe("Trigger Junie in Issue", () => {
+const describeE2E = e2eConfig.githubToken ? describe : describe.skip;
+
+describeE2E("Trigger Junie in Issue", () => {
     let repoName: string;
 
     beforeAll(async () => {

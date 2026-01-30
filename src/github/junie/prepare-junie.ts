@@ -4,7 +4,7 @@ import {
     isTriggeredByUserInteraction,
     isPushEvent,
     isJiraWorkflowDispatchEvent,
-    isResolveConflictsWorkflowDispatchEvent, isPullRequestEvent, isPullRequestReviewEvent, isIssueCommentEvent,
+    isResolveConflictsWorkflowDispatchEvent, isPullRequestEvent, isPullRequestReviewEvent, isIssueCommentEvent, isWorkflowRunFailureEvent,
 } from "../context";
 import {checkHumanActor} from "../validation/actor";
 import {postJunieWorkingStatusComment} from "../operations/comments/feedback";
@@ -101,6 +101,10 @@ async function shouldHandle(context: JunieExecutionContext, octokit: Octokits): 
     }
 
     if (isJiraWorkflowDispatchEvent(context)) {
+        return true;
+    }
+
+    if (isWorkflowRunFailureEvent(context)) {
         return true;
     }
 
