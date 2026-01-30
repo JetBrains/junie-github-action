@@ -122,7 +122,7 @@ Your task is to analyze CI failures and suggest fixes WITHOUT implementing them.
 ### Files to modify
 - \`path/to/file\`: [what needs to change and why]
 
-### Code changes (if applicable)
+### Code changes
 \`\`\`[language]
 // Suggested code snippet or pseudocode
 \`\`\`
