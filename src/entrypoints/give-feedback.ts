@@ -4,9 +4,24 @@ import {JunieExecutionContext} from "../github/context";
 import {ActionType} from "./handle-results";
 import {ENV_VARS, OUTPUT_VARS} from "../constants/environment";
 import {formatJunieSummary} from "./format-summary";
-import {appendFileSync} from "fs";
+import {appendFileSync, readFileSync, existsSync} from "fs";
 import {buildGitHubApiClient} from "../github/api/client";
 import {handleStepError} from "../utils/error-handler";
+
+/**
+ * Reads Junie output from file (preferred) or environment variable (fallback)
+ * File-based approach avoids ARG_MAX limit issues with large outputs
+ */
+function readJunieOutputSafe(): string | undefined {
+    // First try to read from file (new approach)
+    const outputFile = process.env[ENV_VARS.JSON_JUNIE_OUTPUT_FILE];
+    if (outputFile && existsSync(outputFile)) {
+        return readFileSync(outputFile, 'utf-8');
+    }
+    
+    // Fallback to environment variable (legacy approach)
+    return process.env[ENV_VARS.JSON_JUNIE_OUTPUT];
+}
 
 /**
  * Writes feedback comment to GitHub issue/PR if initCommentId is available
@@ -62,7 +77,7 @@ async function generateJobSummary(isJobFailed: boolean): Promise<void> {
     }
 
     // Try to get duration_ms from JSON_JUNIE_OUTPUT if available
-    const jsonOutput = process.env[ENV_VARS.JSON_JUNIE_OUTPUT];
+    const jsonOutput = readJunieOutputSafe();
     if (jsonOutput) {
         try {
             const parsed = JSON.parse(jsonOutput);

@@ -183,10 +183,10 @@ runs:
         if [ -n "${MODEL}" ]; then
           MODEL_FLAG="--model=${MODEL}"
         fi
-        OUTPUT=$(junie --cache-dir="${WORKING_DIR}" --input-format="json" --output-format="json" --auth="${CLI_TOKEN}" ${MODEL_FLAG} <<<"${JUNIE_JSON_TASK}")
-        echo "json_output<<EOF" >> $GITHUB_OUTPUT
-        echo "$OUTPUT" >> $GITHUB_OUTPUT
-        echo "EOF" >> $GITHUB_OUTPUT
+        # Write output to file to avoid ARG_MAX limit with large outputs
+        OUTPUT_FILE="${WORKING_DIR}/junie-output.json"
+        junie --cache-dir="${WORKING_DIR}" --input-format="json" --output-format="json" --auth="${CLI_TOKEN}" ${MODEL_FLAG} <<<"${JUNIE_JSON_TASK}" > "${OUTPUT_FILE}"
+        echo "json_output_file=${OUTPUT_FILE}" >> $GITHUB_OUTPUT
 
     - name: Handle Junie results
       if: always() && steps.prepare.outputs.SHOULD_SKIP != 'true'
@@ -195,7 +195,7 @@ runs:
       run: |
         bun run ${GITHUB_ACTION_PATH}/src/entrypoints/handle-results.ts
       env:
-        JSON_JUNIE_OUTPUT: ${{ steps.junie-run.outputs.json_output }}
+        JSON_JUNIE_OUTPUT_FILE: ${{ steps.junie-run.outputs.json_output_file }}
         PARSED_CONTEXT: ${{ steps.prepare.outputs.PARSED_CONTEXT }}
         INIT_COMMENT_ID: ${{ steps.prepare.outputs.INIT_COMMENT_ID }}
         WORKING_BRANCH: ${{ steps.prepare.outputs.WORKING_BRANCH }}
@@ -282,7 +282,7 @@ runs:
         COMMIT_SHA: ${{ steps.commit.outputs.commit_long_sha }}
         JUNIE_TITLE: ${{ steps.junie-run-results.outputs.JUNIE_TITLE }}
         JUNIE_SUMMARY: ${{ steps.junie-run-results.outputs.JUNIE_SUMMARY }}
-        JSON_JUNIE_OUTPUT: ${{ steps.junie-run.outputs.json_output }}
+        JSON_JUNIE_OUTPUT_FILE: ${{ steps.junie-run.outputs.json_output_file }}
         JIRA_BASE_URL: ${{ inputs.jira_base_url }}
         JIRA_EMAIL: ${{ inputs.jira_email }}
         JIRA_API_TOKEN: ${{ inputs.jira_api_token }}
@@ -306,7 +306,7 @@ runs:
         COMMIT_SHA: ${{ steps.commit.outputs.commit_long_sha }}
         JUNIE_TITLE: ${{ steps.junie-run-results.outputs.JUNIE_TITLE }}
         JUNIE_SUMMARY: ${{ steps.junie-run-results.outputs.JUNIE_SUMMARY }}
-        JSON_JUNIE_OUTPUT: ${{ steps.junie-run.outputs.json_output }}
+        JSON_JUNIE_OUTPUT_FILE: ${{ steps.junie-run.outputs.json_output_file }}
         JIRA_BASE_URL: ${{ inputs.jira_base_url }}
         JIRA_EMAIL: ${{ inputs.jira_email }}
         JIRA_API_TOKEN: ${{ inputs.jira_api_token }}

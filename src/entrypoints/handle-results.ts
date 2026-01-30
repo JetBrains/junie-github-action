@@ -6,6 +6,7 @@ import {ENV_VARS, OUTPUT_VARS} from "../constants/environment";
 import {handleStepError} from "../utils/error-handler";
 import {isReviewOrCommentHasResolveConflictsTrigger} from "../github/validation/trigger";
 import {sanitizeJunieOutput} from "../utils/sanitizer";
+import {readFileSync, existsSync} from 'fs';
 
 export enum ActionType {
     WRITE_COMMENT = 'WRITE_COMMENT',
@@ -15,18 +16,37 @@ export enum ActionType {
     NOTHING = 'NOTHING'
 }
 
+/**
+ * Reads Junie output from file (preferred) or environment variable (fallback)
+ * File-based approach avoids ARG_MAX limit issues with large outputs
+ */
+function readJunieOutput(): string {
+    // First try to read from file (new approach)
+    const outputFile = process.env[ENV_VARS.JSON_JUNIE_OUTPUT_FILE];
+    if (outputFile && existsSync(outputFile)) {
+        console.log(`Reading Junie output from file: ${outputFile}`);
+        return readFileSync(outputFile, 'utf-8');
+    }
+    
+    // Fallback to environment variable (legacy approach)
+    const envOutput = process.env[ENV_VARS.JSON_JUNIE_OUTPUT];
+    if (envOutput) {
+        console.log('Reading Junie output from environment variable (legacy)');
+        return envOutput;
+    }
+    
+    throw new Error(
+        `❌ Failed to retrieve Junie execution results. ` +
+        `This could be due to:\n` +
+        `• Junie execution did not complete successfully\n` +
+        `• Junie output was empty or invalid\n` +
+        `Please check the Junie execution logs for details.`
+    );
+}
+
 export async function handleResults() {
     try {
-        const stringJunieJsonOutput = process.env[ENV_VARS.JSON_JUNIE_OUTPUT]
-        if (!stringJunieJsonOutput) {
-            throw new Error(
-                `❌ Failed to retrieve Junie execution results. ` +
-                `This could be due to:\n` +
-                `• Junie execution did not complete successfully\n` +
-                `• Junie output was empty or invalid\n` +
-                `Please check the Junie execution logs for details.`
-            );
-        }
+        const stringJunieJsonOutput = readJunieOutput();
         const junieJsonOutput = JSON.parse(stringJunieJsonOutput) as any
         const context = JSON.parse(process.env[OUTPUT_VARS.PARSED_CONTEXT]!) as JunieExecutionContext
         const isResolveConflict = context.inputs.resolveConflicts || isReviewOrCommentHasResolveConflictsTrigger(context)
