@@ -476,5 +476,13 @@ export function isTriggeredByUserInteraction(
 function getActorEmail(): string {
     const actor = github.context.actor;
     const userId = github.context.payload.sender?.id;
+
+    // For scheduled workflows or events without sender, use a placeholder ID
+    // GitHub doesn't provide sender info for scheduled events
+    if (!userId) {
+        // Use "0" as placeholder ID for system-triggered events (schedule, workflow_dispatch without actor, etc.)
+        return `0+${actor}@users.noreply.github.com`;
+    }
+
     return `${userId}+${actor}@users.noreply.github.com`;
 }
