@@ -11,6 +11,7 @@ import * as core from "@actions/core";
 import {BranchInfo} from "../operations/branch";
 import {
     isReviewOrCommentHasCodeReviewTrigger,
+    isReviewOrCommentHasFixCITrigger,
     isReviewOrCommentHasResolveConflictsTrigger
 } from "../validation/trigger";
 import {OUTPUT_VARS} from "../../constants/environment";
@@ -76,10 +77,11 @@ export async function prepareJunieTask(
         const isCodeReviewInComment = isReviewOrCommentHasCodeReviewTrigger(context);
         const isCodeReview = isCodeReviewInPrompt || isCodeReviewInComment;
 
-        // Check if prompt contains FIX_CI_ACTION phrase or if this is a workflow_run event triggered by CI failure
+        // Check if prompt contains FIX_CI_ACTION phrase, comment/review has fix-ci trigger, or workflow_run CI failure
         const isFixCIInPrompt = customPrompt?.includes(FIX_CI_ACTION);
+        const isFixCIInComment = isReviewOrCommentHasFixCITrigger(context);
         const isFixCIFromWorkflowFailure = isWorkflowRunFailureEvent(context);
-        const isFixCI = isFixCIInPrompt || isFixCIFromWorkflowFailure;
+        const isFixCI = isFixCIInPrompt || isFixCIInComment || isFixCIFromWorkflowFailure;
 
         let promptText: string;
         let finalCustomPrompt = customPrompt;

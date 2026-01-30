@@ -24,6 +24,8 @@ export const CODE_REVIEW_TRIGGER_PHRASE_REGEXP = new RegExp(CODE_REVIEW_ACTION, 
 
 export const FIX_CI_ACTION = "fix-ci";
 
+export const FIX_CI_TRIGGER_PHRASE_REGEXP = new RegExp(FIX_CI_ACTION, 'i');
+
 export const JIRA_EVENT_ACTION = "jira_event";
 
 export const WORKING_BRANCH_PREFIX = "junie/";
