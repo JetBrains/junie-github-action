@@ -371,6 +371,20 @@ jobs:
 3. Analyzes the failure and identifies root cause
 4. Provides detailed analysis
 
+**Simpler Alternative:**
+
+Use the built-in `fix-ci` prompt for automated CI failure analysis:
+
+```yaml
+prompt: "fix-ci"
+```
+
+You can also trigger CI failure analysis on-demand by commenting on a PR:
+
+```
+@junie-agent fix-ci
+```
+
 **Advanced:**
 - Integrate with issue tracker (create bug report if fix is complex)
 - Notify team Slack channel with analysis summary
