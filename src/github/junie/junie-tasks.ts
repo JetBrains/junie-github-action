@@ -4,6 +4,7 @@ import {
     isPullRequestEvent,
     isPullRequestReviewCommentEvent,
     isPullRequestReviewEvent,
+    isWorkflowRunFailureEvent,
     JunieExecutionContext
 } from "../context";
 import * as core from "@actions/core";
@@ -13,7 +14,7 @@ import {
     isReviewOrCommentHasResolveConflictsTrigger
 } from "../validation/trigger";
 import {OUTPUT_VARS} from "../../constants/environment";
-import {CODE_REVIEW_ACTION, createCodeReviewPrompt} from "../../constants/github";
+import {CODE_REVIEW_ACTION, createCodeReviewPrompt, createFixCIFailuresPrompt, FIX_CI_ACTION} from "../../constants/github";
 import {Octokits} from "../api/client";
 import {NewGitHubPromptFormatter} from "./new-prompt-formatter";
 import {downloadAttachmentsAndRewriteText} from "./attachment-downloader";
@@ -75,12 +76,22 @@ export async function prepareJunieTask(
         const isCodeReviewInComment = isReviewOrCommentHasCodeReviewTrigger(context);
         const isCodeReview = isCodeReviewInPrompt || isCodeReviewInComment;
 
+        // Check if prompt contains FIX_CI_ACTION phrase or if this is a workflow_run event triggered by CI failure
+        const isFixCIInPrompt = customPrompt?.includes(FIX_CI_ACTION);
+        const isFixCIFromWorkflowFailure = isWorkflowRunFailureEvent(context);
+        const isFixCI = isFixCIInPrompt || isFixCIFromWorkflowFailure;
+
         let promptText: string;
         let finalCustomPrompt = customPrompt;
         if (issue && isCodeReview) {
             const branchName = branchInfo.prBaseBranch || branchInfo.baseBranch;
             const diffPoint = context.isPR ? String(context.entityNumber) : branchName;
             finalCustomPrompt = createCodeReviewPrompt(diffPoint);
+        } else if (isFixCI) {
+            // Fix CI can trigger with or without an associated PR/issue (e.g., workflow_run failure on a branch)
+            const branchName = branchInfo.prBaseBranch || branchInfo.baseBranch;
+            const diffPoint = context.isPR && context.entityNumber ? String(context.entityNumber) : branchName;
+            finalCustomPrompt = createFixCIFailuresPrompt(diffPoint);
         }
         promptText = await formatter.generatePrompt(context, fetchedData, finalCustomPrompt, context.inputs.attachGithubContextToCustomPrompt);
 
