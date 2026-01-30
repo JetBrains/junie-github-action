@@ -68,7 +68,9 @@ export async function prepareMcpConfig(
     // Auto-enable checks server for fix-ci action or when explicitly requested
     if (hasGHCheksServer || isFixCI) {
         console.log(`Enabling GitHub Checks MCP Server${isFixCI ? ' (auto-enabled for fix-ci)' : ''}`);
-        const head = branchInfo.isNewBranch ? branchInfo.baseBranch : branchInfo.workingBranch
+        // Use commitSha if available (e.g., from workflow_run events), otherwise fall back to branch reference
+        const checksRef = commitSha || `heads/${branchInfo.isNewBranch ? branchInfo.baseBranch : branchInfo.workingBranch}`;
+        console.log(`GitHub Checks Server using ref: ${checksRef}`);
         baseMcpConfig.mcpServers.github_checks = {
             command: "bun",
             args: [
@@ -80,7 +82,7 @@ export async function prepareMcpConfig(
                 GITHUB_TOKEN: githubToken,
                 REPO_OWNER: owner,
                 REPO_NAME: repo,
-                HEAD_SHA: `heads/${head}`,
+                HEAD_SHA: checksRef,
             },
         };
         enabledServers.push('mcp_github_checks_server');
