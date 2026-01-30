@@ -339,37 +339,20 @@ jobs:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
           allowed_mcp_servers: "mcp_github_checks_server"
           use_single_comment: "true"
-          prompt: |
-            CI workflow "${{ github.event.workflow_run.name }}" failed. Diagnose, provide analytics and suggest fix.
-
-            **Analysis:**
-            1. Retrieve detailed information about failed CI/CD checks
-            2. Identify failing step and error message
-            3. Determine root cause (test/build error, timeout, flaky test)
-            4. Check recent commits that might have caused it
-
-            **Provide diagnosis:**
-            ## 🔴 CI Failure Analysis
-            **Failed step:** [name]
-            **Error:** [message]
-            **Root cause:** [1-2 sentences]
-
-            ## 🔧 Proposed Fix
-            [Description]
-
-            ## 📝 Files to Change
-            - `path/file`: [what needs to change]
-
-            Only provide analysis and suggest fix without modifying files.
 ```
 
 </details>
 
 **How it works:**
-1. Triggers when your CI workflow completes with failure
-2. Uses MCP GitHub Checks Server to fetch error logs
-3. Analyzes the failure and identifies root cause
-4. Provides detailed analysis
+1. Triggers automatically when your CI workflow completes with failure
+2. Junie detects the workflow_run failure event and automatically applies the fix-ci analysis template
+3. Uses MCP GitHub Checks Server to fetch detailed error logs
+4. Analyzes the failure, identifies root cause, and suggests fixes without implementing them
+5. Posts analysis as a comment on the associated PR (if any) or creates an issue
+
+**Alternative trigger methods:**
+- **Manual trigger via comment**: Comment `@junie-agent fix-ci` on a PR to analyze CI failures on-demand
+- **Custom prompt**: Include `fix-ci` in your custom prompt to trigger the analysis template
 
 **Advanced:**
 - Integrate with issue tracker (create bug report if fix is complex)
