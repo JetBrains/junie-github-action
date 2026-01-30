@@ -15,6 +15,7 @@ type PrepareConfigParams = {
     allowedMcpServers: string[];
     prNumber?: number;
     commitSha?: string;
+    isFixCI?: boolean;
 };
 
 
@@ -29,6 +30,7 @@ export async function prepareMcpConfig(
         allowedMcpServers,
         prNumber,
         commitSha,
+        isFixCI,
     } = params;
 
     const hasGHCheksServer = allowedMcpServers.some((name) =>
@@ -63,7 +65,9 @@ export async function prepareMcpConfig(
         enabledServers.push('mcp_github_inline_comment_server');
     }
 
-    if (hasGHCheksServer) {
+    // Auto-enable checks server for fix-ci action or when explicitly requested
+    if (hasGHCheksServer || isFixCI) {
+        console.log(`Enabling GitHub Checks MCP Server${isFixCI ? ' (auto-enabled for fix-ci)' : ''}`);
         const head = branchInfo.isNewBranch ? branchInfo.baseBranch : branchInfo.workingBranch
         baseMcpConfig.mcpServers.github_checks = {
             command: "bun",
