@@ -27,7 +27,7 @@ A powerful GitHub Action that integrates [Junie](https://www.jetbrains.com/junie
 - **PR Management**: Reviews code changes and implements requested modifications
 - **Inline Code Reviews**: Create code review comments with GitHub suggestions directly on PR diffs
 - **Conflict Resolution**: Resolve merge conflicts via `@junie-agent` comment or automatic detection
-- **CI Failure Analysis**: Investigates failed checks and suggests fixes using MCP integration
+- **CI Failure Analysis**: Investigates failed checks and suggests fixes using MCP integration. Trigger with `fix-ci` phrase in comments or automatically via `workflow_run` events
 - **Flexible Triggers**: Activate via mentions, assignees, labels, or custom prompts
 - **Smart Branch Management**: Context-aware branch creation and management
 - **Silent Mode**: Run analysis-only workflows without comments or git operations
@@ -101,6 +101,42 @@ jobs:
 3. Start using Junie:
    - Comment `@junie-agent help me fix this bug` on an issue
    - Mention `@junie-agent review this change` in a PR
+   - Use `@junie-agent fix-ci` to analyze CI failures and get suggested fixes
+
+#### Automatic CI Failure Analysis
+
+To automatically analyze CI failures when workflows fail, add a `workflow_run` trigger:
+
+```yaml
+name: Junie CI Failure Analysis
+
+on:
+  workflow_run:
+    workflows: ["Your CI Workflow Name"]  # Replace with your CI workflow name
+    types: [completed]
+
+jobs:
+  analyze-failures:
+    if: github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      checks: read
+      actions: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Junie CI Analysis
+        uses: JetBrains/junie-github-action@v0
+        with:
+          junie_api_key: ${{ secrets.JUNIE_API_KEY }}
+          allowed_mcp_servers: "mcp_github_checks_server"
+```
+
+This will automatically trigger Junie to analyze failed checks and suggest fixes whenever your CI workflow fails.
 
 ## Jira Integration
 
