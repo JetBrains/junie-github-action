@@ -15,6 +15,7 @@ import {OUTPUT_VARS} from "../constants/environment";
  */
 export function handleStepError(stepName: string, error: unknown): never {
     const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`${stepName} failed with error: ${errorMessage}`);
     core.setFailed(`${stepName} failed with error: ${errorMessage}`);
     core.setOutput(OUTPUT_VARS.EXCEPTION, errorMessage);
     process.exit(1);

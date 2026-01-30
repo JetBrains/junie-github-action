@@ -5,6 +5,7 @@ import { Octokit } from "@octokit/rest";
 import { JunieExecutionContext } from "../github/context";
 import { ENV_VARS, OUTPUT_VARS } from "../constants/environment";
 import { handleStepError } from "../utils/error-handler";
+import { executeWithRetry } from "../utils/retry";
 
 export async function createPullRequest() {
     try {
@@ -22,18 +23,31 @@ export async function createPullRequest() {
             auth: githubToken,
         });
 
-        const { data: pr } = await octokit.rest.pulls.create({
-            owner: context.payload.repository.owner.login,
-            repo: context.payload.repository.name,
-            title: prTitle,
-            body: prBody,
-            head: headBranch,
-            base: baseBranch,
-        });
+        const owner = context.payload.repository.owner.login;
+        const repo = context.payload.repository.name;
+        // Create PR with
+        const { data: pr } = await executeWithRetry(
+            () => octokit.rest.pulls.create({
+                owner,
+                repo,
+                title: prTitle,
+                body: prBody,
+                head: headBranch,
+                base: baseBranch,
+            }),
+            'Create Pull Request'
+        );
 
         console.log(`Successfully created PR #${pr.number}: ${pr.html_url}`);
         core.setOutput("pull-request-url", pr.html_url);
-    } catch (error) {
+    } catch (error: any) {
+        // Enhanced error logging for GitHub API errors
+        if (error.status) {
+            console.error(`GitHub API Error: ${error.status} - ${error.message}`);
+            if (error.response?.data) {
+                console.error('Response data:', JSON.stringify(error.response.data, null, 2));
+            }
+        }
         handleStepError("Create PR step", error);
     }
 }

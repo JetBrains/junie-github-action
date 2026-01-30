@@ -1,6 +1,6 @@
 import {ISSUE_QUERY, IssueQueryResponse, PULL_REQUEST_QUERY, PullRequestQueryResponse, GraphQLPullRequest, GraphQLIssue} from "../api/queries";
 import {Octokits} from "./client";
-import pRetry, {AbortError} from "p-retry";
+import { executeWithRetry } from "../../utils/retry";
 import {
     filterCommentsToTriggerTime,
     filterReviewsToTriggerTime,
@@ -22,48 +22,9 @@ export class GraphQLGitHubDataFetcher {
         query: string,
         variables: Record<string, any>
     ): Promise<T> {
-        return pRetry(
-            async () => {
-                try {
-                    return await this.octokit.graphql<T>(query, variables);
-                } catch (error: any) {
-                    // Ensure we have an Error object for p-retry
-                    const errorObj = error instanceof Error
-                        ? error
-                        : new Error(error.message || String(error));
-
-                    // Copy status property if it exists
-                    if (error.status) {
-                        (errorObj as any).status = error.status;
-                    }
-
-                    // Don't retry on permanent errors (schema errors, not found, etc)
-                    if (error.status === 404 || error.status === 422) {
-                        console.error(`Non-retryable GraphQL error: ${error.message || error}`);
-                        throw new AbortError(errorObj);
-                    }
-
-                    // Don't retry on authentication errors
-                    if (error.status === 401 || error.status === 403) {
-                        console.error(`Authentication error: ${error.message || error}`);
-                        throw new AbortError(errorObj);
-                    }
-
-                    // Retry on rate limit and transient network errors
-                    console.warn(`GraphQL request failed, will retry: ${error.message || error}`);
-                    throw errorObj;
-                }
-            },
-            {
-                retries: 3,
-                minTimeout: 1000,
-                maxTimeout: 5000,
-                onFailedAttempt: (error) => {
-                    console.log(
-                        `GraphQL attempt ${error.attemptNumber} failed. ${error.retriesLeft} retries left.`
-                    );
-                }
-            }
+        return executeWithRetry(
+            () => this.octokit.graphql<T>(query, variables),
+            'GraphQL query'
         );
     }
 
