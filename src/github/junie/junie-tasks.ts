@@ -82,6 +82,9 @@ export async function prepareJunieTask(
         const isFixCIInComment = isReviewOrCommentHasFixCITrigger(context);
         const isFixCIFromWorkflowFailure = isWorkflowRunFailureEvent(context);
         const isFixCI = isFixCIInPrompt || isFixCIInComment || isFixCIFromWorkflowFailure;
+    
+        // Debug: log fix-ci detection status
+        console.log(`Fix-CI detection: inPrompt=${isFixCIInPrompt}, inComment=${isFixCIInComment}, fromWorkflowFailure=${isFixCIFromWorkflowFailure}, isFixCI=${isFixCI}`);
 
         let promptText: string;
         let finalCustomPrompt = customPrompt;
@@ -89,11 +92,14 @@ export async function prepareJunieTask(
             const branchName = branchInfo.prBaseBranch || branchInfo.baseBranch;
             const diffPoint = context.isPR ? String(context.entityNumber) : branchName;
             finalCustomPrompt = createCodeReviewPrompt(diffPoint);
+            console.log(`Using CODE REVIEW prompt for diffPoint: ${diffPoint}`);
         } else if (isFixCI) {
             // Fix CI can trigger with or without an associated PR/issue (e.g., workflow_run failure on a branch)
             const branchName = branchInfo.prBaseBranch || branchInfo.baseBranch;
             const diffPoint = context.isPR && context.entityNumber ? String(context.entityNumber) : branchName;
             finalCustomPrompt = createFixCIFailuresPrompt(diffPoint);
+            console.log(`Using FIX-CI prompt for diffPoint: ${diffPoint}`);
+            console.log(`Fix-CI prompt preview (first 200 chars): ${finalCustomPrompt.substring(0, 200)}`);
         }
         promptText = await formatter.generatePrompt(context, fetchedData, finalCustomPrompt, context.inputs.attachGithubContextToCustomPrompt);
 

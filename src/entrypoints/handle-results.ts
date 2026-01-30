@@ -25,7 +25,10 @@ function readJunieOutput(): string {
     const outputFile = process.env[ENV_VARS.JSON_JUNIE_OUTPUT_FILE];
     if (outputFile && existsSync(outputFile)) {
         console.log(`Reading Junie output from file: ${outputFile}`);
-        return readFileSync(outputFile, 'utf-8');
+        const content = readFileSync(outputFile, 'utf-8');
+        // Debug: log first 1000 chars of content to help diagnose issues
+        console.log(`Junie output content (first 1000 chars): ${content.substring(0, 1000)}`);
+        return content;
     }
     
     // Fallback to environment variable (legacy approach)
