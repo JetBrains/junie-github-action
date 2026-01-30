@@ -37,6 +37,7 @@ export class Client {
             org: this.org,
             name: repoName,
             auto_init: true,
+            private: true,
         });
 
         this.currentRepo = repoName;
@@ -67,14 +68,14 @@ export class Client {
         });
     }
 
-    async waitForJunieComment(issueNumber: number, message: string): Promise<void> {
-        console.log(`Waiting for Junie to post comment containing "${message}" in issue #${issueNumber} in ${this.currentRepo}...`);
+    async waitForJunieComment(issueOrPRNumber: number, message: string): Promise<void> {
+        console.log(`Waiting for Junie to post comment containing "${message}" in issue #${issueOrPRNumber} in ${this.currentRepo}...`);
 
         await startPoll(
-            `Junie didn't post comment containing "${message}" in issue #${issueNumber}`,
+            `Junie didn't post comment containing "${message}" in issue #${issueOrPRNumber}`,
             {},
             async () => {
-                const { data: comments } = await this.getAllIssueComments(issueNumber);
+                const { data: comments } = await this.getAllIssueOrPRComments(issueOrPRNumber);
                 const junieComment = comments.find(c => c.body?.includes(message));
 
                 if (junieComment) {
@@ -86,27 +87,50 @@ export class Client {
         );
     }
 
-    async waitForPR(
-        condition: (pr: PullRequest) => boolean | Promise<boolean>,
-        fileContentChecks: { [filename: string]: string }
-    ): Promise<void> {
-        console.log(`Waiting for Junie to create a PR in ${this.currentRepo}...`);
+    async waitForCommentReaction(commentId: number, reactionType: string = "+1"): Promise<void> {
+        console.log(`Waiting for reaction "${reactionType}" on comment #${commentId} in ${this.currentRepo}...`);
 
         await startPoll(
-            `Junie didn't create a PR in ${this.currentRepo} with expected files/content`,
+            `Reaction "${reactionType}" not found on comment #${commentId}`,
+            {},
+            async () => {
+                const { data: reactions } = await this.getAllCommentReactions(commentId);
+
+                const hasReaction = reactions.some(r => r.content === reactionType);
+                if (hasReaction) {
+                    console.log(`Found "${reactionType}" reaction on comment #${commentId}`);
+                    return true;
+                }
+                return false;
+            }
+        );
+    }
+
+    async waitForPR(
+        condition: (pr: PullRequest) => boolean | Promise<boolean>
+    ): Promise<PullRequest> {
+        console.log(`Waiting for Junie to create a PR in ${this.currentRepo}...`);
+        let foundPR: PullRequest | undefined;
+        await startPoll(
+            `Junie didn't create a PR in ${this.currentRepo}`,
             {},
             async () => {
                 const { data: pulls } = await this.getAllPRs();
                 for (const pull of pulls) {
                     if (await condition(pull)) {
                         console.log(`PR found: ${pull.html_url}`);
-                        await this.checkPRFiles(pull, fileContentChecks);
+                        foundPR = pull;
                         return true;
                     }
                 }
                 return false;
             }
         );
+        if (!foundPR) {
+            throw new Error(`PR not found after polling in ${this.currentRepo}`);
+        }
+
+        return foundPR;
     }
 
     createIssue(issueTitle: string, issueBody: string, repoName?: string) {
@@ -118,30 +142,49 @@ export class Client {
         });
     }
 
-    private async checkPRFiles(
+    async checkPRFiles(
         pr: PullRequest,
-        fileContentChecks: { [filename: string]: string }
+        condition: (files: GitHubFile[], pr: PullRequest) => boolean | Promise<boolean>
     ): Promise<boolean> {
         const { data: files } = await this.getAllPRFiles(pr);
+        return await condition(files, pr);
+    }
 
-        for (const [filename, expectedSnippet] of Object.entries(fileContentChecks)) {
-            const file = files.find(f => f.filename.includes(filename));
-            if (!file) {
-                console.log(`PR found but missing file for content check: ${filename}`);
-                return false;
-            }
-
-            const { data: contentData } = await this.getFileContent(pr.head.sha, file);
-
-            if ("content" in contentData && typeof contentData.content === "string") {
-                const decodedContent = Buffer.from(contentData.content, "base64").toString("utf-8");
-                if (!decodedContent.includes(expectedSnippet)) {
-                    console.log(`Content of ${file.filename} doesn't match expected snippet.`);
+    conditionPRFilesInclude(fileContentChecks: { [filename: string]: string }) {
+        return async (files: GitHubFile[], pr: PullRequest) => {
+            for (const [filename, expectedSnippet] of Object.entries(fileContentChecks)) {
+                const file = files.find(f => f.filename.includes(filename));
+                if (!file) {
+                    console.log(`PR found but missing file for content check: ${filename}`);
                     return false;
                 }
+
+                const {data: contentData} = await this.getFileContent(pr.head.sha, file);
+
+                if ("content" in contentData && typeof contentData.content === "string") {
+                    const decodedContent = Buffer.from(contentData.content, "base64").toString("utf-8");
+                    console.log(`Content of ${expectedSnippet} doesn't match expected snippet.`);
+                    if (!decodedContent.includes(expectedSnippet)) {
+                        console.log(`Content of ${file.filename} doesn't match expected snippet.`);
+                        return false;
+                    }
+                }
             }
+            return true;
+        };
+    }
+
+    conditionPRNumberEquals(prNumber: number){
+        console.log(`Checking PR number is ${prNumber}`);
+        return async (pr: PullRequest):Promise<boolean> => {
+            return pr.number === prNumber;
         }
-        return true;
+    }
+
+    conditionPRFilesCountIncrease(filesCount: number){
+        return async (files: GitHubFile[]):Promise<boolean> => {
+            return files.length > filesCount;
+        }
     }
 
     private async getAllPRs() {
@@ -169,19 +212,20 @@ export class Client {
         });
     }
 
-    private async getAllIssueComments(issueNumber: number) {
+    private async getAllIssueOrPRComments(issueOrPRNumber: number) {
         return this.octokit.issues.listComments({
             owner: this.org,
             repo: this.currentRepo,
-            issue_number: issueNumber,
+            issue_number: issueOrPRNumber,
         });
     }
 
-    private async createOrUpdateFileContents(
+    async createOrUpdateFileContents(
         repoName: string,
         content: string,
         path: string,
-        message: string
+        message: string,
+        branch: string = "main"
     ) {
         return this.octokit.repos.createOrUpdateFileContents({
             owner: this.org,
@@ -189,6 +233,7 @@ export class Client {
             path: path,
             message: message,
             content: content,
+            branch: branch
         });
     }
 
@@ -196,6 +241,57 @@ export class Client {
         return (pr: PullRequest) => {
             return titles.some(title => pr.title.includes(title));
         };
+    }
+
+    async getBranch(repoName: string){
+        return this.octokit.repos.getBranch({
+            owner: e2eConfig.org,
+            repo: repoName,
+            branch: "main",
+        });
+    }
+
+    async createRef(repoName: string, branchName: string, sha: string){
+        return this.octokit.git.createRef({
+            owner: e2eConfig.org,
+            repo: repoName,
+            ref: `refs/heads/${branchName}`,
+            sha: sha,
+        });
+    }
+
+    async createPullRequest(repoName: string, branchName: string, title: string, body: string, base: string = "main"){
+        return this.octokit.pulls.create({
+            owner: e2eConfig.org,
+            repo: repoName,
+            title: title,
+            head: branchName,
+            base: base,
+            body: body,
+        });
+    }
+
+    async createCommentToPROrIssue(repoName: string, issueOrPRNumber: number, commentBody: string){
+        return this.octokit.issues.createComment({
+            owner: e2eConfig.org,
+            repo: repoName,
+            issue_number: issueOrPRNumber,
+            body: commentBody,
+        });
+    }
+
+    private async getPRByNumber(prNumber: number): Promise<PullRequest>{
+        const pulls = await this.getAllPRs();
+        const pr = pulls.data.find(p => p.number === prNumber);
+        return pr as PullRequest;
+    }
+
+    private async getAllCommentReactions(commentId: number){
+        return this.octokit.reactions.listForIssueComment({
+            owner: this.org,
+            repo: this.currentRepo,
+            comment_id: commentId,
+        });
     }
 }
 
