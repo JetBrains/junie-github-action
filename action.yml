@@ -183,10 +183,13 @@ runs:
         if [ -n "${MODEL}" ]; then
           MODEL_FLAG="--model=${MODEL}"
         fi
-        # Write output to file to avoid ARG_MAX limit with large outputs
+        # Ensure working directory exists
+        mkdir -p "${WORKING_DIR}"
+        # Set output file path FIRST (so it's available even if Junie fails)
         OUTPUT_FILE="${WORKING_DIR}/junie-output.json"
-        junie --cache-dir="${WORKING_DIR}" --input-format="json" --output-format="json" --auth="${CLI_TOKEN}" ${MODEL_FLAG} <<<"${JUNIE_JSON_TASK}" > "${OUTPUT_FILE}"
         echo "json_output_file=${OUTPUT_FILE}" >> $GITHUB_OUTPUT
+        # Write output to file to avoid ARG_MAX limit with large outputs
+        junie --cache-dir="${WORKING_DIR}" --input-format="json" --output-format="json" --auth="${CLI_TOKEN}" ${MODEL_FLAG} <<<"${JUNIE_JSON_TASK}" > "${OUTPUT_FILE}"
 
     - name: Handle Junie results
       if: always() && steps.prepare.outputs.SHOULD_SKIP != 'true'
