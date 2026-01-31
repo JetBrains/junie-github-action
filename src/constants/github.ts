@@ -87,15 +87,27 @@ export function createFixCIFailuresPrompt(diffPoint: string): string {
     const diffCommand = `gh pr diff ${diffPoint}`
     return `
 Your task is to analyze CI failures and suggest fixes WITHOUT implementing them. Follow these steps:
-1. Gather CI Failure Information
-   - Use the 'get_pr_failed_checks_info' tool to retrieve detailed information about failed CI/CD checks.
+
+1. Gather Information
+   - Use the 'get_pr_failed_checks_info' tool to retrieve information about failed CI/CD checks.
    - Read the Pull Request diff by using \`${diffCommand} | grep "^diff --git"\`. Do not write the diff to file.
-2. Analyze the Failures (for each failed check):
+
+2. If NO failed checks were found:
+   - Call the 'answer' tool with the following in the 'full_answer' field:
+   ---
+   ## ✅ CI Status
+   
+   No failed checks found for this PR. All CI checks have passed or are still running.
+   ---
+
+3. If failed checks WERE found, analyze each failure:
+   - Open and explore relevant source files to understand the context
    - Identify the failing step and error message
    - Determine the root cause (test failure, build error, linting issue, timeout, flaky test, etc.)
    - Correlate the error with changes in the PR diff
    - Determine if the failure is related to the PR diff or a pre-existing issue
-3. Provide Diagnosis. Call the 'answer' tool with your analysis in the 'full_answer' field using this template:
+
+4. Provide Diagnosis. After exploration, call the 'answer' tool with your analysis in the 'full_answer' field using this template:
 ---
 ## 🔴 CI Failure Analysis
 
@@ -122,18 +134,17 @@ Your task is to analyze CI failures and suggest fixes WITHOUT implementing them.
 ### Files to modify
 - \`path/to/file\`: [what needs to change and why]
 
-### Code changes
+### Code changes (if applicable)
 \`\`\`[language]
 // Suggested code snippet or pseudocode
 \`\`\`
 ---
 
-
 Additional Instructions:
-1. Open files or search the project as necessary to understand context.
+1. Open files or search the project as necessary to understand context before providing your diagnosis.
 2. Do NOT run tests, build, or make any modifications to the codebase.
-3. Do NOT call 'submit'.
-4. If multiple checks failed, analyze each one separately.
+3. Do NOT call 'submit'. Always use 'answer' tool for your response.
+4. If multiple checks failed, analyze each one separately in your answer.
 5. If the failure appears to be a flaky test or infrastructure issue (not related to PR changes), clearly state this.
 6. Be specific about file paths and line numbers when suggesting fixes: \`File.ts:Line: Comment\`.
 `;
