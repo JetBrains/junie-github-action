@@ -28,6 +28,10 @@ export const CODE_REVIEW_ACTION = "code-review";
 
 export const CODE_REVIEW_TRIGGER_PHRASE_REGEXP = new RegExp(CODE_REVIEW_ACTION, 'i')
 
+export const FIX_CI_ACTION = "fix-ci";
+
+export const FIX_CI_TRIGGER_PHRASE_REGEXP = new RegExp(FIX_CI_ACTION, 'i');
+
 export const JIRA_EVENT_ACTION = "jira_event";
 
 export const WORKING_BRANCH_PREFIX = "junie/";
@@ -82,6 +86,74 @@ Additional instructions:
 - Keep it concise (15–25 words per comment). No praise, questions, or speculation; omit low-impact nits.
 - If unsure whether a comment applies, omit it. If no feedback is warranted, answer \`LGTM\` only .
 - For small changes, max 3 comments; medium 6–8; large 8–12.
+`;
+}
+
+export function createFixCIFailuresPrompt(diffPoint: string): string {
+    const diffCommand = `gh pr diff ${diffPoint}`
+    return `
+Your task is to analyze CI failures and suggest fixes WITHOUT implementing them. Follow these steps:
+
+1. Gather Information
+   - Use the 'get_pr_failed_checks_info' tool to retrieve information about failed CI/CD checks.
+   - Read the Pull Request diff by using \`${diffCommand} | grep "^diff --git"\`. Do not write the diff to file.
+
+2. If NO failed checks were found:
+   - Call the 'answer' tool with ONLY the following in the 'full_answer' field:
+   ---
+   ## ✅ CI Status
+   
+   No failed checks found for this PR. All CI checks have passed or are still running.
+   ---
+
+3. If failed checks WERE found, analyze each failure:
+   - Open and explore relevant source files to understand the context
+   - Identify the failing step and error message
+   - Determine the root cause (test failure, build error, linting issue, timeout, flaky test, etc.)
+   - Correlate the error with changes in the PR diff
+   - Determine if the failure is related to the PR diff or a pre-existing issue
+
+4. Provide Diagnosis. After exploration, call the 'answer' tool with your analysis in the 'full_answer' field following this template FAITHFULLY and without adding additional notes:
+---
+## 🔴 CI Failure Analysis
+
+**Failed Check:** [check name]
+**Failed Step:** [step name if identifiable]
+**Error Type:** [test failure / build error / lint error / timeout / other]
+
+### Error Details
+\`\`\`
+[relevant error message/stack trace - keep concise]
+\`\`\`
+
+### Root Cause
+[1-3 sentences explaining why this failed]
+
+### Correlation with PR Changes
+[Explain which files/changes in this PR likely caused the failure, or state if it appears unrelated]
+
+## 🔧 Suggested Fix
+
+### What needs to change
+[Clear description of the fix approach]
+
+### Files to modify
+- \`path/to/file\`: [what needs to change and why]
+
+### Code changes
+\`\`\`[language]
+// Suggested code snippet or pseudocode
+\`\`\`
+---
+
+Additional Instructions:
+1. Open files or search the project as necessary to understand context before providing your diagnosis.
+2. Do NOT run tests, build, or make any modifications to the codebase.
+3. Do NOT call 'submit'. Always use 'answer' tool for your response.
+4. If multiple checks failed, analyze each one separately in your answer.
+5. If the failure appears to be a flaky test or infrastructure issue (not related to PR changes), clearly state this.
+6. Be specific about file paths and line numbers when suggesting fixes: \`File.ts:Line: Comment\`.
+7. **[DEBUG] At the end of your answer, include a section titled "### 🔧 Tools Called" listing all tools you invoked during this task, in order (e.g., get_pr_failed_checks_info, bash, open, answer).**
 `;
 }
 
