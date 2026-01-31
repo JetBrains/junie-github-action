@@ -93,7 +93,7 @@ Your task is to analyze CI failures and suggest fixes WITHOUT implementing them.
    - Read the Pull Request diff by using \`${diffCommand} | grep "^diff --git"\`. Do not write the diff to file.
 
 2. If NO failed checks were found:
-   - Call the 'answer' tool with the following in the 'full_answer' field:
+   - Call the 'answer' tool with ONLY the following in the 'full_answer' field:
    ---
    ## ✅ CI Status
    
@@ -107,7 +107,7 @@ Your task is to analyze CI failures and suggest fixes WITHOUT implementing them.
    - Correlate the error with changes in the PR diff
    - Determine if the failure is related to the PR diff or a pre-existing issue
 
-4. Provide Diagnosis. After exploration, call the 'answer' tool with your analysis in the 'full_answer' field using this template:
+4. Provide Diagnosis. After exploration, call the 'answer' tool with your analysis in the 'full_answer' field following this template FAITHFULLY and without adding additional notes:
 ---
 ## 🔴 CI Failure Analysis
 
