@@ -371,6 +371,30 @@ jobs:
 3. Analyzes the failure and identifies root cause
 4. Provides detailed analysis
 
+**Alternative: Use the built-in `fix-ci` trigger**
+
+You can also trigger CI failure analysis on-demand by commenting on a PR with the `fix-ci` phrase:
+
+```
+@junie-agent fix-ci
+```
+
+Or include it in your custom prompt:
+
+```yaml
+- uses: JetBrains/junie-github-action@v0
+  with:
+    junie_api_key: ${{ secrets.JUNIE_API_KEY }}
+    allowed_mcp_servers: "mcp_github_checks_server"
+    prompt: "fix-ci"
+```
+
+The built-in `fix-ci` action automatically:
+- Retrieves failed check information using `get_pr_failed_checks_info`
+- Analyzes the PR diff to correlate errors with changes
+- Provides structured diagnosis without implementing fixes
+- Identifies root causes (test failures, build errors, timeouts, etc.)
+
 **Advanced:**
 - Integrate with issue tracker (create bug report if fix is complex)
 - Notify team Slack channel with analysis summary
