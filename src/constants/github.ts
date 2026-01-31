@@ -147,6 +147,7 @@ Additional Instructions:
 4. If multiple checks failed, analyze each one separately in your answer.
 5. If the failure appears to be a flaky test or infrastructure issue (not related to PR changes), clearly state this.
 6. Be specific about file paths and line numbers when suggesting fixes: \`File.ts:Line: Comment\`.
+7. **[DEBUG] At the end of your answer, include a section titled "### 🔧 Tools Called" listing all tools you invoked during this task, in order (e.g., get_pr_failed_checks_info, bash, open, answer).**
 `;
 }
 
