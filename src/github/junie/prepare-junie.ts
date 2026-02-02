@@ -4,13 +4,12 @@ import {
     isTriggeredByUserInteraction,
     isPushEvent,
     isJiraWorkflowDispatchEvent,
-    isResolveConflictsWorkflowDispatchEvent, isPullRequestEvent, isPullRequestReviewEvent, isIssueCommentEvent, isWorkflowRunFailureEvent,
+    isResolveConflictsWorkflowDispatchEvent, isWorkflowRunFailureEvent, isFixCIEvent
 } from "../context";
 import {checkHumanActor} from "../validation/actor";
 import {postJunieWorkingStatusComment} from "../operations/comments/feedback";
 import {initializeJunieWorkspace} from "../operations/branch";
 import {PrepareJunieOptions} from "./types/junie";
-import {detectJunieTriggerPhrase, isReviewOrCommentHasFixCITrigger} from "../validation/trigger";
 import {configureGitCredentials} from "../operations/auth";
 import {prepareMcpConfig} from "../../mcp/prepare-mcp-config";
 import {verifyRepositoryAccess} from "../validation/permissions";
@@ -18,8 +17,9 @@ import {Octokits} from "../api/client";
 import {prepareJunieTask} from "./junie-tasks";
 import {prepareJunieCLIToken} from "./junie-token";
 import {OUTPUT_VARS} from "../../constants/environment";
-import {RESOLVE_CONFLICTS_ACTION, FIX_CI_ACTION} from "../../constants/github";
+import {RESOLVE_CONFLICTS_ACTION,} from "../../constants/github";
 import {getJiraClient} from "../jira/client";
+import {detectJunieTriggerPhrase} from "../validation/trigger";
 
 /**
  * Initializes Junie execution by preparing environment, auth, and workflow context
@@ -74,12 +74,6 @@ export async function initializeJunieExecution({
         }
     }
 
-    // Detect if this is a fix-ci action (needed for auto-enabling checks server)
-    const isFixCIInPrompt = context.inputs.prompt?.includes(FIX_CI_ACTION);
-    const isFixCIInComment = isReviewOrCommentHasFixCITrigger(context);
-    const isFixCIFromWorkflowFailure = isWorkflowRunFailureEvent(context);
-    const isFixCI = isFixCIInPrompt || isFixCIInComment || isFixCIFromWorkflowFailure;
-
     // Prepare MCP configuration with automatic server activation
     // - Inline comment server: enabled for PRs (requires commitSha)
     // - Checks server: enabled for fix-ci action or when explicitly requested
@@ -92,7 +86,7 @@ export async function initializeJunieExecution({
         branchInfo: branchInfo,
         prNumber: prNumber,
         commitSha: commitSha,
-        isFixCI: isFixCI
+        isFixCI: isFixCIEvent(context)
     })
 
     await prepareJunieTask(context, branchInfo, octokit, mcpConfig.enabledServers)
@@ -119,10 +113,6 @@ async function shouldHandle(context: JunieExecutionContext, octokit: Octokits): 
     }
 
     if (isJiraWorkflowDispatchEvent(context)) {
-        return true;
-    }
-
-    if (isWorkflowRunFailureEvent(context)) {
         return true;
     }
 

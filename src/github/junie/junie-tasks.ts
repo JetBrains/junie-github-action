@@ -1,21 +1,18 @@
 import {
+    isFixCIEvent,
+    isFixCodeReviewEvent,
     isIssueCommentEvent,
     isIssuesEvent,
     isPullRequestEvent,
     isPullRequestReviewCommentEvent,
     isPullRequestReviewEvent,
-    isWorkflowRunFailureEvent,
     JunieExecutionContext
 } from "../context";
 import * as core from "@actions/core";
 import {BranchInfo} from "../operations/branch";
-import {
-    isReviewOrCommentHasCodeReviewTrigger,
-    isReviewOrCommentHasFixCITrigger,
-    isReviewOrCommentHasResolveConflictsTrigger
-} from "../validation/trigger";
+import {isReviewOrCommentHasResolveConflictsTrigger} from "../validation/trigger";
 import {OUTPUT_VARS} from "../../constants/environment";
-import {CODE_REVIEW_ACTION, createCodeReviewPrompt, createFixCIFailuresPrompt, FIX_CI_ACTION} from "../../constants/github";
+import {createCodeReviewPrompt, createFixCIFailuresPrompt} from "../../constants/github";
 import {Octokits} from "../api/client";
 import {NewGitHubPromptFormatter} from "./new-prompt-formatter";
 import {downloadAttachmentsAndRewriteText} from "./attachment-downloader";
@@ -72,19 +69,8 @@ export async function prepareJunieTask(
 
         const issue = fetchedData.pullRequest || fetchedData.issue;
 
-        // Check if prompt contains CODE_REVIEW_ACTION phrase or if comment/review has code-review trigger
-        const isCodeReviewInPrompt = customPrompt?.includes(CODE_REVIEW_ACTION);
-        const isCodeReviewInComment = isReviewOrCommentHasCodeReviewTrigger(context);
-        const isCodeReview = isCodeReviewInPrompt || isCodeReviewInComment;
-
-        // Check if prompt contains FIX_CI_ACTION phrase, comment/review has fix-ci trigger, or workflow_run CI failure
-        const isFixCIInPrompt = customPrompt?.includes(FIX_CI_ACTION);
-        const isFixCIInComment = isReviewOrCommentHasFixCITrigger(context);
-        const isFixCIFromWorkflowFailure = isWorkflowRunFailureEvent(context);
-        const isFixCI = isFixCIInPrompt || isFixCIInComment || isFixCIFromWorkflowFailure;
-    
-        // Debug: log fix-ci detection status
-        console.log(`Fix-CI detection: inPrompt=${isFixCIInPrompt}, inComment=${isFixCIInComment}, fromWorkflowFailure=${isFixCIFromWorkflowFailure}, isFixCI=${isFixCI}`);
+        const isCodeReview = isFixCodeReviewEvent(context)
+        const isFixCI = isFixCIEvent(context)
 
         let promptText: string;
         let finalCustomPrompt = customPrompt;
