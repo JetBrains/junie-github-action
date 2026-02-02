@@ -32,7 +32,21 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
           TEST_ORG: melotria
-        run: bun test --concurrent test/integration/*.test.ts
+        run: |
+          mkdir -p test-results
+          
+          exit_code=0
+          for test_file in test/integration/*.test.ts; do
+            echo "Starting $test_file"
+            bun test "$test_file" &
+          done
+          
+          for job in $(jobs -p); do
+            wait $job || exit_code=$?
+          done
+          
+          echo "All tests completed"
+          exit $exit_code
 
       - name: Upload Test Report
         if: always()
