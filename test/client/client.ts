@@ -21,7 +21,7 @@ export const TEST_WORKFLOW_FILE_PATHS = {
 
 export class Client {
     private octokit: Octokit;
-    private org: string;
+    private readonly org: string;
     public currentRepo: string = "";
 
     constructor() {
@@ -126,11 +126,8 @@ export class Client {
                 return false;
             }
         );
-        if (!foundPR) {
-            throw new Error(`PR not found after polling in ${this.currentRepo}`);
-        }
 
-        return foundPR;
+        return foundPR!;
     }
 
     createIssue(issueTitle: string, issueBody: string, repoName?: string) {
@@ -147,7 +144,7 @@ export class Client {
         condition: (files: GitHubFile[], pr: PullRequest) => boolean | Promise<boolean>
     ): Promise<boolean> {
         const { data: files } = await this.getAllPRFiles(pr);
-        return await condition(files, pr);
+        return condition(files, pr);
     }
 
     conditionPRFilesInclude(fileContentChecks: { [filename: string]: string }) {
@@ -163,7 +160,6 @@ export class Client {
 
                 if ("content" in contentData && typeof contentData.content === "string") {
                     const decodedContent = Buffer.from(contentData.content, "base64").toString("utf-8");
-                    console.log(`Content of ${expectedSnippet} doesn't match expected snippet.`);
                     if (!decodedContent.includes(expectedSnippet)) {
                         console.log(`Content of ${file.filename} doesn't match expected snippet.`);
                         return false;
@@ -174,15 +170,15 @@ export class Client {
         };
     }
 
-    conditionPRNumberEquals(prNumber: number){
+    conditionPRNumberEquals(prNumber: number) {
         console.log(`Checking PR number is ${prNumber}`);
-        return async (pr: PullRequest):Promise<boolean> => {
+        return async (pr: PullRequest): Promise<boolean> => {
             return pr.number === prNumber;
         }
     }
 
-    conditionPRFilesCountIncrease(filesCount: number){
-        return async (files: GitHubFile[]):Promise<boolean> => {
+    conditionPRFilesCountIncrease(filesCount: number) {
+        return async (files: GitHubFile[]): Promise<boolean> => {
             return files.length > filesCount;
         }
     }
@@ -243,26 +239,26 @@ export class Client {
         };
     }
 
-    async getBranch(repoName: string){
+    async getBranch(repoName: string) {
         return this.octokit.repos.getBranch({
-            owner: e2eConfig.org,
+            owner: this.org,
             repo: repoName,
             branch: "main",
         });
     }
 
-    async createRef(repoName: string, branchName: string, sha: string){
+    async createRef(repoName: string, branchName: string, sha: string) {
         return this.octokit.git.createRef({
-            owner: e2eConfig.org,
+            owner: this.org,
             repo: repoName,
             ref: `refs/heads/${branchName}`,
             sha: sha,
         });
     }
 
-    async createPullRequest(repoName: string, branchName: string, title: string, body: string, base: string = "main"){
+    async createPullRequest(repoName: string, branchName: string, title: string, body: string, base: string = "main") {
         return this.octokit.pulls.create({
-            owner: e2eConfig.org,
+            owner: this.org,
             repo: repoName,
             title: title,
             head: branchName,
@@ -271,22 +267,16 @@ export class Client {
         });
     }
 
-    async createCommentToPROrIssue(repoName: string, issueOrPRNumber: number, commentBody: string){
+    async createCommentToPROrIssue(repoName: string, issueOrPRNumber: number, commentBody: string) {
         return this.octokit.issues.createComment({
-            owner: e2eConfig.org,
+            owner: this.org,
             repo: repoName,
             issue_number: issueOrPRNumber,
             body: commentBody,
         });
     }
 
-    private async getPRByNumber(prNumber: number): Promise<PullRequest>{
-        const pulls = await this.getAllPRs();
-        const pr = pulls.data.find(p => p.number === prNumber);
-        return pr as PullRequest;
-    }
-
-    private async getAllCommentReactions(commentId: number){
+    private async getAllCommentReactions(commentId: number) {
         return this.octokit.reactions.listForIssueComment({
             owner: this.org,
             repo: this.currentRepo,
