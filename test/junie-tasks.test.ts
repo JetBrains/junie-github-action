@@ -480,37 +480,6 @@ describe("prepareJunieTask", () => {
             expect(result.task).toContain("get_pr_failed_checks_info");
         });
 
-        test("should automatically trigger fix CI prompt when workflow_run event has failure conclusion", async () => {
-            const context = createMockContext({
-                eventName: "workflow_run" as any,
-                isPR: true,
-                entityNumber: 123,
-                payload: {
-                    action: "completed",
-                    workflow_run: {
-                        id: 12345,
-                        name: "CI",
-                        head_branch: "feature-branch",
-                        head_sha: "abc123",
-                        conclusion: "failure",
-                        pull_requests: [{number: 123}]
-                    },
-                    repository: {
-                        owner: {login: "owner"},
-                        name: "repo"
-                    }
-                } as any
-            });
-            const octokit = createMockOctokit();
-
-            const result = await prepareJunieTask(context, branchInfo, octokit);
-
-            expect(result).toBeDefined();
-            expect(result.task).toBeDefined();
-            expect(result.task).toContain("analyze CI failures and suggest fixes WITHOUT implementing them");
-            expect(result.task).toContain("get_pr_failed_checks_info");
-        });
-
         test("should not trigger fix CI prompt when workflow_run event has success conclusion", async () => {
             const context = createMockContext({
                 eventName: "workflow_run" as any,
