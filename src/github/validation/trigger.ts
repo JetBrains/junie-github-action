@@ -9,7 +9,7 @@ import {
     isPullRequestReviewCommentEvent,
     isPullRequestReviewEvent,
 } from "../context";
-import {CODE_REVIEW_TRIGGER_PHRASE_REGEXP, RESOLVE_CONFLICTS_TRIGGER_PHRASE_REGEXP} from "../../constants/github";
+import {CODE_REVIEW_TRIGGER_PHRASE_REGEXP, FIX_CI_TRIGGER_PHRASE_REGEXP, RESOLVE_CONFLICTS_TRIGGER_PHRASE_REGEXP} from "../../constants/github";
 
 /**
  * Detects if the Junie trigger phrase is present in the workflow context
@@ -93,6 +93,10 @@ export function isReviewOrCommentHasResolveConflictsTrigger(context: JunieExecut
 
 export function isReviewOrCommentHasCodeReviewTrigger(context: JunieExecutionContext) {
     return isReviewOrCommentHasTrigger(context, CODE_REVIEW_TRIGGER_PHRASE_REGEXP)
+}
+
+export function isReviewOrCommentHasFixCITrigger(context: JunieExecutionContext) {
+    return isReviewOrCommentHasTrigger(context, FIX_CI_TRIGGER_PHRASE_REGEXP)
 }
 
 export function isReviewOrCommentHasTrigger(context: JunieExecutionContext, regExp: RegExp) {
