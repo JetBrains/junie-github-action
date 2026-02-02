@@ -360,4 +360,180 @@ describe("NewGitHubPromptFormatter", () => {
         expect(prompt).toContain("<actor>");
         expect(prompt).toContain("<pull_request_info>");
     });
+
+    test("generatePrompt formats review comments with thread structure", async () => {
+        const context = createMockContext();
+        const fetchedData: FetchedData = {
+            pullRequest: {
+                ...createMockPR(),
+                reviews: {
+                    nodes: [
+                        {
+                            id: "review1",
+                            databaseId: 1,
+                            author: {login: "reviewer"},
+                            body: "Some review comments",
+                            state: "COMMENTED",
+                            submittedAt: "2024-01-03T00:00:00Z",
+                            lastEditedAt: null,
+                            url: "https://github.com/test/test/pull/1#pullrequestreview-1",
+                            comments: {
+                                nodes: [
+                                    {
+                                        id: "comment1",
+                                        databaseId: 1,
+                                        body: "This needs improvement",
+                                        path: "src/file.ts",
+                                        position: 10,
+                                        diffHunk: "@@ -1,3 +1,5 @@\n function test() {\n-  return 1;\n+  return 2;\n }",
+                                        author: {login: "reviewer"},
+                                        createdAt: "2024-01-03T10:00:00Z",
+                                        lastEditedAt: null,
+                                        url: "https://github.com/test/test/pull/1#discussion_r1",
+                                        replyTo: null
+                                    },
+                                    {
+                                        id: "comment2",
+                                        databaseId: 2,
+                                        body: "I agree, let me explain why",
+                                        path: "src/file.ts",
+                                        position: 10,
+                                        diffHunk: "@@ -1,3 +1,5 @@\n function test() {\n-  return 1;\n+  return 2;\n }",
+                                        author: {login: "author"},
+                                        createdAt: "2024-01-03T11:00:00Z",
+                                        lastEditedAt: null,
+                                        url: "https://github.com/test/test/pull/1#discussion_r2",
+                                        replyTo: {id: "comment1"}
+                                    },
+                                    {
+                                        id: "comment3",
+                                        databaseId: 3,
+                                        body: "@junie-agent why did you decide this approach?",
+                                        path: "src/file.ts",
+                                        position: 10,
+                                        diffHunk: "@@ -1,3 +1,5 @@\n function test() {\n-  return 1;\n+  return 2;\n }",
+                                        author: {login: "author"},
+                                        createdAt: "2024-01-03T12:00:00Z",
+                                        lastEditedAt: null,
+                                        url: "https://github.com/test/test/pull/1#discussion_r3",
+                                        replyTo: {id: "comment2"}
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            }
+        };
+
+        const prompt = await formatter.generatePrompt(context, fetchedData);
+
+        // Should contain the review section
+        expect(prompt).toContain("<reviews>");
+        expect(prompt).toContain("Review by @reviewer (COMMENTED)");
+        expect(prompt).toContain("Review Comments:");
+
+        // Should show the thread structure with file path and position
+        expect(prompt).toContain("src/file.ts (position: 10):");
+
+        // Should show all comments in thread order
+        expect(prompt).toContain("@reviewer: This needs improvement");
+        expect(prompt).toContain("@author: I agree, let me explain why");
+        expect(prompt).toContain("@junie-agent why did you decide this approach?");
+
+        // Verify the thread structure is preserved (replies come after parent)
+        const reviewerCommentPos = prompt.indexOf("@reviewer: This needs improvement");
+        const firstReplyPos = prompt.indexOf("@author: I agree, let me explain why");
+        const secondReplyPos = prompt.indexOf("@junie-agent why did you decide this approach?");
+
+        expect(reviewerCommentPos).toBeLessThan(firstReplyPos);
+        expect(firstReplyPos).toBeLessThan(secondReplyPos);
+    });
+
+    test("generatePrompt formats multiple comment threads correctly", async () => {
+        const context = createMockContext();
+        const fetchedData: FetchedData = {
+            pullRequest: {
+                ...createMockPR(),
+                reviews: {
+                    nodes: [
+                        {
+                            id: "review1",
+                            databaseId: 1,
+                            author: {login: "reviewer"},
+                            body: "Review with multiple threads",
+                            state: "COMMENTED",
+                            submittedAt: "2024-01-03T00:00:00Z",
+                            lastEditedAt: null,
+                            url: "https://github.com/test/test/pull/1#pullrequestreview-1",
+                            comments: {
+                                nodes: [
+                                    // First thread
+                                    {
+                                        id: "thread1-comment1",
+                                        databaseId: 1,
+                                        body: "First thread root comment",
+                                        path: "src/file1.ts",
+                                        position: 5,
+                                        diffHunk: "@@ -1,1 +1,1 @@",
+                                        author: {login: "reviewer"},
+                                        createdAt: "2024-01-03T10:00:00Z",
+                                        lastEditedAt: null,
+                                        url: "https://github.com/test/test/pull/1#discussion_r1",
+                                        replyTo: null
+                                    },
+                                    {
+                                        id: "thread1-comment2",
+                                        databaseId: 2,
+                                        body: "Reply to first thread",
+                                        path: "src/file1.ts",
+                                        position: 5,
+                                        diffHunk: "@@ -1,1 +1,1 @@",
+                                        author: {login: "author"},
+                                        createdAt: "2024-01-03T11:00:00Z",
+                                        lastEditedAt: null,
+                                        url: "https://github.com/test/test/pull/1#discussion_r2",
+                                        replyTo: {id: "thread1-comment1"}
+                                    },
+                                    // Second thread
+                                    {
+                                        id: "thread2-comment1",
+                                        databaseId: 3,
+                                        body: "Second thread root comment",
+                                        path: "src/file2.ts",
+                                        position: 10,
+                                        diffHunk: "@@ -2,2 +2,2 @@",
+                                        author: {login: "reviewer"},
+                                        createdAt: "2024-01-03T12:00:00Z",
+                                        lastEditedAt: null,
+                                        url: "https://github.com/test/test/pull/1#discussion_r3",
+                                        replyTo: null
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            }
+        };
+
+        const prompt = await formatter.generatePrompt(context, fetchedData);
+
+        // Should contain both file paths as separate threads
+        expect(prompt).toContain("src/file1.ts (position: 5):");
+        expect(prompt).toContain("src/file2.ts (position: 10):");
+
+        // Should contain all comments
+        expect(prompt).toContain("First thread root comment");
+        expect(prompt).toContain("Reply to first thread");
+        expect(prompt).toContain("Second thread root comment");
+
+        // Verify thread separation: first thread should be complete before second thread
+        const firstThreadRootPos = prompt.indexOf("First thread root comment");
+        const firstThreadReplyPos = prompt.indexOf("Reply to first thread");
+        const secondThreadRootPos = prompt.indexOf("Second thread root comment");
+
+        expect(firstThreadRootPos).toBeLessThan(firstThreadReplyPos);
+        expect(firstThreadReplyPos).toBeLessThan(secondThreadRootPos);
+    });
 });

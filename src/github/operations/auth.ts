@@ -3,7 +3,7 @@ import {JunieExecutionContext} from "../context";
 import {$} from "bun";
 import type {Octokits} from "../api/client";
 import type {GitHubTokenConfig} from "../token";
-import {GITHUB_ACTIONS_BOT} from "../../constants/github";
+import {GITHUB_ACTIONS_BOT, JUNIE_AGENT} from "../../constants/github";
 import {VIEWER_QUERY, type ViewerQueryResponse} from "../api/queries";
 
 interface GitUser {
@@ -131,41 +131,15 @@ export async function configureGitCredentials(parsedContext: JunieExecutionConte
     console.log("Configuring git authentication...");
 
     const serverUrl = new URL(GITHUB_SERVER_URL);
-    let gitUser: GitUser;
-    const tokenOwner = parsedContext.tokenOwner;
 
-    // Determine which credentials to use for git commits
-    // Bots/Apps should commit as themselves, not as the human actor
-    if (tokenOwner.type === "Bot") {
-        console.log(`Using token owner (bot) credentials for git authentication: ${tokenOwner.login}`);
-
-        // Generate GitHub noreply email address for bots
-        // Format: {id}+{login}@users.noreply.github.com
-        // Example: 41898282+github-actions[bot]@users.noreply.github.com
-        const noreplyDomain =
-            serverUrl.hostname === "github.com"
-                ? "users.noreply.github.com"
-                : `users.noreply.${serverUrl.hostname}`; // For GitHub Enterprise
-
-        const email = `${tokenOwner.id}+${tokenOwner.login}@${noreplyDomain}`;
-        gitUser = {
-            login: tokenOwner.login,
-            email: email,
-        };
-    } else {
-        // For human users with custom PATs, use their actual credentials
-        console.log("Using actor credentials for git authentication");
-        gitUser = {
-            login: parsedContext.actor,
-            email: parsedContext.actorEmail,
-        };
-    }
+    // Always use junie-agent account for git commits
+    // The actual actor who triggered the workflow will be added as co-author in commit message
+    console.log(`Using junie-agent credentials for git authentication: ${JUNIE_AGENT.login}`);
 
     // Configure git user for commits (required for both default and custom tokens)
     try {
-        await $`git config user.name "${gitUser.login}"`;
-        await $`git config user.email "${gitUser.email}"`;
-        console.log(`✓ Git user configured: ${gitUser.login} <${gitUser.email}>`);
+        await $`git config user.name "${JUNIE_AGENT.login}"`;
+        await $`git config user.email "${JUNIE_AGENT.email}"`;
     } catch (error) {
         throw new Error(
             `❌ Failed to configure git user credentials. ` +

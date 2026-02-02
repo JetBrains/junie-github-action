@@ -58,7 +58,16 @@ export async function handleResults() {
         if (isTriggeredByUserInteraction(context)) {
             issueId = context.entityNumber
         }
-        const commitMessage = COMMIT_MESSAGE_TEMPLATE(title, issueId)
+
+        // Add co-author only for user-triggered events (issues, PRs, comments)
+        // For system-triggered events (schedule, workflow_dispatch), skip co-author
+        const addCoAuthor = isTriggeredByUserInteraction(context);
+        const commitMessage = COMMIT_MESSAGE_TEMPLATE(
+            title,
+            issueId,
+            addCoAuthor ? context.actor : undefined,
+            addCoAuthor ? context.actorEmail : undefined
+        )
 
         // Export outputs based on action type
         switch (actionToDo) {

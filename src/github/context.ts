@@ -311,8 +311,14 @@ export function extractJunieWorkflowContext(tokenOwner: TokenOwner): JunieExecut
         default:
             throw new Error(`Unsupported event type: ${context.eventName}`);
     }
+    // Set actor information (user who triggered the workflow) - used for co-author
     core.setOutput(OUTPUT_VARS.ACTOR_NAME, parsedContext.actor);
     core.setOutput(OUTPUT_VARS.ACTOR_EMAIL, parsedContext.actorEmail);
+
+    // Set junie-agent information - used as commit author
+    core.setOutput(OUTPUT_VARS.JUNIE_AGENT_NAME, JUNIE_AGENT.login);
+    core.setOutput(OUTPUT_VARS.JUNIE_AGENT_EMAIL, JUNIE_AGENT.email);
+
     core.setOutput(OUTPUT_VARS.PARSED_CONTEXT, JSON.stringify(parsedContext));
     return parsedContext;
 }
@@ -502,7 +508,13 @@ export function isTriggeredByUserInteraction(
 function getActorEmail(): string {
     const actor = github.context.actor;
     const userId = github.context.payload.sender?.id;
+
+    // For scheduled workflows or events without sender, use a placeholder ID
+    // GitHub doesn't provide sender info for scheduled events
+    if (!userId) {
+        // Use "0" as placeholder ID for system-triggered events (schedule, workflow_dispatch without actor, etc.)
+        return `0+${actor}@users.noreply.github.com`;
+    }
+
     return `${userId}+${actor}@users.noreply.github.com`;
 }
-
-

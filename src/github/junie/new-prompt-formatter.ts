@@ -2,6 +2,7 @@ import {
     FetchedData,
     GraphQLCommitNode,
     GraphQLFileNode,
+    GraphQLReviewCommentNode,
     GraphQLReviewNode,
     GraphQLTimelineItemNode,
     isCrossReferencedEventNode,
@@ -39,7 +40,7 @@ export class NewGitHubPromptFormatter {
 
         const repositoryInfo = this.getRepositoryInfo(context);
         const actorInfo = this.getActorInfo(context);
-        const userInstruction = this.getUserInstruction(context, userPrompt)
+        const userInstruction = this.getUserInstruction(context, fetchedData, userPrompt)
         const prOrIssueInfo = this.getPrOrIssueInfo(context, fetchedData);
         const commitsInfo = this.getCommitsInfo(fetchedData);
         const timelineInfo = this.getTimelineInfo(fetchedData);
@@ -99,14 +100,22 @@ ${GIT_OPERATIONS_NOTE}
         return sanitizeContent(promptWithAttachments);
     }
 
-    private getUserInstruction(context: JunieExecutionContext, customPrompt?: string): string | undefined {
+    private getUserInstruction(context: JunieExecutionContext, fetchedData: FetchedData, customPrompt?: string): string | undefined {
         let githubUserInstruction
         if (isPullRequestEvent(context)) {
             githubUserInstruction = context.payload.pull_request.body
         } else if (isPullRequestReviewEvent(context)) {
             githubUserInstruction = context.payload.review.body
         } else if (isPullRequestReviewCommentEvent(context)) {
-            githubUserInstruction = context.payload.comment.body
+            // For review comments, include thread context
+            const commentBody = context.payload.comment.body;
+            const threadId = this.findThreadId(context, fetchedData);
+
+            if (threadId) {
+                githubUserInstruction = `Review thread #${threadId}:\n${commentBody}`;
+            } else {
+                githubUserInstruction = commentBody;
+            }
         } else if (isIssuesEvent(context)) {
             githubUserInstruction = context.payload.issue.body
         } else if (isIssueCommentEvent(context)) {
@@ -118,6 +127,42 @@ ${GIT_OPERATIONS_NOTE}
         <user_instruction>
         ${instruction}
 </user_instruction>` : undefined
+    }
+
+    /**
+     * Finds the thread ID (root comment ID) for a review comment
+     */
+    private findThreadId(context: JunieExecutionContext, fetchedData: FetchedData): string | undefined {
+        if (!isPullRequestReviewCommentEvent(context)) {
+            return undefined;
+        }
+
+        const currentCommentId = context.payload.comment.id; // REST API ID (number)
+
+        // Get all comments from all reviews
+        const allComments = fetchedData.pullRequest?.reviews?.nodes
+            ?.flatMap(r => r.comments.nodes) || [];
+
+        // Find the current comment by databaseId (REST API ID)
+        const currentComment = allComments.find(c => c.databaseId === currentCommentId);
+        if (!currentComment) return undefined;
+
+        // If it has a replyTo, find the root comment by following the chain
+        if (currentComment.replyTo) {
+            let root = currentComment;
+            while (root.replyTo) {
+                const parent = allComments.find(c => c.id === root.replyTo!.id);
+                if (parent) {
+                    root = parent;
+                } else {
+                    break;
+                }
+            }
+            return root.databaseId.toString();
+        }
+
+        // This is already the root comment
+        return currentComment.databaseId.toString();
     }
 
     private getPrOrIssueInfo(context: JunieExecutionContext, fetchedData: FetchedData): string | undefined {
@@ -266,28 +311,72 @@ ${body}`;
 
         if (review.comments.nodes.length > 0) {
             reviewText += '\n\nReview Comments:';
-
-            const sortedComments = [...review.comments.nodes].sort(
-                (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-            );
-
-            for (const comment of sortedComments) {
-                const commentAuthor = comment.author?.login;
-                const commentBody = comment.body;
-                const path = comment.path;
-                const diffHunk = comment.diffHunk;
-
-                reviewText += `\n\n  ${path}:`;
-
-                if (diffHunk) {
-                    reviewText += `\n  \`\`\`diff\n${diffHunk}\n  \`\`\``;
-                }
-
-                reviewText += `\n  @${commentAuthor}: ${commentBody}`;
-            }
+            reviewText += this.formatReviewCommentsWithThreads(review.comments.nodes);
         }
 
         return reviewText;
+    }
+
+    /**
+     * Formats review comments as a tree structure, showing reply threads
+     */
+    private formatReviewCommentsWithThreads(comments: GraphQLReviewCommentNode[]): string {
+        // Find root comments (those that are not replies)
+        const rootComments = comments.filter(c => !c.replyTo);
+
+        // Sort root comments by creation time
+        const sortedRoots = [...rootComments].sort(
+            (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        );
+
+        let result = '';
+        for (const rootComment of sortedRoots) {
+            result += this.formatCommentThread(rootComment, comments, 0);
+        }
+
+        return result;
+    }
+
+    /**
+     * Recursively formats a comment and its replies with proper indentation
+     */
+    private formatCommentThread(
+        comment: GraphQLReviewCommentNode,
+        allComments: GraphQLReviewCommentNode[],
+        depth: number
+    ): string {
+        const indent = '  '.repeat(depth);
+        const commentAuthor = comment.author?.login;
+        const commentBody = comment.body;
+        const path = comment.path;
+        const position = comment.position;
+
+        let result = '';
+
+        // Show file path, position, and thread ID only for root comments
+        if (depth === 0) {
+            result += `\n\n  Thread #${comment.databaseId} - ${path}`;
+            if (position !== null) {
+                result += ` (position: ${position})`;
+            }
+            result += ':';
+        }
+
+        result += `\n  ${indent}@${commentAuthor}: ${commentBody}`;
+
+        // Find and format replies to this comment
+        const replies = allComments.filter(c => c.replyTo?.id === comment.id);
+
+        // Sort replies by creation time
+        const sortedReplies = [...replies].sort(
+            (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        );
+
+        for (const reply of sortedReplies) {
+            result += this.formatCommentThread(reply, allComments, depth + 1);
+        }
+
+        return result;
     }
 
     private getChangedFilesInfo(fetchedData: FetchedData): string | undefined {

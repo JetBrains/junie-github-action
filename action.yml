@@ -238,8 +238,8 @@ runs:
       id: commit
       if: steps.prepare.outputs.SHOULD_SKIP != 'true' && inputs.silent_mode != 'true' && (steps.junie-run-results.outputs.ACTION_TO_DO == 'COMMIT_CHANGES' || steps.junie-run-results.outputs.ACTION_TO_DO == 'CREATE_PR')
       with:
-        author_name: ${{ steps.prepare.outputs.ACTOR_NAME }}
-        author_email: ${{ steps.prepare.outputs.ACTOR_EMAIL }}
+        author_name: ${{ steps.prepare.outputs.JUNIE_AGENT_NAME }}
+        author_email: ${{ steps.prepare.outputs.JUNIE_AGENT_EMAIL }}
         message: ${{ steps.junie-run-results.outputs.COMMIT_MESSAGE }}
         new_branch: ${{ steps.prepare.outputs.WORKING_BRANCH }}
 

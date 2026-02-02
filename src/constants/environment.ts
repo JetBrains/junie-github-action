@@ -56,6 +56,10 @@ export const OUTPUT_VARS = {
     ACTOR_NAME: "ACTOR_NAME",
     ACTOR_EMAIL: "ACTOR_EMAIL",
 
+    // Junie agent information (for commit author)
+    JUNIE_AGENT_NAME: "JUNIE_AGENT_NAME",
+    JUNIE_AGENT_EMAIL: "JUNIE_AGENT_EMAIL",
+
     // Context and branches
     PARSED_CONTEXT: "PARSED_CONTEXT",
     BASE_BRANCH: "BASE_BRANCH",
