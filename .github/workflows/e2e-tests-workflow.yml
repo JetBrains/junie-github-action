@@ -32,6 +32,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
           TEST_ORG: melotria
+          CURRENT_BRANCH: ${{ github.head_ref || github.ref_name }}
         run: |
           mkdir -p test-results
           

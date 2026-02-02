@@ -23,7 +23,7 @@ export const TEST_WORKFLOW_FILE_PATHS = {
 
 export class Client {
     private octokit: Octokit;
-    private readonly org: string;
+    public readonly org: string;
     public currentRepo: string = "";
 
     constructor() {
@@ -52,8 +52,10 @@ export class Client {
         workflowFilePathInTestDirectory: string = TEST_WORKFLOW_FILE_PATHS.workflowFilePathInTestDirectory
     ): Promise<void> {
         const workflowPath = path.join(process.cwd(), workflowFilePathInTestDirectory);
-        const workflowContent = fs.readFileSync(workflowPath, "utf-8");
+        let workflowContent = fs.readFileSync(workflowPath, "utf-8");
+        const currentBranch = process.env.CURRENT_BRANCH || "v0";
 
+        workflowContent = workflowContent.replace(/@v0/g, `@${currentBranch}`);
         await this.createOrUpdateFileContents(
             repoName,
             Buffer.from(workflowContent).toString("base64"),
