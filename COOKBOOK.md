@@ -306,8 +306,60 @@ jobs:
 
 **Solution:** Junie analyzes failed CI runs, identifies root causes, and proposes fixes.
 
+### Option A: Use Built-in Fix CI (Recommended)
+
+Use the built-in `fix-ci` prompt for automatic CI failure analysis with structured output:
+
 <details>
 <summary>View complete workflow</summary>
+
+```yaml
+# .github/workflows/fix-ci.yml
+name: Fix CI Failures
+
+on:
+  workflow_run:
+    workflows: ["CI"]  # Replace with your CI workflow name
+    types: [completed]
+
+jobs:
+  analyze-failure:
+    if: github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      checks: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_branch }}
+          fetch-depth: 1
+
+      - uses: JetBrains/junie-github-action@v0
+        with:
+          junie_api_key: ${{ secrets.JUNIE_API_KEY }}
+          allowed_mcp_servers: "mcp_github_checks_server"
+          use_single_comment: "true"
+          prompt: "fix-ci"
+```
+
+</details>
+
+The built-in fix-ci prompt:
+- **Retrieves failed check information** using MCP GitHub Checks Server
+- **Analyzes root causes** - test failures, build errors, linting issues, timeouts, flaky tests
+- **Correlates with PR changes** - determines if failure is related to the PR or pre-existing
+- **Provides structured output** - failed check details, error messages, root cause analysis, and suggested fixes
+
+### Option B: Custom Fix CI Prompt
+
+For custom analysis criteria, provide your own detailed prompt:
+
+<details>
+<summary>View complete workflow with custom prompt</summary>
 
 ```yaml
 # .github/workflows/fix-ci.yml
@@ -365,11 +417,22 @@ jobs:
 
 </details>
 
+### Option C: On-Demand Fix CI via Comments
+
+You can also trigger CI failure analysis on-demand by commenting on a PR with the `fix-ci` phrase:
+
+```
+@junie-agent fix-ci
+```
+
+This works with any workflow that has issue/PR comment triggers configured. The same built-in fix-ci prompt will be used automatically.
+
 **How it works:**
-1. Triggers when your CI workflow completes with failure
+1. Triggers when your CI workflow completes with failure or when someone uses `@junie-agent fix-ci`
 2. Uses MCP GitHub Checks Server to fetch error logs
 3. Analyzes the failure and identifies root cause
-4. Provides detailed analysis
+4. Provides detailed analysis with suggested fixes
+5. Updates the same comment on subsequent runs (via `use_single_comment`)
 
 **Advanced:**
 - Integrate with issue tracker (create bug report if fix is complex)

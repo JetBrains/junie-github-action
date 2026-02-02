@@ -4,13 +4,12 @@ import {
     isTriggeredByUserInteraction,
     isPushEvent,
     isJiraWorkflowDispatchEvent,
-    isResolveConflictsWorkflowDispatchEvent, isPullRequestEvent, isPullRequestReviewEvent, isIssueCommentEvent,
+    isResolveConflictsWorkflowDispatchEvent, isWorkflowRunFailureEvent, isFixCIEvent
 } from "../context";
 import {checkHumanActor} from "../validation/actor";
 import {postJunieWorkingStatusComment} from "../operations/comments/feedback";
 import {initializeJunieWorkspace} from "../operations/branch";
 import {PrepareJunieOptions} from "./types/junie";
-import {detectJunieTriggerPhrase} from "../validation/trigger";
 import {configureGitCredentials} from "../operations/auth";
 import {prepareMcpConfig} from "../../mcp/prepare-mcp-config";
 import {verifyRepositoryAccess} from "../validation/permissions";
@@ -18,8 +17,9 @@ import {Octokits} from "../api/client";
 import {prepareJunieTask} from "./junie-tasks";
 import {prepareJunieCLIToken} from "./junie-token";
 import {OUTPUT_VARS} from "../../constants/environment";
-import {RESOLVE_CONFLICTS_ACTION} from "../../constants/github";
+import {RESOLVE_CONFLICTS_ACTION,} from "../../constants/github";
 import {getJiraClient} from "../jira/client";
+import {detectJunieTriggerPhrase} from "../validation/trigger";
 
 /**
  * Initializes Junie execution by preparing environment, auth, and workflow context
@@ -62,10 +62,21 @@ export async function initializeJunieExecution({
 
     // Get PR-specific info for MCP servers
     const prNumber = context.isPR ? context.entityNumber : undefined;
-    const commitSha = branchInfo.headSha;
+    
+    // For workflow_run events, use the workflow run's head_sha (the commit that was tested)
+    // This is critical for the checks server to find the correct check runs
+    let commitSha = branchInfo.headSha;
+    if (isWorkflowRunFailureEvent(context)) {
+        const workflowRunSha = (context.payload as any).workflow_run?.head_sha;
+        if (workflowRunSha) {
+            console.log(`Using workflow_run head_sha for checks: ${workflowRunSha}`);
+            commitSha = workflowRunSha;
+        }
+    }
 
     // Prepare MCP configuration with automatic server activation
     // - Inline comment server: enabled for PRs (requires commitSha)
+    // - Checks server: enabled for fix-ci action or when explicitly requested
     const mcpConfig = await prepareMcpConfig({
         junieWorkingDir: context.inputs.junieWorkingDir,
         allowedMcpServers: mcpServers,
@@ -74,7 +85,8 @@ export async function initializeJunieExecution({
         repo: context.payload.repository.name,
         branchInfo: branchInfo,
         prNumber: prNumber,
-        commitSha: commitSha
+        commitSha: commitSha,
+        isFixCI: isFixCIEvent(context)
     })
 
     await prepareJunieTask(context, branchInfo, octokit, mcpConfig.enabledServers)

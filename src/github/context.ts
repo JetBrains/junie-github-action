@@ -16,7 +16,14 @@ import {
 } from "@octokit/webhooks-types";
 import type {TokenOwner} from "./operations/auth";
 import {OUTPUT_VARS} from "../constants/environment";
-import {DEFAULT_TRIGGER_PHRASE, JIRA_EVENT_ACTION, JUNIE_AGENT, RESOLVE_CONFLICTS_ACTION} from "../constants/github";
+import {
+    CODE_REVIEW_ACTION,
+    DEFAULT_TRIGGER_PHRASE,
+    FIX_CI_ACTION,
+    JIRA_EVENT_ACTION, JUNIE_AGENT,
+    RESOLVE_CONFLICTS_ACTION
+} from "../constants/github";
+import {isReviewOrCommentHasCodeReviewTrigger, isReviewOrCommentHasFixCITrigger} from "./validation/trigger";
 
 // Jira integration types
 export type JiraComment = {
@@ -408,11 +415,15 @@ function extractJiraEventData(workflowPayload: WorkflowDispatchEvent, context: J
     };
 }
 
-export function isJiraWorkflowDispatchEvent(context: JunieExecutionContext): context is AutomationEventContext & { payload: JiraIssuePayload } {
+export function isJiraWorkflowDispatchEvent(context: JunieExecutionContext): context is AutomationEventContext & {
+    payload: JiraIssuePayload
+} {
     return context.eventName === "workflow_dispatch" && 'action' in context.payload && context.payload.action === JIRA_EVENT_ACTION;
 }
 
-export function isResolveConflictsWorkflowDispatchEvent(context: JunieExecutionContext): context is AutomationEventContext & { payload: ResolveConflictsEventPayload }  {
+export function isResolveConflictsWorkflowDispatchEvent(context: JunieExecutionContext): context is AutomationEventContext & {
+    payload: ResolveConflictsEventPayload
+} {
     return context.eventName === "workflow_dispatch" && 'action' in context.payload && context.payload.action === RESOLVE_CONFLICTS_ACTION;
 }
 
@@ -463,6 +474,31 @@ export function isIssuesAssignedEvent(
 ): context is UserInitiatedEventContext & { payload: IssuesAssignedEvent } {
     return isIssuesEvent(context) && context.eventAction === "assigned";
 }
+
+/**
+ * Checks if the context is a workflow_run event triggered by a CI failure
+ */
+export function isWorkflowRunFailureEvent(
+    context: JunieExecutionContext,
+): context is AutomationEventContext & { payload: WorkflowRunEvent } {
+    return context.eventName === "workflow_run" &&
+        (context.payload as WorkflowRunEvent).workflow_run?.conclusion === "failure";
+}
+
+export function isFixCIEvent(context: JunieExecutionContext) {
+    const isFixCIInPrompt = context.inputs.prompt?.includes(FIX_CI_ACTION);
+    const isFixCIInComment = isReviewOrCommentHasFixCITrigger(context);
+    console.log(`Fix-CI detection: inPrompt=${isFixCIInPrompt}, inComment=${isFixCIInComment}`);
+    return isFixCIInPrompt || isFixCIInComment;
+}
+
+export function isFixCodeReviewEvent(context: JunieExecutionContext) {
+    const isCodeReviewInPrompt = context.inputs.prompt?.includes(CODE_REVIEW_ACTION);
+    const isCodeReviewInComment = isReviewOrCommentHasCodeReviewTrigger(context);
+    console.log(`Code review detection: inPrompt=${isCodeReviewInPrompt}, inComment=${isCodeReviewInComment}`);
+    return isCodeReviewInPrompt || isCodeReviewInComment;
+}
+
 
 /**
  * Checks if the context is triggered by user interaction (comments, PR/issue events)

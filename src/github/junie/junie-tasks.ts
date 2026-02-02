@@ -1,4 +1,6 @@
 import {
+    isFixCIEvent,
+    isFixCodeReviewEvent,
     isIssueCommentEvent,
     isIssuesEvent,
     isPullRequestEvent,
@@ -8,12 +10,9 @@ import {
 } from "../context";
 import * as core from "@actions/core";
 import {BranchInfo} from "../operations/branch";
-import {
-    isReviewOrCommentHasCodeReviewTrigger,
-    isReviewOrCommentHasResolveConflictsTrigger
-} from "../validation/trigger";
+import {isReviewOrCommentHasResolveConflictsTrigger} from "../validation/trigger";
 import {OUTPUT_VARS} from "../../constants/environment";
-import {CODE_REVIEW_ACTION, createCodeReviewPrompt} from "../../constants/github";
+import {createCodeReviewPrompt, createFixCIFailuresPrompt} from "../../constants/github";
 import {Octokits} from "../api/client";
 import {NewGitHubPromptFormatter} from "./new-prompt-formatter";
 import {downloadAttachmentsAndRewriteText} from "./attachment-downloader";
@@ -70,10 +69,8 @@ export async function prepareJunieTask(
 
         const issue = fetchedData.pullRequest || fetchedData.issue;
 
-        // Check if prompt contains CODE_REVIEW_ACTION phrase or if comment/review has code-review trigger
-        const isCodeReviewInPrompt = customPrompt?.includes(CODE_REVIEW_ACTION);
-        const isCodeReviewInComment = isReviewOrCommentHasCodeReviewTrigger(context);
-        const isCodeReview = isCodeReviewInPrompt || isCodeReviewInComment;
+        const isCodeReview = isFixCodeReviewEvent(context)
+        const isFixCI = isFixCIEvent(context)
 
         let promptText: string;
         let finalCustomPrompt = customPrompt;
@@ -81,6 +78,14 @@ export async function prepareJunieTask(
             const branchName = branchInfo.prBaseBranch || branchInfo.baseBranch;
             const diffPoint = context.isPR ? String(context.entityNumber) : branchName;
             finalCustomPrompt = createCodeReviewPrompt(diffPoint);
+            console.log(`Using CODE REVIEW prompt for diffPoint: ${diffPoint}`);
+        } else if (isFixCI) {
+            // Fix CI can trigger with or without an associated PR/issue (e.g., workflow_run failure on a branch)
+            const branchName = branchInfo.prBaseBranch || branchInfo.baseBranch;
+            const diffPoint = context.isPR && context.entityNumber ? String(context.entityNumber) : branchName;
+            finalCustomPrompt = createFixCIFailuresPrompt(diffPoint);
+            console.log(`Using FIX-CI prompt for diffPoint: ${diffPoint}`);
+            console.log(`Fix-CI prompt preview (first 200 chars): ${finalCustomPrompt.substring(0, 200)}`);
         }
         promptText = await formatter.generatePrompt(context, fetchedData, finalCustomPrompt, context.inputs.attachGithubContextToCustomPrompt);
 

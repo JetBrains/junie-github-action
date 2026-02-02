@@ -28,6 +28,10 @@ export const CODE_REVIEW_ACTION = "code-review";
 
 export const CODE_REVIEW_TRIGGER_PHRASE_REGEXP = new RegExp(CODE_REVIEW_ACTION, 'i')
 
+export const FIX_CI_ACTION = "fix-ci";
+
+export const FIX_CI_TRIGGER_PHRASE_REGEXP = new RegExp(FIX_CI_ACTION, 'i');
+
 export const JIRA_EVENT_ACTION = "jira_event";
 
 export const WORKING_BRANCH_PREFIX = "junie/";
@@ -82,6 +86,70 @@ Additional instructions:
 - Keep it concise (15–25 words per comment). No praise, questions, or speculation; omit low-impact nits.
 - If unsure whether a comment applies, omit it. If no feedback is warranted, answer \`LGTM\` only .
 - For small changes, max 3 comments; medium 6–8; large 8–12.
+`;
+}
+
+export function createFixCIFailuresPrompt(diffPoint: string): string {
+    const diffCommand = `gh pr diff ${diffPoint}`
+    return `
+Your task is to analyze CI failures and suggest fixes WITHOUT implementing them. Follow these steps:
+
+### Steps to follow
+1. Gather Information
+   - Use the 'get_pr_failed_checks_info' tool to retrieve information about failed CI/CD checks.
+   - Read the Pull Request diff by using \`${diffCommand} | grep "^diff --git"\`. Do not write the diff to file.
+
+2. If NO failed checks were found:
+   - Submit ONLY the following message:
+   ---
+   ## ✅ CI Status
+   
+   No failed checks found for this PR. All CI checks have passed or are still running.
+   ---
+
+3. If failed checks WERE found, analyze each failure:
+   - Open and explore relevant source files to understand the context
+   - Do NOT run tests, build, or make any modifications to the codebase.
+   - Identify the failing step and error message. 
+   - Determine the root cause (test failure, build error, linting issue, timeout, flaky test, etc.)
+   - Correlate the error with changes in the PR diff. 
+   - Determine if the failure is related to the PR diff or a pre-existing issue
+   - Do not use the 'post_inline_review_comment' tool. Suggest changes only as shown in the template below.
+
+4. Submit your analysis using EXACTLY the output format described below. You MUST always follow this template structure precisely, do not add an extra section or change the format.
+
+### Output Format
+---
+## 🔴 CI Failure Analysis
+
+**Failed Check:** [check name]
+**Failed Step:** [step name if identifiable]
+**Error Type:** [test failure / build error / lint error / timeout / other]
+
+### Error Details
+\`\`\`
+[relevant error message/stack trace - keep concise]
+\`\`\`
+
+### Root Cause
+[1-3 sentences explaining why this failed]
+
+### Correlation with PR Changes
+[Explain which files/changes in this PR likely caused the failure, or state if it appears unrelated]
+
+## 🔧 Suggested Fix
+
+### What needs to change
+[Clear description of the fix approach]
+
+### Files to modify
+- \`File.ts:Line:\`: [what needs to change and why]
+
+### Code changes
+\`\`\`[language]
+// Suggested code snippet or pseudocode
+\`\`\`
+---
 `;
 }
 
