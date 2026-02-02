@@ -9,6 +9,8 @@ import {
 import {RestEndpointMethodTypes} from "@octokit/rest";
 
 type PullRequest = RestEndpointMethodTypes["pulls"]["list"]["response"]["data"][number];
+type Comment = RestEndpointMethodTypes["issues"]["listComments"]["response"]["data"][number];
+type Reaction = RestEndpointMethodTypes["reactions"]["listForIssueComment"]["response"]["data"][number];
 type GitHubFile =
     | RestEndpointMethodTypes["pulls"]["listFiles"]["response"]["data"][number]
     | NonNullable<RestEndpointMethodTypes["repos"]["getCommit"]["response"]["data"]["files"]>[number]
@@ -68,9 +70,9 @@ export class Client {
         });
     }
 
-    async waitForJunieComment(issueOrPRNumber: number, message: string): Promise<void> {
+    async waitForJunieComment(issueOrPRNumber: number, message: string): Promise<Comment> {
         console.log(`Waiting for Junie to post comment containing "${message}" in issue #${issueOrPRNumber} in ${this.currentRepo}...`);
-
+        let foundComment: Comment | undefined;
         await startPoll(
             `Junie didn't post comment containing "${message}" in issue #${issueOrPRNumber}`,
             {},
@@ -79,17 +81,19 @@ export class Client {
                 const junieComment = comments.find(c => c.body?.includes(message));
 
                 if (junieComment) {
+                    foundComment = junieComment;
                     console.log(`Found comment with message: "${message}"`);
                     return true;
                 }
                 return false;
             }
         );
+        return foundComment!;
     }
 
-    async waitForCommentReaction(commentId: number, reactionType: string = "+1"): Promise<void> {
+    async waitForCommentReaction(commentId: number, reactionType: string = "+1"): Promise<Reaction> {
         console.log(`Waiting for reaction "${reactionType}" on comment #${commentId} in ${this.currentRepo}...`);
-
+        let foundReaction: Reaction | undefined;
         await startPoll(
             `Reaction "${reactionType}" not found on comment #${commentId}`,
             {},
@@ -98,12 +102,14 @@ export class Client {
 
                 const hasReaction = reactions.some(r => r.content === reactionType);
                 if (hasReaction) {
+                    foundReaction = reactions.find(r => r.content === reactionType);
                     console.log(`Found "${reactionType}" reaction on comment #${commentId}`);
                     return true;
                 }
                 return false;
             }
         );
+        return foundReaction!;
     }
 
     async waitForPR(
