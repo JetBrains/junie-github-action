@@ -25,34 +25,6 @@ async function getValidatedTextTask(text: string): Promise<string> {
     return await downloadAttachmentsAndRewriteText(text)
 }
 
-/**
- * Extracts the user's request text from a comment that triggered the minor-fix action.
- * The request is the text that follows "minor-fix" in the comment.
- * For example: "minor-fix rename variable foo to bar" -> "rename variable foo to bar"
- */
-function extractMinorFixRequest(context: JunieExecutionContext): string | undefined {
-    let commentBody: string | undefined;
-
-    if (isIssueCommentEvent(context) || isPullRequestReviewCommentEvent(context)) {
-        commentBody = context.payload.comment.body;
-    } else if (isPullRequestReviewEvent(context)) {
-        commentBody = context.payload.review.body || undefined;
-    }
-
-    if (!commentBody) {
-        return undefined;
-    }
-
-    // Match "minor-fix" (case insensitive) and capture everything after it
-    const match = commentBody.match(new RegExp(`${MINOR_FIX_ACTION}\\s*(.*)`, 'is'));
-    if (match && match[1]) {
-        const request = match[1].trim();
-        return request.length > 0 ? request : undefined;
-    }
-
-    return undefined;
-}
-
 function getTriggerTime(context: JunieExecutionContext): string | undefined {
     if (isIssueCommentEvent(context)) {
         return context.payload.comment.created_at;
