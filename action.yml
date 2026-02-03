@@ -189,7 +189,7 @@ runs:
         # If no custom --model flag in CUSTOM_JUNIE_ARGS, use MODEL input
         if [ -n "${MODEL}" ] && ! echo "${CUSTOM_JUNIE_ARGS}" | grep -q -- "--model="; then
           JUNIE_FLAGS="${JUNIE_FLAGS} --model=${MODEL}"
-        fi  `
+        fi
 
         JUNIE_OUTPUT_FILE="${WORKING_DIR}/junie_output.json"
         echo "Using Junie flags: ${JUNIE_FLAGS}"
