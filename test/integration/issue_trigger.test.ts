@@ -5,6 +5,7 @@ import { testClient } from "../client/client";
 
 describe("Trigger Junie in Issue", () => {
     let repoName: string;
+    let testPassed = false;
 
     beforeAll(async () => {
         repoName = await testClient.createTestRepo();
@@ -12,8 +13,10 @@ describe("Trigger Junie in Issue", () => {
     });
 
     afterAll(async () => {
-      if (repoName) {
+      if (repoName && testPassed) {
         await testClient.deleteTestRepo(repoName);
+      } else if (repoName) {
+        console.log(`⚠️ Keeping failed test repo: ${e2eConfig.org}/${repoName}`);
       }
     });
 
@@ -35,8 +38,11 @@ describe("Trigger Junie in Issue", () => {
 
         const titleKeywords = ["greeting", "hello", "requirements"]
 
-        await testClient.waitForPR(testClient.conditionIncludes(titleKeywords), {[functionFile]: `def ${functionName}:`, [requirementsFile]: ``});
+        const foundPR = await testClient.waitForPR(testClient.conditionIncludes(titleKeywords));
+
+        await testClient.checkPRFiles(foundPR, testClient.conditionPRFilesInclude({[functionFile]: `def ${functionName}:`, [requirementsFile]: ``}));
 
         await testClient.waitForJunieComment(issueNumber, SUCCESS_FEEDBACK_COMMENT);
+        testPassed = true;
     }, 900000);
 });
