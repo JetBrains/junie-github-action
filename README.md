@@ -151,7 +151,7 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 
 ```markdown
 @junie-agent fix the bug
-junie-args: --model="claude-opus-4-5"
+junie-args: --model=claude-opus-4-5
 ```
 
 **Available MCP Servers**:
