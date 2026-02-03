@@ -15,6 +15,7 @@ import {
     isIssueCommentEvent,
     isIssuesEvent,
     isJiraWorkflowDispatchEvent,
+    isMinorFixEvent,
     isPullRequestEvent,
     isPullRequestReviewCommentEvent,
     isPullRequestReviewEvent,
@@ -25,7 +26,7 @@ import {
 } from "../context";
 import {downloadJiraAttachmentsAndRewriteText} from "./attachment-downloader";
 import {sanitizeContent} from "../../utils/sanitizer";
-import {createCodeReviewPrompt, createFixCIFailuresPrompt, GIT_OPERATIONS_NOTE} from "../../constants/github";
+import {createCodeReviewPrompt, createFixCIFailuresPrompt, createMinorFixPrompt, GIT_OPERATIONS_NOTE, MINOR_FIX_ACTION} from "../../constants/github";
 import {extractJunieArgs} from "../../utils/junie-args-parser";
 import {BranchInfo} from "../operations/branch";
 
@@ -112,6 +113,7 @@ ${GIT_OPERATIONS_NOTE}
 
         const isCodeReview = isFixCodeReviewEvent(context)
         const isFixCI = isFixCIEvent(context)
+        const isMinorFix = isMinorFixEvent(context)
 
         if (issue && isCodeReview) {
             const branchName = branchInfo.prBaseBranch || branchInfo.baseBranch;
@@ -123,7 +125,42 @@ ${GIT_OPERATIONS_NOTE}
             const diffPoint = context.isPR && context.entityNumber ? String(context.entityNumber) : branchName;
             console.log(`Using FIX-CI prompt for diffPoint: ${diffPoint}`);
             return createFixCIFailuresPrompt(diffPoint);
+        } else if (isMinorFix) {
+            const branchName = branchInfo.prBaseBranch || branchInfo.baseBranch;
+            const diffPoint = context.isPR && context.entityNumber ? String(context.entityNumber) : branchName;
+            // Extract user request from comment (text after "minor-fix")
+            const userRequest = this.extractMinorFixRequest(context);
+            console.log(`Using MINOR-FIX prompt for diffPoint: ${diffPoint}, userRequest: ${userRequest || '(none)'}`);
+            return createMinorFixPrompt(diffPoint, userRequest);
         }
+    }
+
+    /**
+     * Extracts the user's request text from a comment that triggered the minor-fix action.
+     * The request is the text that follows "minor-fix" in the comment.
+     * For example: "minor-fix rename variable foo to bar" -> "rename variable foo to bar"
+     */
+    private extractMinorFixRequest(context: JunieExecutionContext): string | undefined {
+        let commentBody: string | undefined;
+
+        if (isIssueCommentEvent(context) || isPullRequestReviewCommentEvent(context)) {
+            commentBody = context.payload.comment.body;
+        } else if (isPullRequestReviewEvent(context)) {
+            commentBody = context.payload.review.body || undefined;
+        }
+
+        if (!commentBody) {
+            return undefined;
+        }
+
+        // Match "minor-fix" (case insensitive) and capture everything after it
+        const match = commentBody.match(new RegExp(`${MINOR_FIX_ACTION}\\s*(.*)`, 'is'));
+        if (match && match[1]) {
+            const request = match[1].trim();
+            return request.length > 0 ? request : undefined;
+        }
+
+        return undefined;
     }
     private async generateJiraPrompt(context: JunieExecutionContext): Promise<string> {
         const jira = context.payload as JiraIssuePayload;
