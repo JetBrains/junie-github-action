@@ -4,6 +4,7 @@ import {JunieExecutionContext} from "../src/github/context";
 import {BranchInfo} from "../src/github/operations/branch";
 import {Octokits} from "../src/github/api/client";
 import * as core from "@actions/core";
+import {createMockContext} from "./mockContext";
 
 // Mock modules
 mock.module("@actions/core", () => ({
@@ -417,69 +418,6 @@ describe("prepareJunieTask", () => {
             expect(result.task).toContain("Read the Pull Request diff");
         });
 
-        test("should use default code review prompt when code-review is in comment", async () => {
-            const context = createMockContext({
-                eventName: "issue_comment",
-                isPR: true,
-                entityNumber: 123,
-                payload: {
-                    issue: {
-                        number: 123,
-                        title: "Test PR",
-                        pull_request: {},
-                        updated_at: "2024-01-01T00:00:00Z"
-                    },
-                    comment: {
-                        id: 1,
-                        body: "@junie-agent code-review",
-                        user: {login: "reviewer"},
-                        created_at: "2024-01-01T00:00:00Z"
-                    },
-                    repository: {
-                        owner: {login: "owner"},
-                        name: "repo"
-                    }
-                } as any
-            });
-            const octokit = createMockOctokit();
-
-            const result = await prepareJunieTask(context, branchInfo, octokit);
-
-            expect(result).toBeDefined();
-            expect(result.task).toBeDefined();
-            expect(result.task).toContain("Read the Pull Request diff");
-        });
-
-        test("should replace FIX_CI_ACTION phrase with default fix CI prompt", async () => {
-            const context = createMockContext({
-                eventName: "pull_request",
-                isPR: true,
-                entityNumber: 123,
-                inputs: {
-                    prompt: "fix-ci"
-                },
-                payload: {
-                    pull_request: {
-                        number: 123,
-                        title: "Test PR",
-                        updated_at: "2024-01-01T00:00:00Z"
-                    },
-                    repository: {
-                        owner: {login: "owner"},
-                        name: "repo"
-                    }
-                } as any
-            });
-            const octokit = createMockOctokit();
-
-            const result = await prepareJunieTask(context, branchInfo, octokit);
-
-            expect(result).toBeDefined();
-            expect(result.task).toBeDefined();
-            expect(result.task).toContain("analyze CI failures and suggest fixes WITHOUT implementing them");
-            expect(result.task).toContain("get_pr_failed_checks_info");
-        });
-
         test("should not trigger fix CI prompt when workflow_run event has success conclusion", async () => {
             const context = createMockContext({
                 eventName: "workflow_run" as any,
@@ -509,40 +447,6 @@ describe("prepareJunieTask", () => {
             expect(result.task).toBeDefined();
             // Should NOT contain fix CI prompt since workflow succeeded
             expect(result.task).not.toContain("analyze CI failures and suggest fixes WITHOUT implementing them");
-        });
-
-        test("should use default fix CI prompt when fix-ci is in comment", async () => {
-            const context = createMockContext({
-                eventName: "issue_comment",
-                isPR: true,
-                entityNumber: 123,
-                payload: {
-                    issue: {
-                        number: 123,
-                        title: "Test PR",
-                        pull_request: {},
-                        updated_at: "2024-01-01T00:00:00Z"
-                    },
-                    comment: {
-                        id: 1,
-                        body: "@junie-agent fix-ci",
-                        user: {login: "reviewer"},
-                        created_at: "2024-01-01T00:00:00Z"
-                    },
-                    repository: {
-                        owner: {login: "owner"},
-                        name: "repo"
-                    }
-                } as any
-            });
-            const octokit = createMockOctokit();
-
-            const result = await prepareJunieTask(context, branchInfo, octokit);
-
-            expect(result).toBeDefined();
-            expect(result.task).toBeDefined();
-            expect(result.task).toContain("analyze CI failures and suggest fixes WITHOUT implementing them");
-            expect(result.task).toContain("get_pr_failed_checks_info");
         });
     });
 

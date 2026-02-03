@@ -10,6 +10,8 @@ import {
     isReferencedEventNode
 } from "../api/queries";
 import {
+    isFixCIEvent,
+    isFixCodeReviewEvent,
     isIssueCommentEvent,
     isIssuesEvent,
     isJiraWorkflowDispatchEvent,
@@ -23,8 +25,9 @@ import {
 } from "../context";
 import {downloadJiraAttachmentsAndRewriteText} from "./attachment-downloader";
 import {sanitizeContent} from "../../utils/sanitizer";
-import {GIT_OPERATIONS_NOTE} from "../../constants/github";
+import {createCodeReviewPrompt, createFixCIFailuresPrompt, GIT_OPERATIONS_NOTE} from "../../constants/github";
 import {extractJunieArgs} from "../../utils/junie-args-parser";
+import {BranchInfo} from "../operations/branch";
 
 export interface GeneratePromptResult {
     prompt: string;
@@ -33,20 +36,22 @@ export interface GeneratePromptResult {
 
 export class NewGitHubPromptFormatter {
 
-    async generatePrompt(context: JunieExecutionContext, fetchedData: FetchedData, userPrompt?: string, attachGithubContextToCustomPrompt: boolean = true): Promise<GeneratePromptResult> {
+    async generatePrompt(context: JunieExecutionContext, fetchedData: FetchedData, branchInfo: BranchInfo, attachGithubContextToCustomPrompt: boolean = true): Promise<GeneratePromptResult> {
         let customJunieArgs: string[] = [];
 
+        let prompt = context.inputs.prompt || undefined;
         // 1. Extract junie-args from user prompt if provided
-        let cleanedUserPrompt = userPrompt;
-        if (userPrompt) {
-            const parsed = extractJunieArgs(userPrompt);
-            cleanedUserPrompt = parsed.cleanedText;
+        if (prompt) {
+            const parsed = extractJunieArgs(prompt);
+            prompt = parsed.cleanedText;
             customJunieArgs.push(...parsed.args);
+            prompt = this.extractKeyWords(context, fetchedData, branchInfo) || prompt
+
         }
 
         // If user provided custom prompt and doesn't want GitHub context, sanitize and return it
-        if (cleanedUserPrompt && !attachGithubContextToCustomPrompt) {
-            const finalPrompt = sanitizeContent(cleanedUserPrompt + GIT_OPERATIONS_NOTE);
+        if (prompt && !attachGithubContextToCustomPrompt) {
+            const finalPrompt = sanitizeContent(prompt + GIT_OPERATIONS_NOTE);
             return {
                 prompt: finalPrompt,
                 customJunieArgs
@@ -65,7 +70,7 @@ export class NewGitHubPromptFormatter {
 
         const repositoryInfo = this.getRepositoryInfo(context);
         const actorInfo = this.getActorInfo(context);
-        const userInstruction = this.getUserInstruction(context, fetchedData, cleanedUserPrompt);
+        const userInstruction = this.getUserInstruction(context, fetchedData, prompt);
         const prOrIssueInfo = this.getPrOrIssueInfo(context, fetchedData);
         const commitsInfo = this.getCommitsInfo(fetchedData);
         const timelineInfo = this.getTimelineInfo(fetchedData);
@@ -73,7 +78,7 @@ export class NewGitHubPromptFormatter {
         const changedFilesInfo = this.getChangedFilesInfo(fetchedData);
 
         // Build the final prompt
-        let prompt = `You were triggered as a GitHub AI Assistant by ${context.eventName} action. Your task is to:
+        let finalPrompt = `You were triggered as a GitHub AI Assistant by ${context.eventName} action. Your task is to:
 
 ${userInstruction ? userInstruction : ""}
 ${repositoryInfo ? repositoryInfo : ""}
@@ -87,18 +92,36 @@ ${GIT_OPERATIONS_NOTE}
 `;
 
         // 3. Extract junie-args from final prompt
-        const finalParsed = extractJunieArgs(prompt);
+        const finalParsed = extractJunieArgs(finalPrompt);
         customJunieArgs.push(...finalParsed.args);
-        prompt = finalParsed.cleanedText;
+        finalPrompt = finalParsed.cleanedText;
 
         // Sanitize the entire prompt once to prevent prompt injection attacks
         // This removes HTML comments, invisible characters, obfuscated entities, etc.
         return {
-            prompt: sanitizeContent(prompt),
+            prompt: sanitizeContent(finalPrompt),
             customJunieArgs
         };
     }
 
+    private extractKeyWords(context: JunieExecutionContext, fetchedData: FetchedData, branchInfo: BranchInfo) {
+        const issue = fetchedData.pullRequest || fetchedData.issue;
+
+        const isCodeReview = isFixCodeReviewEvent(context)
+        const isFixCI = isFixCIEvent(context)
+
+        if (issue && isCodeReview) {
+            const branchName = branchInfo.prBaseBranch || branchInfo.baseBranch;
+            const diffPoint = context.isPR ? String(context.entityNumber) : branchName;
+            console.log(`Using CODE REVIEW prompt for diffPoint: ${diffPoint}`);
+            return  createCodeReviewPrompt(diffPoint);
+        } else if (isFixCI) {
+            const branchName = branchInfo.prBaseBranch || branchInfo.baseBranch;
+            const diffPoint = context.isPR && context.entityNumber ? String(context.entityNumber) : branchName;
+            console.log(`Using FIX-CI prompt for diffPoint: ${diffPoint}`);
+            return createFixCIFailuresPrompt(diffPoint);
+        }
+    }
     private async generateJiraPrompt(context: JunieExecutionContext): Promise<string> {
         const jira = context.payload as JiraIssuePayload;
 
