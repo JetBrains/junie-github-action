@@ -70,7 +70,15 @@ export class NewGitHubPromptFormatter {
 
         const repositoryInfo = this.getRepositoryInfo(context);
         const actorInfo = this.getActorInfo(context);
-        const userInstruction = this.getUserInstruction(context, fetchedData, prompt);
+
+        // Extract junie-args ONLY from user instruction, not from GitHub context (timeline, reviews, etc.)
+        let userInstruction = this.getUserInstruction(context, fetchedData, prompt);
+        if (userInstruction) {
+            const parsed = extractJunieArgs(userInstruction);
+            userInstruction = parsed.cleanedText;
+            customJunieArgs.push(...parsed.args);
+        }
+
         const prOrIssueInfo = this.getPrOrIssueInfo(context, fetchedData);
         const commitsInfo = this.getCommitsInfo(fetchedData);
         const timelineInfo = this.getTimelineInfo(fetchedData);
@@ -78,7 +86,7 @@ export class NewGitHubPromptFormatter {
         const changedFilesInfo = this.getChangedFilesInfo(fetchedData);
 
         // Build the final prompt
-        let finalPrompt = `You were triggered as a GitHub AI Assistant by ${context.eventName} action. Your task is to:
+        const finalPrompt = `You were triggered as a GitHub AI Assistant by ${context.eventName} action. Your task is to:
 
 ${userInstruction ? userInstruction : ""}
 ${repositoryInfo ? repositoryInfo : ""}
@@ -91,16 +99,11 @@ ${actorInfo ? actorInfo : ""}
 ${GIT_OPERATIONS_NOTE}
 `;
 
-        // 3. Extract junie-args from final prompt
-        const finalParsed = extractJunieArgs(finalPrompt);
-        customJunieArgs.push(...finalParsed.args);
-        finalPrompt = finalParsed.cleanedText;
-
         // Sanitize the entire prompt once to prevent prompt injection attacks
         // This removes HTML comments, invisible characters, obfuscated entities, etc.
         return {
             prompt: sanitizeContent(finalPrompt),
-            customJunieArgs
+            customJunieArgs: this.deduplicateArgs(customJunieArgs)
         };
     }
 
@@ -465,5 +468,28 @@ Owner: ${repo.owner.login}
 Triggered by: @${context.actor}
 Event: ${context.eventName}${context.eventAction ? ` (${context.eventAction})` : ""}
 </actor>`
+    }
+
+    /**
+     * Deduplicates junie args by keeping only the last occurrence of each argument.
+     * For arguments with values (--key=value or --key "value"), keeps the most recent value.
+     * For boolean flags (--flag), keeps only one occurrence.
+     */
+    private deduplicateArgs(args: string[]): string[] {
+        const argsMap = new Map<string, string>();
+
+        for (const arg of args) {
+            // Match --key=value or --key="value" or --key or -k
+            const match = arg.match(/^(-{1,2}[^=\s]+)(?:=(.*))?$/);
+            if (match) {
+                const key = match[1]; // e.g., "--model" or "-m"
+                argsMap.set(key, arg); // Store the full arg, overwriting previous occurrences
+            } else {
+                // If it doesn't match the pattern, keep it as-is (shouldn't happen normally)
+                argsMap.set(arg, arg);
+            }
+        }
+
+        return Array.from(argsMap.values());
     }
 }
