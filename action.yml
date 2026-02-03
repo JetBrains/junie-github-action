@@ -115,7 +115,7 @@ outputs:
     description: "The GitHub token used by the action"
     value: ${{ steps.prepare.outputs.EJ_AUTH_GITHUB_TOKEN }}
   custom_junie_args:
-    description: "Custom Junie arguments extracted from prompt/comment (e.g., --model='value')"
+    description: "Custom Junie arguments extracted from prompt/comment (e.g., --model=value)"
     value: ${{ steps.prepare.outputs.CUSTOM_JUNIE_ARGS }}
 
 runs:
