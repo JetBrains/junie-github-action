@@ -129,6 +129,8 @@ export function isReviewOrCommentHasTrigger(context: JunieExecutionContext, regE
             return true;
         }
     }
+
+    return false;
 }
 
 export function escapeRegExp(string: string) {

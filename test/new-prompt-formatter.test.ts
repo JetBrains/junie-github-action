@@ -2,9 +2,17 @@ import {describe, test, expect} from "bun:test";
 import {NewGitHubPromptFormatter} from "../src/github/junie/new-prompt-formatter";
 import {JunieExecutionContext} from "../src/github/context";
 import {FetchedData, GraphQLPullRequest, GraphQLIssue} from "../src/github/api/queries";
+import {BranchInfo} from "../src/github/operations/branch";
 
 describe("NewGitHubPromptFormatter", () => {
     const formatter = new NewGitHubPromptFormatter();
+
+    const createMockBranchInfo = (): BranchInfo => ({
+        baseBranch: "main",
+        workingBranch: "feature",
+        isNewBranch: false,
+        prBaseBranch: "main"
+    });
 
     const createMockContext = (overrides: Partial<JunieExecutionContext> = {}): JunieExecutionContext => ({
         runId: "123",
@@ -105,7 +113,7 @@ describe("NewGitHubPromptFormatter", () => {
         const context = createMockContext();
         const fetchedData: FetchedData = {};
 
-        const result = await formatter.generatePrompt(context, fetchedData);
+        const result = await formatter.generatePrompt(context, fetchedData, createMockBranchInfo());
 
         expect(result.prompt).toContain("<repository>");
         expect(result.prompt).toContain("Repository: test-owner/test-repo");
@@ -117,7 +125,7 @@ describe("NewGitHubPromptFormatter", () => {
         const context = createMockContext();
         const fetchedData: FetchedData = {};
 
-        const result = await formatter.generatePrompt(context, fetchedData);
+        const result = await formatter.generatePrompt(context, fetchedData, createMockBranchInfo());
 
         expect(result.prompt).toContain("<actor>");
         expect(result.prompt).toContain("Triggered by: @test-user");
@@ -131,7 +139,7 @@ describe("NewGitHubPromptFormatter", () => {
             pullRequest: createMockPR()
         };
 
-        const result = await formatter.generatePrompt(context, fetchedData);
+        const result = await formatter.generatePrompt(context, fetchedData, createMockBranchInfo());
 
         expect(result.prompt).toContain("<pull_request_info>");
         expect(result.prompt).toContain("Number: #1");
@@ -148,7 +156,7 @@ describe("NewGitHubPromptFormatter", () => {
             pullRequest: createMockPR()
         };
 
-        const result = await formatter.generatePrompt(context, fetchedData);
+        const result = await formatter.generatePrompt(context, fetchedData, createMockBranchInfo());
 
         expect(result.prompt).toContain("<commits>");
         expect(result.prompt).toContain("abc123");
@@ -164,7 +172,7 @@ describe("NewGitHubPromptFormatter", () => {
             pullRequest: createMockPR()
         };
 
-        const result = await formatter.generatePrompt(context, fetchedData);
+        const result = await formatter.generatePrompt(context, fetchedData, createMockBranchInfo());
 
         expect(result.prompt).toContain("<changed_files>");
         expect(result.prompt).toContain("file1.ts (modified) +5/-2");
@@ -195,7 +203,7 @@ describe("NewGitHubPromptFormatter", () => {
             issue: mockIssue
         };
 
-        const result = await formatter.generatePrompt(context, fetchedData);
+        const result = await formatter.generatePrompt(context, fetchedData, createMockBranchInfo());
 
         expect(result.prompt).toContain("<issue_info>");
         expect(result.prompt).toContain("Number: #1");
@@ -205,11 +213,12 @@ describe("NewGitHubPromptFormatter", () => {
     });
 
     test("generatePrompt includes custom prompt", async () => {
-        const context = createMockContext();
+        const context = createMockContext({
+            inputs: { ...createMockContext().inputs, prompt: "Please fix this bug" }
+        });
         const fetchedData: FetchedData = {};
-        const customPrompt = "Please fix this bug";
 
-        const result = await formatter.generatePrompt(context, fetchedData, customPrompt);
+        const result = await formatter.generatePrompt(context, fetchedData, createMockBranchInfo());
 
         expect(result.prompt).toContain("<user_instruction>");
         expect(result.prompt).toContain("Please fix this bug");
@@ -238,7 +247,7 @@ describe("NewGitHubPromptFormatter", () => {
             }
         };
 
-        const result = await formatter.generatePrompt(context, fetchedData);
+        const result = await formatter.generatePrompt(context, fetchedData, createMockBranchInfo());
 
         expect(result.prompt).toContain("<timeline>");
         expect(result.prompt).toContain("Comment by @commenter");
@@ -269,7 +278,7 @@ describe("NewGitHubPromptFormatter", () => {
             }
         };
 
-        const result = await formatter.generatePrompt(context, fetchedData);
+        const result = await formatter.generatePrompt(context, fetchedData, createMockBranchInfo());
 
         expect(result.prompt).toContain("<reviews>");
         expect(result.prompt).toContain("Review by @reviewer (APPROVED)");
@@ -281,7 +290,7 @@ describe("NewGitHubPromptFormatter", () => {
         const context = createMockContext();
         const fetchedData: FetchedData = {};
 
-        const result = await formatter.generatePrompt(context, fetchedData);
+        const result = await formatter.generatePrompt(context, fetchedData, createMockBranchInfo());
 
         expect(result.prompt).not.toContain("<timeline>");
         expect(result.prompt).not.toContain("<reviews>");
@@ -290,13 +299,14 @@ describe("NewGitHubPromptFormatter", () => {
     });
 
     test("generatePrompt returns only custom prompt when attachGithubContext is false", async () => {
-        const context = createMockContext();
+        const context = createMockContext({
+            inputs: { ...createMockContext().inputs, prompt: "Please fix this specific bug" }
+        });
         const fetchedData: FetchedData = {
             pullRequest: createMockPR()
         };
-        const customPrompt = "Please fix this specific bug";
 
-        const result = await formatter.generatePrompt(context, fetchedData, customPrompt, false);
+        const result = await formatter.generatePrompt(context, fetchedData, createMockBranchInfo(), false);
 
         // Should contain the custom prompt + git operations note
         expect(result.prompt).toContain("Please fix this specific bug");
@@ -311,13 +321,14 @@ describe("NewGitHubPromptFormatter", () => {
     });
 
     test("generatePrompt includes GitHub context when attachGithubContext is true with custom prompt", async () => {
-        const context = createMockContext();
+        const context = createMockContext({
+            inputs: { ...createMockContext().inputs, prompt: "Please review this PR" }
+        });
         const fetchedData: FetchedData = {
             pullRequest: createMockPR()
         };
-        const customPrompt = "Please review this PR";
 
-        const result = await formatter.generatePrompt(context, fetchedData, customPrompt, true);
+        const result = await formatter.generatePrompt(context, fetchedData, createMockBranchInfo(), true);
 
         // Should contain custom prompt
         expect(result.prompt).toContain("Please review this PR");
@@ -350,7 +361,7 @@ describe("NewGitHubPromptFormatter", () => {
             pullRequest: createMockPR()
         };
 
-        const result = await formatter.generatePrompt(context, fetchedData, undefined, true);
+        const result = await formatter.generatePrompt(context, fetchedData, createMockBranchInfo(), true);
 
         // Should contain PR body as user instruction
         expect(result.prompt).toContain("PR description from GitHub");
@@ -426,7 +437,7 @@ describe("NewGitHubPromptFormatter", () => {
             }
         };
 
-        const result = await formatter.generatePrompt(context, fetchedData);
+        const result = await formatter.generatePrompt(context, fetchedData, createMockBranchInfo());
 
         // Should contain the review section
         expect(result.prompt).toContain("<reviews>");
@@ -517,7 +528,7 @@ describe("NewGitHubPromptFormatter", () => {
             }
         };
 
-        const result = await formatter.generatePrompt(context, fetchedData);
+        const result = await formatter.generatePrompt(context, fetchedData, createMockBranchInfo());
 
         // Should contain both file paths as separate threads
         expect(result.prompt).toContain("src/file1.ts (position: 5):");
@@ -539,11 +550,11 @@ describe("NewGitHubPromptFormatter", () => {
 
     describe("junie-args extraction", () => {
         test("should extract junie-args from custom prompt", async () => {
-            const customPrompt = `Do something
-junie-args: --model="gpt-5" --other="value"`;
-
-            const context = createMockContext();
-            const result = await formatter.generatePrompt(context, {}, customPrompt, false);
+            const context = createMockContext({
+                inputs: { ...createMockContext().inputs, prompt: `Do something
+junie-args: --model="gpt-5" --other="value"` }
+            });
+            const result = await formatter.generatePrompt(context, {}, createMockBranchInfo(), false);
 
             expect(result.customJunieArgs).toEqual(['--model="gpt-5"', '--other="value"']);
             expect(result.prompt).not.toContain('junie-args:');
@@ -569,7 +580,7 @@ junie-args: --model="claude-opus-4-5"`,
                 pullRequest: createMockPR()
             };
 
-            const result = await formatter.generatePrompt(context, fetchedData);
+            const result = await formatter.generatePrompt(context, fetchedData, createMockBranchInfo());
 
             expect(result.customJunieArgs).toEqual(['--model="claude-opus-4-5"']);
             expect(result.prompt).not.toContain('junie-args:');
@@ -601,7 +612,7 @@ junie-args: --model="gpt-5.2-codex" --temperature="0.7"`,
                 issue: createMockIssue()
             };
 
-            const result = await formatter.generatePrompt(context, fetchedData);
+            const result = await formatter.generatePrompt(context, fetchedData, createMockBranchInfo());
 
             expect(result.customJunieArgs).toEqual(['--model="gpt-5.2-codex"', '--temperature="0.7"']);
             expect(result.prompt).not.toContain('junie-args:');
@@ -609,14 +620,14 @@ junie-args: --model="gpt-5.2-codex" --temperature="0.7"`,
         });
 
         test("should handle multiple junie-args blocks", async () => {
-            const customPrompt = `First instruction
+            const context = createMockContext({
+                inputs: { ...createMockContext().inputs, prompt: `First instruction
 junie-args: --model="gpt-5"
 
 Second instruction
-junie-args: --other="value"`;
-
-            const context = createMockContext();
-            const result = await formatter.generatePrompt(context, {}, customPrompt, false);
+junie-args: --other="value"` }
+            });
+            const result = await formatter.generatePrompt(context, {}, createMockBranchInfo(), false);
 
             expect(result.customJunieArgs).toEqual(['--model="gpt-5"', '--other="value"']);
             expect(result.prompt).not.toContain('junie-args:');
@@ -625,13 +636,55 @@ junie-args: --other="value"`;
         });
 
         test("should return empty array when no junie-args present", async () => {
-            const customPrompt = "Just a regular prompt without any args";
-
-            const context = createMockContext();
-            const result = await formatter.generatePrompt(context, {}, customPrompt, false);
+            const context = createMockContext({
+                inputs: { ...createMockContext().inputs, prompt: "Just a regular prompt without any args" }
+            });
+            const result = await formatter.generatePrompt(context, {}, createMockBranchInfo(), false);
 
             expect(result.customJunieArgs).toEqual([]);
             expect(result.prompt).toContain('Just a regular prompt without any args');
+        });
+    });
+
+    describe("code-review and fix-ci keywords (refactoring validation)", () => {
+        test("preserves junie-args when code-review is detected", async () => {
+            const context = createMockContext({
+                inputs: { ...createMockContext().inputs, prompt: "code-review junie-args: --model=\"gpt-5.2-codex\"" }
+            });
+            const fetchedData: FetchedData = { pullRequest: createMockPR() };
+
+            const result = await formatter.generatePrompt(context, fetchedData, createMockBranchInfo(), false);
+
+            expect(result.customJunieArgs).toContain('--model="gpt-5.2-codex"');
+            expect(result.prompt).toContain("Read the Pull Request diff");
+        });
+
+        test("preserves junie-args when fix-ci is detected", async () => {
+            const context = createMockContext({
+                inputs: { ...createMockContext().inputs, prompt: "fix-ci junie-args: --model=\"gpt-5.2-codex\"" }
+            });
+            const fetchedData: FetchedData = { pullRequest: createMockPR() };
+
+            const result = await formatter.generatePrompt(context, fetchedData, createMockBranchInfo(), false);
+
+            expect(result.customJunieArgs).toContain('--model="gpt-5.2-codex"');
+            expect(result.prompt).toContain("analyze CI failures");
+        });
+
+        test("uses branch name for diffPoint when not a PR", async () => {
+            const context = createMockContext({
+                isPR: false,
+                entityNumber: 1,
+                inputs: { ...createMockContext().inputs, prompt: "code-review" }
+            });
+            const branchInfo = createMockBranchInfo();
+            branchInfo.prBaseBranch = undefined;
+            branchInfo.baseBranch = "develop";
+            const fetchedData: FetchedData = { issue: createMockIssue() };
+
+            const result = await formatter.generatePrompt(context, fetchedData, branchInfo, false);
+
+            expect(result.prompt).toContain("develop");
         });
     });
 });
