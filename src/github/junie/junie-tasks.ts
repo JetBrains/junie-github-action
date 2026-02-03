@@ -3,6 +3,7 @@ import {
     isFixCodeReviewEvent,
     isIssueCommentEvent,
     isIssuesEvent,
+    isMinorFixEvent,
     isPullRequestEvent,
     isPullRequestReviewCommentEvent,
     isPullRequestReviewEvent,
@@ -12,7 +13,7 @@ import * as core from "@actions/core";
 import {BranchInfo} from "../operations/branch";
 import {isReviewOrCommentHasResolveConflictsTrigger} from "../validation/trigger";
 import {OUTPUT_VARS} from "../../constants/environment";
-import {createCodeReviewPrompt, createFixCIFailuresPrompt} from "../../constants/github";
+import {createCodeReviewPrompt, createFixCIFailuresPrompt, createMinorFixPrompt, MINOR_FIX_ACTION} from "../../constants/github";
 import {Octokits} from "../api/client";
 import {NewGitHubPromptFormatter} from "./new-prompt-formatter";
 import {downloadAttachmentsAndRewriteText} from "./attachment-downloader";
@@ -24,6 +25,34 @@ import {generateMcpToolsPrompt} from "../../mcp/mcp-prompts";
 async function getValidatedTextTask(text: string, taskType: string): Promise<string> {
     // Download attachments and rewrite URLs in the text
     return await downloadAttachmentsAndRewriteText(text)
+}
+
+/**
+ * Extracts the user's request text from a comment that triggered the minor-fix action.
+ * The request is the text that follows "minor-fix" in the comment.
+ * For example: "minor-fix rename variable foo to bar" -> "rename variable foo to bar"
+ */
+function extractMinorFixRequest(context: JunieExecutionContext): string | undefined {
+    let commentBody: string | undefined;
+
+    if (isIssueCommentEvent(context) || isPullRequestReviewCommentEvent(context)) {
+        commentBody = context.payload.comment.body;
+    } else if (isPullRequestReviewEvent(context)) {
+        commentBody = context.payload.review.body || undefined;
+    }
+
+    if (!commentBody) {
+        return undefined;
+    }
+
+    // Match "minor-fix" (case insensitive) and capture everything after it
+    const match = commentBody.match(new RegExp(`${MINOR_FIX_ACTION}\\s*(.*)`, 'is'));
+    if (match && match[1]) {
+        const request = match[1].trim();
+        return request.length > 0 ? request : undefined;
+    }
+
+    return undefined;
 }
 
 function getTriggerTime(context: JunieExecutionContext): string | undefined {
@@ -71,6 +100,7 @@ export async function prepareJunieTask(
 
         const isCodeReview = isFixCodeReviewEvent(context)
         const isFixCI = isFixCIEvent(context)
+        const isMinorFix = isMinorFixEvent(context)
 
         let promptText: string;
         let finalCustomPrompt = customPrompt;
@@ -86,6 +116,13 @@ export async function prepareJunieTask(
             finalCustomPrompt = createFixCIFailuresPrompt(diffPoint);
             console.log(`Using FIX-CI prompt for diffPoint: ${diffPoint}`);
             console.log(`Fix-CI prompt preview (first 200 chars): ${finalCustomPrompt.substring(0, 200)}`);
+        } else if (isMinorFix) {
+            const branchName = branchInfo.prBaseBranch || branchInfo.baseBranch;
+            const diffPoint = context.isPR && context.entityNumber ? String(context.entityNumber) : branchName;
+            // Extract user request from comment (text after "minor-fix")
+            const userRequest = extractMinorFixRequest(context);
+            finalCustomPrompt = createMinorFixPrompt(diffPoint, userRequest);
+            console.log(`Using MINOR-FIX prompt for diffPoint: ${diffPoint}, userRequest: ${userRequest || '(none)'}`);
         }
         promptText = await formatter.generatePrompt(context, fetchedData, finalCustomPrompt, context.inputs.attachGithubContextToCustomPrompt);
 

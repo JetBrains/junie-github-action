@@ -21,9 +21,10 @@ import {
     DEFAULT_TRIGGER_PHRASE,
     FIX_CI_ACTION,
     JIRA_EVENT_ACTION, JUNIE_AGENT,
+    MINOR_FIX_ACTION,
     RESOLVE_CONFLICTS_ACTION
 } from "../constants/github";
-import {isReviewOrCommentHasCodeReviewTrigger, isReviewOrCommentHasFixCITrigger} from "./validation/trigger";
+import {isReviewOrCommentHasCodeReviewTrigger, isReviewOrCommentHasFixCITrigger, isReviewOrCommentHasMinorFixTrigger} from "./validation/trigger";
 
 // Jira integration types
 export type JiraComment = {
@@ -497,6 +498,13 @@ export function isFixCodeReviewEvent(context: JunieExecutionContext) {
     const isCodeReviewInComment = isReviewOrCommentHasCodeReviewTrigger(context);
     console.log(`Code review detection: inPrompt=${isCodeReviewInPrompt}, inComment=${isCodeReviewInComment}`);
     return isCodeReviewInPrompt || isCodeReviewInComment;
+}
+
+export function isMinorFixEvent(context: JunieExecutionContext) {
+    const isMinorFixInPrompt = context.inputs.prompt?.includes(MINOR_FIX_ACTION);
+    const isMinorFixInComment = isReviewOrCommentHasMinorFixTrigger(context);
+    console.log(`Minor fix detection: inPrompt=${isMinorFixInPrompt}, inComment=${isMinorFixInComment}`);
+    return isMinorFixInPrompt || isMinorFixInComment;
 }
 
 
