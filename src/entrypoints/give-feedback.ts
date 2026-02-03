@@ -61,17 +61,10 @@ async function generateJobSummary(isJobFailed: boolean): Promise<void> {
         junieOutput.summary = process.env[OUTPUT_VARS.JUNIE_SUMMARY];
     }
 
-    // Try to get duration_ms from JSON_JUNIE_OUTPUT if available
-    const jsonOutput = process.env[ENV_VARS.JSON_JUNIE_OUTPUT];
-    if (jsonOutput) {
-        try {
-            const parsed = JSON.parse(jsonOutput);
-            if (parsed.duration_ms) {
-                junieOutput.duration_ms = parsed.duration_ms;
-            }
-        } catch (parseError) {
-            // Ignore parse errors, we have the main data from env vars
-        }
+    // Get duration_ms from output vars (already extracted in handle-results)
+    const durationMs = process.env[OUTPUT_VARS.JUNIE_DURATION_MS];
+    if (durationMs) {
+        junieOutput.duration_ms = parseInt(durationMs, 10);
     }
 
     const markdown = formatJunieSummary(
