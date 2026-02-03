@@ -162,6 +162,7 @@ ${GIT_OPERATIONS_NOTE}
 
         return undefined;
     }
+  
     private async generateJiraPrompt(context: JunieExecutionContext): Promise<string> {
         const jira = context.payload as JiraIssuePayload;
 
