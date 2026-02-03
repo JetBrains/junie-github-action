@@ -712,7 +712,8 @@ describe("prepareJunieTask", () => {
             expect(prResult.mergeTask).toBeUndefined();
 
             // Both should have been processed successfully
-            expect(core.setOutput).toHaveBeenCalledTimes(2);
+            // Each call to prepareJunieTask makes 2 setOutput calls (JUNIE_JSON_TASK and CUSTOM_JUNIE_ARGS)
+            expect(core.setOutput).toHaveBeenCalledTimes(4);
         });
     });
 });

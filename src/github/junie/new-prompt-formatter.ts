@@ -24,23 +24,48 @@ import {
 import {downloadJiraAttachmentsAndRewriteText} from "./attachment-downloader";
 import {sanitizeContent} from "../../utils/sanitizer";
 import {GIT_OPERATIONS_NOTE} from "../../constants/github";
+import {extractJunieArgs} from "../../utils/junie-args-parser";
+
+export interface GeneratePromptResult {
+    prompt: string;
+    customJunieArgs: string[];
+}
 
 export class NewGitHubPromptFormatter {
 
-    async generatePrompt(context: JunieExecutionContext, fetchedData: FetchedData, userPrompt?: string, attachGithubContextToCustomPrompt: boolean = true) {
-        // If user provided custom prompt and doesn't want GitHub context, sanitize and return it
-        if (userPrompt && !attachGithubContextToCustomPrompt) {
-            return sanitizeContent(userPrompt + GIT_OPERATIONS_NOTE);
+    async generatePrompt(context: JunieExecutionContext, fetchedData: FetchedData, userPrompt?: string, attachGithubContextToCustomPrompt: boolean = true): Promise<GeneratePromptResult> {
+        let customJunieArgs: string[] = [];
+
+        // 1. Extract junie-args from user prompt if provided
+        let cleanedUserPrompt = userPrompt;
+        if (userPrompt) {
+            const parsed = extractJunieArgs(userPrompt);
+            cleanedUserPrompt = parsed.cleanedText;
+            customJunieArgs.push(...parsed.args);
         }
 
-        // Handle Jira issue integration
+        // If user provided custom prompt and doesn't want GitHub context, sanitize and return it
+        if (cleanedUserPrompt && !attachGithubContextToCustomPrompt) {
+            const finalPrompt = sanitizeContent(cleanedUserPrompt + GIT_OPERATIONS_NOTE);
+            return {
+                prompt: finalPrompt,
+                customJunieArgs
+            };
+        }
+
+        // 2. Handle Jira issue integration
         if (isJiraWorkflowDispatchEvent(context)) {
-            return await this.generateJiraPrompt(context);
+            const jiraPrompt = await this.generateJiraPrompt(context);
+            const parsed = extractJunieArgs(jiraPrompt);
+            return {
+                prompt: sanitizeContent(parsed.cleanedText),
+                customJunieArgs: parsed.args
+            };
         }
 
         const repositoryInfo = this.getRepositoryInfo(context);
         const actorInfo = this.getActorInfo(context);
-        const userInstruction = this.getUserInstruction(context, fetchedData, userPrompt)
+        const userInstruction = this.getUserInstruction(context, fetchedData, cleanedUserPrompt);
         const prOrIssueInfo = this.getPrOrIssueInfo(context, fetchedData);
         const commitsInfo = this.getCommitsInfo(fetchedData);
         const timelineInfo = this.getTimelineInfo(fetchedData);
@@ -48,7 +73,7 @@ export class NewGitHubPromptFormatter {
         const changedFilesInfo = this.getChangedFilesInfo(fetchedData);
 
         // Build the final prompt
-        const prompt = `You were triggered as a GitHub AI Assistant by ${context.eventName} action. Your task is to:
+        let prompt = `You were triggered as a GitHub AI Assistant by ${context.eventName} action. Your task is to:
 
 ${userInstruction ? userInstruction : ""}
 ${repositoryInfo ? repositoryInfo : ""}
@@ -61,9 +86,17 @@ ${actorInfo ? actorInfo : ""}
 ${GIT_OPERATIONS_NOTE}
 `;
 
+        // 3. Extract junie-args from final prompt
+        const finalParsed = extractJunieArgs(prompt);
+        customJunieArgs.push(...finalParsed.args);
+        prompt = finalParsed.cleanedText;
+
         // Sanitize the entire prompt once to prevent prompt injection attacks
         // This removes HTML comments, invisible characters, obfuscated entities, etc.
-        return sanitizeContent(prompt);
+        return {
+            prompt: sanitizeContent(prompt),
+            customJunieArgs
+        };
     }
 
     private async generateJiraPrompt(context: JunieExecutionContext): Promise<string> {
@@ -95,9 +128,8 @@ Description: ${jira.issueDescription}${commentsInfo}
 ${GIT_OPERATIONS_NOTE}
 `;
 
-        // Download all attachments referenced in text (single pass), then sanitize
-        const promptWithAttachments = await downloadJiraAttachmentsAndRewriteText(promptText, jira.attachments);
-        return sanitizeContent(promptWithAttachments);
+        // Download all attachments referenced in text (single pass), then return
+        return await downloadJiraAttachmentsAndRewriteText(promptText, jira.attachments);
     }
 
     private getUserInstruction(context: JunieExecutionContext, fetchedData: FetchedData, customPrompt?: string): string | undefined {

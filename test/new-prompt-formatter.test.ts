@@ -105,24 +105,24 @@ describe("NewGitHubPromptFormatter", () => {
         const context = createMockContext();
         const fetchedData: FetchedData = {};
 
-        const prompt = await formatter.generatePrompt(context, fetchedData);
+        const result = await formatter.generatePrompt(context, fetchedData);
 
-        expect(prompt).toContain("<repository>");
-        expect(prompt).toContain("Repository: test-owner/test-repo");
-        expect(prompt).toContain("Owner: test-owner");
-        expect(prompt).toContain("</repository>");
+        expect(result.prompt).toContain("<repository>");
+        expect(result.prompt).toContain("Repository: test-owner/test-repo");
+        expect(result.prompt).toContain("Owner: test-owner");
+        expect(result.prompt).toContain("</repository>");
     });
 
     test("generatePrompt includes actor info", async () => {
         const context = createMockContext();
         const fetchedData: FetchedData = {};
 
-        const prompt = await formatter.generatePrompt(context, fetchedData);
+        const result = await formatter.generatePrompt(context, fetchedData);
 
-        expect(prompt).toContain("<actor>");
-        expect(prompt).toContain("Triggered by: @test-user");
-        expect(prompt).toContain("Event: pull_request (opened)");
-        expect(prompt).toContain("</actor>");
+        expect(result.prompt).toContain("<actor>");
+        expect(result.prompt).toContain("Triggered by: @test-user");
+        expect(result.prompt).toContain("Event: pull_request (opened)");
+        expect(result.prompt).toContain("</actor>");
     });
 
     test("generatePrompt includes PR info when available", async () => {
@@ -131,15 +131,15 @@ describe("NewGitHubPromptFormatter", () => {
             pullRequest: createMockPR()
         };
 
-        const prompt = await formatter.generatePrompt(context, fetchedData);
+        const result = await formatter.generatePrompt(context, fetchedData);
 
-        expect(prompt).toContain("<pull_request_info>");
-        expect(prompt).toContain("Number: #1");
-        expect(prompt).toContain("Title: Test PR");
-        expect(prompt).toContain("Author: @test-author");
-        expect(prompt).toContain("State: OPEN");
-        expect(prompt).toContain("Branch: feature -> main");
-        expect(prompt).toContain("</pull_request_info>");
+        expect(result.prompt).toContain("<pull_request_info>");
+        expect(result.prompt).toContain("Number: #1");
+        expect(result.prompt).toContain("Title: Test PR");
+        expect(result.prompt).toContain("Author: @test-author");
+        expect(result.prompt).toContain("State: OPEN");
+        expect(result.prompt).toContain("Branch: feature -> main");
+        expect(result.prompt).toContain("</pull_request_info>");
     });
 
     test("generatePrompt includes commits info", async () => {
@@ -148,14 +148,14 @@ describe("NewGitHubPromptFormatter", () => {
             pullRequest: createMockPR()
         };
 
-        const prompt = await formatter.generatePrompt(context, fetchedData);
+        const result = await formatter.generatePrompt(context, fetchedData);
 
-        expect(prompt).toContain("<commits>");
-        expect(prompt).toContain("abc123");
-        expect(prompt).toContain("First commit");
-        expect(prompt).toContain("def456");
-        expect(prompt).toContain("Second commit");
-        expect(prompt).toContain("</commits>");
+        expect(result.prompt).toContain("<commits>");
+        expect(result.prompt).toContain("abc123");
+        expect(result.prompt).toContain("First commit");
+        expect(result.prompt).toContain("def456");
+        expect(result.prompt).toContain("Second commit");
+        expect(result.prompt).toContain("</commits>");
     });
 
     test("generatePrompt includes changed files info", async () => {
@@ -164,12 +164,12 @@ describe("NewGitHubPromptFormatter", () => {
             pullRequest: createMockPR()
         };
 
-        const prompt = await formatter.generatePrompt(context, fetchedData);
+        const result = await formatter.generatePrompt(context, fetchedData);
 
-        expect(prompt).toContain("<changed_files>");
-        expect(prompt).toContain("file1.ts (modified) +5/-2");
-        expect(prompt).toContain("file2.ts (added) +5/-3");
-        expect(prompt).toContain("</changed_files>");
+        expect(result.prompt).toContain("<changed_files>");
+        expect(result.prompt).toContain("file1.ts (modified) +5/-2");
+        expect(result.prompt).toContain("file2.ts (added) +5/-3");
+        expect(result.prompt).toContain("</changed_files>");
     });
 
     test("generatePrompt includes issue info when not a PR", async () => {
@@ -195,13 +195,13 @@ describe("NewGitHubPromptFormatter", () => {
             issue: mockIssue
         };
 
-        const prompt = await formatter.generatePrompt(context, fetchedData);
+        const result = await formatter.generatePrompt(context, fetchedData);
 
-        expect(prompt).toContain("<issue_info>");
-        expect(prompt).toContain("Number: #1");
-        expect(prompt).toContain("Title: Test Issue");
-        expect(prompt).toContain("Author: @test-author");
-        expect(prompt).toContain("</issue_info>");
+        expect(result.prompt).toContain("<issue_info>");
+        expect(result.prompt).toContain("Number: #1");
+        expect(result.prompt).toContain("Title: Test Issue");
+        expect(result.prompt).toContain("Author: @test-author");
+        expect(result.prompt).toContain("</issue_info>");
     });
 
     test("generatePrompt includes custom prompt", async () => {
@@ -209,11 +209,11 @@ describe("NewGitHubPromptFormatter", () => {
         const fetchedData: FetchedData = {};
         const customPrompt = "Please fix this bug";
 
-        const prompt = await formatter.generatePrompt(context, fetchedData, customPrompt);
+        const result = await formatter.generatePrompt(context, fetchedData, customPrompt);
 
-        expect(prompt).toContain("<user_instruction>");
-        expect(prompt).toContain("Please fix this bug");
-        expect(prompt).toContain("</user_instruction>");
+        expect(result.prompt).toContain("<user_instruction>");
+        expect(result.prompt).toContain("Please fix this bug");
+        expect(result.prompt).toContain("</user_instruction>");
     });
 
     test("generatePrompt handles timeline comments", async () => {
@@ -238,12 +238,12 @@ describe("NewGitHubPromptFormatter", () => {
             }
         };
 
-        const prompt = await formatter.generatePrompt(context, fetchedData);
+        const result = await formatter.generatePrompt(context, fetchedData);
 
-        expect(prompt).toContain("<timeline>");
-        expect(prompt).toContain("Comment by @commenter");
-        expect(prompt).toContain("Test comment");
-        expect(prompt).toContain("</timeline>");
+        expect(result.prompt).toContain("<timeline>");
+        expect(result.prompt).toContain("Comment by @commenter");
+        expect(result.prompt).toContain("Test comment");
+        expect(result.prompt).toContain("</timeline>");
     });
 
     test("generatePrompt handles reviews", async () => {
@@ -269,24 +269,24 @@ describe("NewGitHubPromptFormatter", () => {
             }
         };
 
-        const prompt = await formatter.generatePrompt(context, fetchedData);
+        const result = await formatter.generatePrompt(context, fetchedData);
 
-        expect(prompt).toContain("<reviews>");
-        expect(prompt).toContain("Review by @reviewer (APPROVED)");
-        expect(prompt).toContain("Looks good!");
-        expect(prompt).toContain("</reviews>");
+        expect(result.prompt).toContain("<reviews>");
+        expect(result.prompt).toContain("Review by @reviewer (APPROVED)");
+        expect(result.prompt).toContain("Looks good!");
+        expect(result.prompt).toContain("</reviews>");
     });
 
     test("generatePrompt omits empty sections", async () => {
         const context = createMockContext();
         const fetchedData: FetchedData = {};
 
-        const prompt = await formatter.generatePrompt(context, fetchedData);
+        const result = await formatter.generatePrompt(context, fetchedData);
 
-        expect(prompt).not.toContain("<timeline>");
-        expect(prompt).not.toContain("<reviews>");
-        expect(prompt).not.toContain("<changed_files>");
-        expect(prompt).not.toContain("<commits>");
+        expect(result.prompt).not.toContain("<timeline>");
+        expect(result.prompt).not.toContain("<reviews>");
+        expect(result.prompt).not.toContain("<changed_files>");
+        expect(result.prompt).not.toContain("<commits>");
     });
 
     test("generatePrompt returns only custom prompt when attachGithubContext is false", async () => {
@@ -296,18 +296,18 @@ describe("NewGitHubPromptFormatter", () => {
         };
         const customPrompt = "Please fix this specific bug";
 
-        const prompt = await formatter.generatePrompt(context, fetchedData, customPrompt, false);
+        const result = await formatter.generatePrompt(context, fetchedData, customPrompt, false);
 
         // Should contain the custom prompt + git operations note
-        expect(prompt).toContain("Please fix this specific bug");
-        expect(prompt).toContain("Do NOT commit or push changes");
+        expect(result.prompt).toContain("Please fix this specific bug");
+        expect(result.prompt).toContain("Do NOT commit or push changes");
 
         // Should NOT contain any GitHub context
-        expect(prompt).not.toContain("<repository>");
-        expect(prompt).not.toContain("<actor>");
-        expect(prompt).not.toContain("<pull_request_info>");
-        expect(prompt).not.toContain("<commits>");
-        expect(prompt).not.toContain("<changed_files>");
+        expect(result.prompt).not.toContain("<repository>");
+        expect(result.prompt).not.toContain("<actor>");
+        expect(result.prompt).not.toContain("<pull_request_info>");
+        expect(result.prompt).not.toContain("<commits>");
+        expect(result.prompt).not.toContain("<changed_files>");
     });
 
     test("generatePrompt includes GitHub context when attachGithubContext is true with custom prompt", async () => {
@@ -317,17 +317,17 @@ describe("NewGitHubPromptFormatter", () => {
         };
         const customPrompt = "Please review this PR";
 
-        const prompt = await formatter.generatePrompt(context, fetchedData, customPrompt, true);
+        const result = await formatter.generatePrompt(context, fetchedData, customPrompt, true);
 
         // Should contain custom prompt
-        expect(prompt).toContain("Please review this PR");
+        expect(result.prompt).toContain("Please review this PR");
 
         // Should also contain GitHub context
-        expect(prompt).toContain("<repository>");
-        expect(prompt).toContain("<actor>");
-        expect(prompt).toContain("<pull_request_info>");
-        expect(prompt).toContain("<commits>");
-        expect(prompt).toContain("<changed_files>");
+        expect(result.prompt).toContain("<repository>");
+        expect(result.prompt).toContain("<actor>");
+        expect(result.prompt).toContain("<pull_request_info>");
+        expect(result.prompt).toContain("<commits>");
+        expect(result.prompt).toContain("<changed_files>");
     });
 
     test("generatePrompt includes GitHub context when attachGithubContext is true without custom prompt", async () => {
@@ -350,15 +350,15 @@ describe("NewGitHubPromptFormatter", () => {
             pullRequest: createMockPR()
         };
 
-        const prompt = await formatter.generatePrompt(context, fetchedData, undefined, true);
+        const result = await formatter.generatePrompt(context, fetchedData, undefined, true);
 
         // Should contain PR body as user instruction
-        expect(prompt).toContain("PR description from GitHub");
+        expect(result.prompt).toContain("PR description from GitHub");
 
         // Should contain GitHub context
-        expect(prompt).toContain("<repository>");
-        expect(prompt).toContain("<actor>");
-        expect(prompt).toContain("<pull_request_info>");
+        expect(result.prompt).toContain("<repository>");
+        expect(result.prompt).toContain("<actor>");
+        expect(result.prompt).toContain("<pull_request_info>");
     });
 
     test("generatePrompt formats review comments with thread structure", async () => {
@@ -426,25 +426,25 @@ describe("NewGitHubPromptFormatter", () => {
             }
         };
 
-        const prompt = await formatter.generatePrompt(context, fetchedData);
+        const result = await formatter.generatePrompt(context, fetchedData);
 
         // Should contain the review section
-        expect(prompt).toContain("<reviews>");
-        expect(prompt).toContain("Review by @reviewer (COMMENTED)");
-        expect(prompt).toContain("Review Comments:");
+        expect(result.prompt).toContain("<reviews>");
+        expect(result.prompt).toContain("Review by @reviewer (COMMENTED)");
+        expect(result.prompt).toContain("Review Comments:");
 
         // Should show the thread structure with file path and position
-        expect(prompt).toContain("src/file.ts (position: 10):");
+        expect(result.prompt).toContain("src/file.ts (position: 10):");
 
         // Should show all comments in thread order
-        expect(prompt).toContain("@reviewer: This needs improvement");
-        expect(prompt).toContain("@author: I agree, let me explain why");
-        expect(prompt).toContain("@junie-agent why did you decide this approach?");
+        expect(result.prompt).toContain("@reviewer: This needs improvement");
+        expect(result.prompt).toContain("@author: I agree, let me explain why");
+        expect(result.prompt).toContain("@junie-agent why did you decide this approach?");
 
         // Verify the thread structure is preserved (replies come after parent)
-        const reviewerCommentPos = prompt.indexOf("@reviewer: This needs improvement");
-        const firstReplyPos = prompt.indexOf("@author: I agree, let me explain why");
-        const secondReplyPos = prompt.indexOf("@junie-agent why did you decide this approach?");
+        const reviewerCommentPos = result.prompt.indexOf("@reviewer: This needs improvement");
+        const firstReplyPos = result.prompt.indexOf("@author: I agree, let me explain why");
+        const secondReplyPos = result.prompt.indexOf("@junie-agent why did you decide this approach?");
 
         expect(reviewerCommentPos).toBeLessThan(firstReplyPos);
         expect(firstReplyPos).toBeLessThan(secondReplyPos);
@@ -517,23 +517,121 @@ describe("NewGitHubPromptFormatter", () => {
             }
         };
 
-        const prompt = await formatter.generatePrompt(context, fetchedData);
+        const result = await formatter.generatePrompt(context, fetchedData);
 
         // Should contain both file paths as separate threads
-        expect(prompt).toContain("src/file1.ts (position: 5):");
-        expect(prompt).toContain("src/file2.ts (position: 10):");
+        expect(result.prompt).toContain("src/file1.ts (position: 5):");
+        expect(result.prompt).toContain("src/file2.ts (position: 10):");
 
         // Should contain all comments
-        expect(prompt).toContain("First thread root comment");
-        expect(prompt).toContain("Reply to first thread");
-        expect(prompt).toContain("Second thread root comment");
+        expect(result.prompt).toContain("First thread root comment");
+        expect(result.prompt).toContain("Reply to first thread");
+        expect(result.prompt).toContain("Second thread root comment");
 
         // Verify thread separation: first thread should be complete before second thread
-        const firstThreadRootPos = prompt.indexOf("First thread root comment");
-        const firstThreadReplyPos = prompt.indexOf("Reply to first thread");
-        const secondThreadRootPos = prompt.indexOf("Second thread root comment");
+        const firstThreadRootPos = result.prompt.indexOf("First thread root comment");
+        const firstThreadReplyPos = result.prompt.indexOf("Reply to first thread");
+        const secondThreadRootPos = result.prompt.indexOf("Second thread root comment");
 
         expect(firstThreadRootPos).toBeLessThan(firstThreadReplyPos);
         expect(firstThreadReplyPos).toBeLessThan(secondThreadRootPos);
+    });
+
+    describe("junie-args extraction", () => {
+        test("should extract junie-args from custom prompt", async () => {
+            const customPrompt = `Do something
+junie-args: --model="gpt-5" --other="value"`;
+
+            const context = createMockContext();
+            const result = await formatter.generatePrompt(context, {}, customPrompt, false);
+
+            expect(result.customJunieArgs).toEqual(['--model="gpt-5"', '--other="value"']);
+            expect(result.prompt).not.toContain('junie-args:');
+            expect(result.prompt).toContain('Do something');
+        });
+
+        test("should extract junie-args from PR body", async () => {
+            const context = createMockContext({
+                eventName: "pull_request",
+                payload: {
+                    ...createMockContext().payload,
+                    pull_request: {
+                        number: 1,
+                        title: "Test PR",
+                        body: `Fix the bug
+junie-args: --model="claude-opus-4-5"`,
+                        updated_at: "2024-01-01T00:00:00Z"
+                    }
+                } as any
+            });
+
+            const fetchedData: FetchedData = {
+                pullRequest: createMockPR()
+            };
+
+            const result = await formatter.generatePrompt(context, fetchedData);
+
+            expect(result.customJunieArgs).toEqual(['--model="claude-opus-4-5"']);
+            expect(result.prompt).not.toContain('junie-args:');
+            expect(result.prompt).toContain('Fix the bug');
+        });
+
+        test("should extract junie-args from issue comment", async () => {
+            const context = createMockContext({
+                eventName: "issue_comment",
+                isPR: false,
+                payload: {
+                    ...createMockContext().payload,
+                    comment: {
+                        id: 1,
+                        body: `@junie-agent do something
+junie-args: --model="gpt-5.2-codex" --temperature="0.7"`,
+                        created_at: "2024-01-01T00:00:00Z"
+                    },
+                    issue: {
+                        number: 1,
+                        title: "Test Issue",
+                        body: "Test body",
+                        updated_at: "2024-01-01T00:00:00Z"
+                    }
+                } as any
+            });
+
+            const fetchedData: FetchedData = {
+                issue: createMockIssue()
+            };
+
+            const result = await formatter.generatePrompt(context, fetchedData);
+
+            expect(result.customJunieArgs).toEqual(['--model="gpt-5.2-codex"', '--temperature="0.7"']);
+            expect(result.prompt).not.toContain('junie-args:');
+            expect(result.prompt).toContain('@junie-agent do something');
+        });
+
+        test("should handle multiple junie-args blocks", async () => {
+            const customPrompt = `First instruction
+junie-args: --model="gpt-5"
+
+Second instruction
+junie-args: --other="value"`;
+
+            const context = createMockContext();
+            const result = await formatter.generatePrompt(context, {}, customPrompt, false);
+
+            expect(result.customJunieArgs).toEqual(['--model="gpt-5"', '--other="value"']);
+            expect(result.prompt).not.toContain('junie-args:');
+            expect(result.prompt).toContain('First instruction');
+            expect(result.prompt).toContain('Second instruction');
+        });
+
+        test("should return empty array when no junie-args present", async () => {
+            const customPrompt = "Just a regular prompt without any args";
+
+            const context = createMockContext();
+            const result = await formatter.generatePrompt(context, {}, customPrompt, false);
+
+            expect(result.customJunieArgs).toEqual([]);
+            expect(result.prompt).toContain('Just a regular prompt without any args');
+        });
     });
 });

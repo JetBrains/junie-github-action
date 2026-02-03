@@ -48,6 +48,7 @@ export const OUTPUT_VARS = {
     // Task and MCP configuration
     JUNIE_JSON_TASK: "JUNIE_JSON_TASK",
     EJ_MCP_CONFIG: "EJ_MCP_CONFIG",
+    CUSTOM_JUNIE_ARGS: "CUSTOM_JUNIE_ARGS",
 
     // Exception handling
     EXCEPTION: "EXCEPTION",
