@@ -6,6 +6,7 @@ import {ENV_VARS, OUTPUT_VARS} from "../constants/environment";
 import {handleStepError} from "../utils/error-handler";
 import {isReviewOrCommentHasResolveConflictsTrigger} from "../github/validation/trigger";
 import {sanitizeJunieOutput} from "../utils/sanitizer";
+import * as fs from "node:fs";
 
 export enum ActionType {
     WRITE_COMMENT = 'WRITE_COMMENT',
@@ -17,8 +18,12 @@ export enum ActionType {
 
 export async function handleResults() {
     try {
-        const stringJunieJsonOutput = process.env[ENV_VARS.JSON_JUNIE_OUTPUT]
-        if (!stringJunieJsonOutput) {
+        // Read Junie output from file
+        const outputFile = process.env[ENV_VARS.JSON_JUNIE_OUTPUT_FILE]!!;
+        console.log(`Reading Junie output from file: ${outputFile}`);
+        const stringJunieJsonOutput = fs.readFileSync(outputFile, 'utf-8');
+
+        if (!stringJunieJsonOutput || stringJunieJsonOutput.trim() === '') {
             throw new Error(
                 `❌ Failed to retrieve Junie execution results. ` +
                 `This could be due to:\n` +
@@ -28,6 +33,7 @@ export async function handleResults() {
             );
         }
         const junieJsonOutput = JSON.parse(stringJunieJsonOutput) as any
+        const durationMs = junieJsonOutput.duration_ms;
         const context = JSON.parse(process.env[OUTPUT_VARS.PARSED_CONTEXT]!) as JunieExecutionContext
         const isResolveConflict = context.inputs.resolveConflicts || isReviewOrCommentHasResolveConflictsTrigger(context)
         const junieErrors = junieJsonOutput.errors
@@ -75,17 +81,18 @@ export async function handleResults() {
                 exportResultsOutputs(
                     title,
                     body,
+                    durationMs,
                     commitMessage,
                     PR_TITLE_TEMPLATE(title),
                     PR_BODY_TEMPLATE(body, issueId));
                 break;
             case ActionType.COMMIT_CHANGES:
             case ActionType.PUSH:
-                exportResultsOutputs(title, body, commitMessage);
+                exportResultsOutputs(title, body, durationMs, commitMessage);
                 break;
             case ActionType.WRITE_COMMENT:
             case ActionType.NOTHING:
-                exportResultsOutputs(title, body);
+                exportResultsOutputs(title, body, durationMs);
                 break;
         }
     } catch (error) {
@@ -178,11 +185,16 @@ async function checkForUnpushedCommits(isNewBranch: boolean, baseBranch: string)
 
 function exportResultsOutputs(junieTitle: string,
                               junieSummary: string,
+                              durationMs?: number,
                               commitMessage?: string,
                               prTitle?: string,
                               prBody?: string): void {
     core.setOutput(OUTPUT_VARS.JUNIE_TITLE, junieTitle);
     core.setOutput(OUTPUT_VARS.JUNIE_SUMMARY, junieSummary);
+
+    if (durationMs !== undefined) {
+        core.setOutput(OUTPUT_VARS.JUNIE_DURATION_MS, durationMs.toString());
+    }
 
     if (commitMessage) {
         core.setOutput(OUTPUT_VARS.COMMIT_MESSAGE, commitMessage);
