@@ -18,7 +18,6 @@ A powerful GitHub Action that integrates [Junie](https://www.jetbrains.com/junie
 - [How It Works](#how-it-works)
 - [Security Considerations](#security-considerations)
 - [Troubleshooting](#troubleshooting)
-- [Contributing](#contributing)
 
 ## Features
 
@@ -147,6 +146,13 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 | `junie_work_dir` | Working directory for Junie files | `/tmp/junie-work` |
 | `junie_guidelines_filename` | Filename of the guidelines file (should be in `<project-root>/.junie` dir) | `guidelines.md` |
 | `allowed_mcp_servers` | Comma-separated list of MCP servers to use (e.g., `mcp_github_checks_server`). Note: inline comment server is automatically enabled for PRs. | - |
+
+**Inline Arguments**: You can pass custom Junie CLI arguments directly in comments, issues, or custom prompts using `junie-args:` syntax. These arguments take priority over workflow inputs.
+
+```markdown
+@junie-agent fix the bug
+junie-args: --model="claude-opus-4-5"
+```
 
 **Available MCP Servers**:
 - `mcp_github_checks_server`: Analyze failed GitHub Actions checks and provide detailed error information

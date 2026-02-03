@@ -114,6 +114,9 @@ outputs:
   github_token:
     description: "The GitHub token used by the action"
     value: ${{ steps.prepare.outputs.EJ_AUTH_GITHUB_TOKEN }}
+  custom_junie_args:
+    description: "Custom Junie arguments extracted from prompt/comment (e.g., --model='value')"
+    value: ${{ steps.prepare.outputs.CUSTOM_JUNIE_ARGS }}
 
 runs:
   using: "composite"
@@ -178,12 +181,18 @@ runs:
         MATTERHORN_DEBUG_LOG: false
         WORKING_DIR: ${{ inputs.junie_work_dir }}
         MODEL: ${{ inputs.model }}
+        CUSTOM_JUNIE_ARGS: ${{ steps.prepare.outputs.CUSTOM_JUNIE_ARGS }}
       run: |
-        MODEL_FLAG=""
-        if [ -n "${MODEL}" ]; then
-          MODEL_FLAG="--model=${MODEL}"
-        fi
-        OUTPUT=$(junie --cache-dir="${WORKING_DIR}" --input-format="json" --output-format="json" --auth="${CLI_TOKEN}" ${MODEL_FLAG} <<<"${JUNIE_JSON_TASK}")
+        # Start with custom junie args if provided (highest priority)
+        JUNIE_FLAGS="${CUSTOM_JUNIE_ARGS}"
+
+        # If no custom --model flag in CUSTOM_JUNIE_ARGS, use MODEL input
+        if [ -n "${MODEL}" ] && ! echo "${CUSTOM_JUNIE_ARGS}" | grep -q -- "--model="; then
+          JUNIE_FLAGS="${JUNIE_FLAGS} --model=${MODEL}"
+        fi  `
+
+        echo "Using Junie flags: ${JUNIE_FLAGS}"
+        OUTPUT=$(junie --cache-dir="${WORKING_DIR}" --input-format="json" --output-format="json" --auth="${CLI_TOKEN}" ${JUNIE_FLAGS} <<<"${JUNIE_JSON_TASK}")
         echo "json_output<<EOF" >> $GITHUB_OUTPUT
         echo "$OUTPUT" >> $GITHUB_OUTPUT
         echo "EOF" >> $GITHUB_OUTPUT
