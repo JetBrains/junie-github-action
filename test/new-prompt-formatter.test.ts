@@ -686,5 +686,87 @@ junie-args: --other="value"` }
 
             expect(result.prompt).toContain("develop");
         });
+
+        test("deduplicates junie-args keeping the last occurrence", async () => {
+            const context = createMockContext({
+                eventName: "issue_comment",
+                isPR: true,
+                entityNumber: 1,
+                payload: {
+                    ...createMockContext().payload,
+                    comment: {
+                        body: `Please fix this
+junie-args: --model="gpt-4" --timeout=30 --model="claude-opus-4-5"`,
+                        created_at: "2024-01-01T00:00:00Z"
+                    }
+                } as any
+            });
+
+            const fetchedData: FetchedData = {
+                pullRequest: createMockPR()
+            };
+
+            const result = await formatter.generatePrompt(context, fetchedData, createMockBranchInfo());
+
+            // Should only have one --model, with the last value
+            expect(result.customJunieArgs).toContain('--model="claude-opus-4-5"');
+            expect(result.customJunieArgs).not.toContain('--model="gpt-4"');
+            expect(result.customJunieArgs).toContain('--timeout=30');
+            // Should have exactly 2 args, not 3
+            expect(result.customJunieArgs.length).toBe(2);
+        });
+
+        test("does not extract junie-args from timeline or reviews", async () => {
+            const context = createMockContext({
+                eventName: "issue_comment",
+                isPR: true,
+                entityNumber: 1,
+                payload: {
+                    ...createMockContext().payload,
+                    comment: {
+                        body: `Fix the bug`,
+                        created_at: "2024-01-01T00:00:00Z"
+                    }
+                } as any
+            });
+
+            const mockPR = createMockPR();
+            // Add timeline with junie-args (should NOT be extracted)
+            const fetchedData: FetchedData = {
+                pullRequest: {
+                    ...mockPR,
+                    timelineItems: {
+                        nodes: [
+                            {
+                                __typename: "IssueComment",
+                                author: { login: "someuser" },
+                                body: "Some comment with junie-args: --model=\"should-not-extract\"",
+                                createdAt: "2024-01-01T00:00:00Z"
+                            }
+                        ]
+                    },
+                    reviews: {
+                        nodes: [
+                            {
+                                author: { login: "reviewer" },
+                                state: "COMMENTED",
+                                submittedAt: "2024-01-01T00:00:00Z",
+                                body: "Review with junie-args: --timeout=999",
+                                comments: { nodes: [] }
+                            }
+                        ]
+                    }
+                }
+            };
+
+            const result = await formatter.generatePrompt(context, fetchedData, createMockBranchInfo());
+
+            // Should have no junie-args extracted from timeline/reviews
+            expect(result.customJunieArgs.length).toBe(0);
+            expect(result.customJunieArgs).not.toContain('--model="should-not-extract"');
+            expect(result.customJunieArgs).not.toContain('--timeout=999');
+            // But timeline content should still be in prompt (not cleaned)
+            expect(result.prompt).toContain("Some comment with junie-args:");
+        });
     });
 });

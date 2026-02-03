@@ -19,17 +19,39 @@ export enum ActionType {
 export async function handleResults() {
     try {
         // Read Junie output from file
-        const outputFile = process.env[ENV_VARS.JSON_JUNIE_OUTPUT_FILE]!!;
+        const outputFile = process.env[ENV_VARS.JSON_JUNIE_OUTPUT_FILE];
+
+        if (!outputFile) {
+            throw new Error(
+                `❌ Junie output file path is not set.\n\n` +
+                `This indicates that Junie execution did not complete properly.\n` +
+                `Please check the Junie execution logs above for error details.`
+            );
+        }
+
         console.log(`Reading Junie output from file: ${outputFile}`);
+
+        // Check if file exists
+        if (!fs.existsSync(outputFile)) {
+            throw new Error(
+                `❌ Junie output file not found: ${outputFile}\n\n` +
+                `This could be due to:\n` +
+                `• Junie execution failed before completing\n` +
+                `• Junie crashed or was terminated\n` +
+                `• File system error\n\n` +
+                `Please check the Junie execution logs above for error details.`
+            );
+        }
+
         const stringJunieJsonOutput = fs.readFileSync(outputFile, 'utf-8');
 
         if (!stringJunieJsonOutput || stringJunieJsonOutput.trim() === '') {
             throw new Error(
-                `❌ Failed to retrieve Junie execution results. ` +
+                `❌ Junie output file is empty.\n\n` +
                 `This could be due to:\n` +
                 `• Junie execution did not complete successfully\n` +
-                `• Junie output was empty or invalid\n` +
-                `Please check the Junie execution logs for details.`
+                `• Junie output was empty or invalid\n\n` +
+                `Please check the Junie execution logs above for details.`
             );
         }
         const junieJsonOutput = JSON.parse(stringJunieJsonOutput) as any
