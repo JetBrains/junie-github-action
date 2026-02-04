@@ -174,7 +174,7 @@ runs:
       env:
         JUNIE_GUIDELINES_FILENAME: ${{ inputs.junie_guidelines_filename }}
         CLI_TOKEN: ${{ steps.prepare.outputs.EJ_CLI_TOKEN }}
-        JUNIE_JSON_TASK: ${{ steps.prepare.outputs.JUNIE_JSON_TASK }}
+        JUNIE_INPUT_FILE: ${{ steps.prepare.outputs.JUNIE_INPUT_FILE }}
         EJ_AUTH_GITHUB_TOKEN: ${{ steps.prepare.outputs.EJ_AUTH_GITHUB_TOKEN  }}
         GH_TOKEN: ${{ steps.prepare.outputs.EJ_AUTH_GITHUB_TOKEN }}
         MULTI_RUNS: true
@@ -194,13 +194,14 @@ runs:
         JUNIE_OUTPUT_FILE="${WORKING_DIR}/junie_output.json"
         echo "Using Junie flags: ${JUNIE_FLAGS}"
         echo "Writing Junie output to: ${JUNIE_OUTPUT_FILE}"
+        echo "Reading Junie input from: ${JUNIE_INPUT_FILE}"
 
         junie --cache-dir="${WORKING_DIR}" \
               --output-format="json" \
               --input-format="json" \
               --json-output-file="${JUNIE_OUTPUT_FILE}" \
               --auth="${CLI_TOKEN}" \
-              ${JUNIE_FLAGS} <<<"${JUNIE_JSON_TASK}"
+              ${JUNIE_FLAGS} < "${JUNIE_INPUT_FILE}"
 
         # Export the file path instead of the content
         echo "json_output_file=${JUNIE_OUTPUT_FILE}" >> $GITHUB_OUTPUT

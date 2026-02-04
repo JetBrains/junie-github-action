@@ -4,7 +4,7 @@ import {JunieExecutionContext} from "../src/github/context";
 import {BranchInfo} from "../src/github/operations/branch";
 import {Octokits} from "../src/github/api/client";
 import * as core from "@actions/core";
-import {createMockContext} from "./mockContext";
+import * as fs from "node:fs";
 
 // Mock modules
 mock.module("@actions/core", () => ({
@@ -200,6 +200,13 @@ describe("prepareJunieTask", () => {
 
     beforeEach(() => {
         (core.setOutput as any).mockClear();
+        // Set WORKING_DIR for file operations
+        const workingDir = "/tmp/junie-test";
+        process.env.WORKING_DIR = workingDir;
+        // Create directory if it doesn't exist
+        if (!fs.existsSync(workingDir)) {
+            fs.mkdirSync(workingDir, { recursive: true });
+        }
     });
 
     describe("with user prompt", () => {
@@ -228,7 +235,7 @@ describe("prepareJunieTask", () => {
             expect(result.task).toContain("<repository>");
             expect(result.task).toContain("<actor>");
             expect(result.mergeTask).toBeUndefined();
-            expect(core.setOutput).toHaveBeenCalledWith("JUNIE_JSON_TASK", expect.any(String));
+            expect(core.setOutput).toHaveBeenCalledWith("JUNIE_INPUT_FILE", expect.any(String));
         });
 
         test("should set task from inputs.prompt without GitHub context when disabled", async () => {
@@ -255,7 +262,7 @@ describe("prepareJunieTask", () => {
             expect(result.task).toContain("Do something");
             expect(result.task).toContain("Do NOT commit or push changes");
             expect(result.mergeTask).toBeUndefined();
-            expect(core.setOutput).toHaveBeenCalledWith("JUNIE_JSON_TASK", expect.any(String));
+            expect(core.setOutput).toHaveBeenCalledWith("JUNIE_INPUT_FILE", expect.any(String));
         });
     });
 
@@ -593,7 +600,8 @@ describe("prepareJunieTask", () => {
             const result = await prepareJunieTask(context, branchInfo, octokit);
 
             expect(result).toBeDefined();
-            expect(core.setOutput).toHaveBeenCalledWith("JUNIE_JSON_TASK", JSON.stringify(result));
+            expect(core.setOutput).toHaveBeenCalledWith("JUNIE_INPUT_FILE", expect.any(String));
+            expect(core.setOutput).toHaveBeenCalledWith("CUSTOM_JUNIE_ARGS", expect.any(String));
         });
     });
 
@@ -616,7 +624,7 @@ describe("prepareJunieTask", () => {
             expect(prResult.mergeTask).toBeUndefined();
 
             // Both should have been processed successfully
-            // Each call to prepareJunieTask makes 2 setOutput calls (JUNIE_JSON_TASK and CUSTOM_JUNIE_ARGS)
+            // Each call to prepareJunieTask makes 2 setOutput calls (JUNIE_INPUT_FILE, CUSTOM_JUNIE_ARGS)
             expect(core.setOutput).toHaveBeenCalledTimes(4);
         });
     });

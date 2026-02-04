@@ -7,9 +7,10 @@ import {
     JunieExecutionContext
 } from "../context";
 import * as core from "@actions/core";
+import * as fs from "node:fs";
 import {BranchInfo} from "../operations/branch";
 import {isReviewOrCommentHasResolveConflictsTrigger} from "../validation/trigger";
-import {OUTPUT_VARS} from "../../constants/environment";
+import {ENV_VARS, OUTPUT_VARS} from "../../constants/environment";
 import {Octokits} from "../api/client";
 import {NewGitHubPromptFormatter} from "./new-prompt-formatter";
 import {downloadAttachmentsAndRewriteText} from "./attachment-downloader";
@@ -87,7 +88,17 @@ export async function prepareJunieTask(
         throw new Error("No task was created. Please check your inputs.");
     }
 
-    core.setOutput(OUTPUT_VARS.JUNIE_JSON_TASK, JSON.stringify(junieCLITask));
+    // Write task JSON to file to avoid ARG_MAX limit for large prompts
+    const workingDir = process.env[ENV_VARS.WORKING_DIR];
+    if (!workingDir) {
+        throw new Error("WORKING_DIR environment variable is not set");
+    }
+    const junieInputFile = `${workingDir}/junie_input.json`;
+    fs.writeFileSync(junieInputFile, JSON.stringify(junieCLITask, null, 2));
+    console.log(`Junie task written to file: ${junieInputFile}`);
+
+    // Output file path (not content!) to avoid env variable size limits
+    core.setOutput(OUTPUT_VARS.JUNIE_INPUT_FILE, junieInputFile);
 
     // Output custom junie args as a string for use in action.yml
     const customJunieArgsString = junieArgsToString(customJunieArgs);
