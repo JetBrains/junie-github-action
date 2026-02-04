@@ -65,8 +65,10 @@ jobs:
 - Create an issue with `@junie-agent` in the title or body → Junie analyzes and proposes a solution
 - Submit a PR review mentioning `@junie-agent` → Junie addresses your feedback
 - Comment `@junie-agent resolve conflicts` on a PR with merge conflicts → Junie resolves the conflicts
+- Comment `@junie-agent minor-fix rename variable x to y` in a PR → Junie makes the requested adjustment
 
 **Features enabled:**
+- ✅ Minor Fixes - quickly implement small PR adjustments with `minor-fix`
 - ✅ Single comment mode - updates one comment instead of creating multiple
 - ✅ Works on issues, PRs, comments, and reviews
 - ✅ Only triggers on explicit `@junie-agent` mentions
