@@ -1,0 +1,32 @@
+
+name: Cleanup Test Repositories
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'
+    - cron: '0 12 * * 4'
+  workflow_dispatch:
+
+jobs:
+  cleanup-repositories:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Run cleanup
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          TEST_ORG: melotria
+        run: bun test test/cleanup/cleanup.test.ts

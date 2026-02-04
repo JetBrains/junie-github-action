@@ -15,6 +15,7 @@ type GitHubFile =
     | RestEndpointMethodTypes["pulls"]["listFiles"]["response"]["data"][number]
     | NonNullable<RestEndpointMethodTypes["repos"]["getCommit"]["response"]["data"]["files"]>[number]
     | NonNullable<RestEndpointMethodTypes["repos"]["compareCommits"]["response"]["data"]["files"]>[number];
+type Repository = RestEndpointMethodTypes["repos"]["listForOrg"]["response"]["data"][number];
 type ReviewComment = RestEndpointMethodTypes["pulls"]["listReviewComments"]["response"]["data"][number];
 type ReviewCommentCondition = {
     commentText: string;
@@ -88,7 +89,19 @@ export class Client {
 
     async deleteTestRepo(repoName: string): Promise<void> {
         console.log(`Deleting test repository: ${this.org}/${repoName}`);
-        await this.octokit.repos.delete({
+        await this.deleteRepository(repoName);
+    }
+
+    async getAllReposForOrg(){
+        return this.octokit.repos.listForOrg({
+            org: this.org,
+            per_page: 100,
+            sort: "updated",
+        });
+    }
+
+    async deleteRepository(repoName: string){
+        return this.octokit.repos.delete({
             owner: this.org,
             repo: repoName,
         });
