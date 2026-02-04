@@ -32,6 +32,10 @@ export const FIX_CI_ACTION = "fix-ci";
 
 export const FIX_CI_TRIGGER_PHRASE_REGEXP = new RegExp(FIX_CI_ACTION, 'i');
 
+export const MINOR_FIX_ACTION = "minor-fix";
+
+export const MINOR_FIX_TRIGGER_PHRASE_REGEXP = new RegExp(MINOR_FIX_ACTION, 'i');
+
 export const JIRA_EVENT_ACTION = "jira_event";
 
 export const WORKING_BRANCH_PREFIX = "junie/";
@@ -152,6 +156,47 @@ Your task is to analyze CI failures and suggest fixes WITHOUT implementing them.
 // Suggested code snippet or pseudocode
 \`\`\`
 ---
+`;
+}
+
+export function createMinorFixPrompt(diffPoint: string, userRequest?: string): string {
+    const diffCommand = `gh pr diff ${diffPoint}`
+    const userRequestSection = userRequest 
+        ? `\n### User Request\nThe user has specifically requested: "${userRequest}"\nFocus on addressing this request while following all the guidelines below.\n`
+        : '';
+    const gatherInfoUserRequestNote = userRequest
+        ? `\n   - Focus specifically on understanding what "${userRequest}" means in the context of this PR. Identify the relevant files, functions, or code sections that relate to this request.`
+        : '';
+    
+    return `
+Your task is to make a minor fix to this Pull Request based on the user's request.
+${userRequestSection}
+### Steps to follow
+1. Gather Information
+   - Read the Pull Request diff by using \`${diffCommand} | grep "^diff --git"\`. Do not write the diff to file.
+   - Understand the context of the changes and what the PR is trying to accomplish.${gatherInfoUserRequestNote}
+
+2. Implement the Fix
+   - Make the requested changes to the codebase.
+   - Keep changes minimal and focused on the specific request.
+   - Follow the existing code style and conventions in the repository.
+   - Do NOT make unrelated changes or "improvements" beyond what was requested.
+
+3. Validation
+   - Ensure your changes compile/build successfully.
+   - Run relevant tests if applicable.
+   - Verify the fix addresses the user's request.
+
+### Guidelines
+- **Scope**: Only make changes directly related to the user's request. Do not refactor or "improve" unrelated code.
+- **Style**: Match the existing code style, naming conventions, and patterns in the repository.
+- **Safety**: Be conservative with changes. When in doubt, make the smaller change.
+- **Testing**: If you modify logic, ensure existing tests still pass. Add tests only if explicitly requested.
+
+### Output
+Submit a brief summary of the changes you made and why they address the user's request.
+
+IMPORTANT: Do NOT commit or push changes. The system will handle all git operations (staging, committing, and pushing) automatically.
 `;
 }
 

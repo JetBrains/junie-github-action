@@ -1,6 +1,7 @@
 import {
     isIssueCommentEvent,
     isIssuesEvent,
+    isMinorFixEvent,
     isPullRequestEvent,
     isPullRequestReviewCommentEvent,
     isPullRequestReviewEvent,

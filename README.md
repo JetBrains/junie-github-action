@@ -26,6 +26,7 @@ A powerful GitHub Action that integrates [Junie](https://www.jetbrains.com/junie
 - **PR Management**: Reviews code changes and implements requested modifications
 - **Inline Code Reviews**: Create code review comments with GitHub suggestions directly on PR diffs
 - **Conflict Resolution**: Resolve merge conflicts via `@junie-agent` comment or automatic detection
+- **Minor PR Fixes**: Quickly implement small changes in PRs using `@junie-agent minor-fix [instruction]`
 - **CI Failure Analysis**: Investigates failed checks and suggests fixes using MCP integration
 - **Flexible Triggers**: Activate via mentions, assignees, labels, or custom prompts
 - **Smart Branch Management**: Context-aware branch creation and management
@@ -100,6 +101,7 @@ jobs:
 3. Start using Junie:
    - Comment `@junie-agent help me fix this bug` on an issue
    - Mention `@junie-agent review this change` in a PR
+   - Comment `@junie-agent minor-fix rename variable x to y` in a PR to make quick adjustments
 
 ## Jira Integration
 
@@ -140,7 +142,7 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 
 | Input | Description | Default |
 |-------|-------------|---------|
-| `prompt` | Custom instructions for Junie. Special values: `code-review` for structured PR reviews, `fix-ci` for CI failure analysis. See [Cookbook](COOKBOOK.md) for examples. | - |
+| `prompt` | Custom instructions for Junie. Special values: `code-review` for structured PR reviews, `fix-ci` for CI failure analysis, `minor-fix` for quick PR adjustments. See [Cookbook](COOKBOOK.md) for examples. | - |
 | `junie_version` | Junie CLI version to install | `624.1.0` |
 | `model` | Model to use for the primary agent. Available: `gpt-5-2025-08-07`, `gpt-5.2-codex`, `gpt-5.2-2025-12-11`, `claude-sonnet-4-5-20250929`, `claude-opus-4-5-20251101`, `gemini-3-pro-preview`, `gemini-3-flash-preview`, `grok-4-1-fast-reasoning` | - |
 | `junie_work_dir` | Working directory for Junie files | `/tmp/junie-work` |
@@ -207,6 +209,7 @@ For detailed setup instructions, see the [Jira Integration Guide](docs/JIRA_INTE
 | `pr_url` | URL of the pull request created by Junie (if any) |
 | `junie_title` | Title of the task completion from Junie |
 | `junie_summary` | Summary of the changes made by Junie |
+| `custom_junie_args` | Custom Junie arguments extracted from prompt/comment (e.g., `--model=value`) |
 | `github_token` | The GitHub token used by the action |
 
 **Example usage:**
