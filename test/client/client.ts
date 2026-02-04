@@ -33,7 +33,22 @@ export class Client {
     }
 
     async createTestRepo(): Promise<string> {
-        const repoName = `junie-test-${Date.now()}`;
+        const stack = new Error().stack || '';
+        const stackLines = stack.split('\n');
+
+        let testName = 'unknown';
+        for (const line of stackLines) {
+            if (line.includes('test/integration/')) {
+                const match = line.match(/test\/integration\/([^.]+)\.test\.ts/);
+                if (match) {
+                    testName = match[1];
+                    break;
+                }
+            }
+        }
+
+        const timestamp = Date.now();
+        const repoName = `junie-test-${testName}-${timestamp}`;
         console.log(`Creating test repository: ${this.org}/${repoName}`);
 
         await this.octokit.repos.createInOrg({
