@@ -93,6 +93,10 @@ export async function prepareJunieTask(
     if (!workingDir) {
         throw new Error("WORKING_DIR environment variable is not set");
     }
+
+    // Ensure working directory exists (recursive: true won't fail if dir already exists)
+    fs.mkdirSync(workingDir, { recursive: true });
+
     const junieInputFile = `${workingDir}/junie_input.json`;
     fs.writeFileSync(junieInputFile, JSON.stringify(junieCLITask, null, 2));
     console.log(`Junie task written to file: ${junieInputFile}`);
