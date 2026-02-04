@@ -158,7 +158,7 @@ export function extractJunieWorkflowContext(tokenOwner: TokenOwner): JunieExecut
             silentMode: process.env.SILENT_MODE == "true",
             useSingleComment: process.env.USE_SINGLE_COMMENT == "true",
             attachGithubContextToCustomPrompt: process.env.ATTACH_GITHUB_CONTEXT_TO_CUSTOM_PROMPT !== "false",
-            junieWorkingDir: process.env.JUNIE_WORKING_DIR!,
+            junieWorkingDir: process.env.WORKING_DIR!,
             headRef: process.env.GITHUB_HEAD_REF,
             appToken: process.env.APP_TOKEN!,
             prompt: process.env.PROMPT || "",

@@ -147,7 +147,7 @@ runs:
         TARGET_BRANCH: ${{ github.head_ref }}
         OVERRIDE_GITHUB_TOKEN: ${{ inputs.custom_github_token }}
         DEFAULT_WORKFLOW_TOKEN: ${{ github.token }}
-        JUNIE_WORKING_DIR: ${{ inputs.junie_work_dir }}
+        WORKING_DIR: ${{ inputs.junie_work_dir }}
         ALLOWED_MCP_SERVERS: ${{ inputs.allowed_mcp_servers }}
         RESOLVE_CONFLICTS: ${{ inputs.resolve_conflicts }}
         CREATE_NEW_BRANCH_FOR_PR: ${{ inputs.create_new_branch_for_pr }}
