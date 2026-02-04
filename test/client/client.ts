@@ -78,6 +78,8 @@ export class Client {
             workflowFilePathInRepo,
             "Add Junie workflow"
         );
+
+        await new Promise(resolve => setTimeout(resolve, 6000));
     }
 
     async deleteTestRepo(repoName: string): Promise<void> {
