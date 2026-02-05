@@ -11,7 +11,7 @@ import {
 } from "../api/queries";
 import {
     isFixCIEvent,
-    isFixCodeReviewEvent,
+    isCodeReviewEvent,
     isIssueCommentEvent,
     isIssuesEvent,
     isJiraWorkflowDispatchEvent,
@@ -111,7 +111,7 @@ ${GIT_OPERATIONS_NOTE}
     private extractKeyWords(context: JunieExecutionContext, fetchedData: FetchedData, branchInfo: BranchInfo) {
         const issue = fetchedData.pullRequest || fetchedData.issue;
 
-        const isCodeReview = isFixCodeReviewEvent(context)
+        const isCodeReview = isCodeReviewEvent(context)
         const isFixCI = isFixCIEvent(context)
         const isMinorFix = isMinorFixEvent(context)
 

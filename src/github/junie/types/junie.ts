@@ -13,7 +13,12 @@ export interface MergeTask {
     branch: string;
 }
 
+export interface CodeReviewTask {
+    diffPoint: string;
+}
+
 export interface CliInput {
     task?: string;
     mergeTask?: MergeTask;
+    CodeReviewTask?: CodeReviewTask;
 }
