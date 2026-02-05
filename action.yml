@@ -196,9 +196,10 @@ runs:
         echo "Writing Junie output to: ${JUNIE_OUTPUT_FILE}"
         echo "Reading Junie input from: ${JUNIE_INPUT_FILE}"
 
-        # Read JSON from file and pass via EJ_TASK environment variable
-        export EJ_TASK=$(cat "${JUNIE_INPUT_FILE}")
-        echo "EJ_TASK: ${EJ_TASK}"
+        # Read JSON from file and pass via JUNIE_TASK environment variable
+        # JUNIE_TASK parses directly as JunieTask which supports codeReview
+        export JUNIE_TASK=$(cat "${JUNIE_INPUT_FILE}")
+        echo "JUNIE_TASK: ${JUNIE_TASK}"
 
         junie --cache-dir="${WORKING_DIR}" \
               --output-format="json" \
