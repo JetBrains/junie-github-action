@@ -77,6 +77,7 @@ export function detectJunieTriggerPhrase(context: JunieExecutionContext): boolea
             return true;
         }
     }
+
     const hasTrigger = isReviewOrCommentHasTrigger(context, triggerPhraseRegex)
 
     if (hasTrigger) {
