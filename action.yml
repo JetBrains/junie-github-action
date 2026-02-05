@@ -196,12 +196,15 @@ runs:
         echo "Writing Junie output to: ${JUNIE_OUTPUT_FILE}"
         echo "Reading Junie input from: ${JUNIE_INPUT_FILE}"
 
+        # Read JSON from file and pass via EJ_TASK environment variable
+        export EJ_TASK=$(cat "${JUNIE_INPUT_FILE}")
+        echo "EJ_TASK: ${EJ_TASK}"
+
         junie --cache-dir="${WORKING_DIR}" \
               --output-format="json" \
-              --input-format="json" \
               --json-output-file="${JUNIE_OUTPUT_FILE}" \
               --auth="${CLI_TOKEN}" \
-              ${JUNIE_FLAGS} < "${JUNIE_INPUT_FILE}"
+              ${JUNIE_FLAGS}
 
         # Export the file path instead of the content
         echo "json_output_file=${JUNIE_OUTPUT_FILE}" >> $GITHUB_OUTPUT
