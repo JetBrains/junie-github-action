@@ -396,7 +396,7 @@ describe("prepareJunieTask", () => {
             expect(result.task).toContain("<repository>");
         });
 
-        test("should replace CODE_REVIEW_ACTION phrase with default code review prompt", async () => {
+        test("should create codeReview task when code-review prompt is provided", async () => {
             const context = createMockContext({
                 eventName: "pull_request",
                 isPR: true,
@@ -421,8 +421,8 @@ describe("prepareJunieTask", () => {
             const result = await prepareJunieTask(context, branchInfo, octokit);
 
             expect(result).toBeDefined();
-            expect(result.task).toBeDefined();
-            expect(result.task).toContain("Read the Pull Request diff");
+            expect(result.codeReview).toBeDefined();
+            expect(result.codeReview?.diffCommand).toContain("gh pr diff 123");
         });
 
         test("should not trigger fix CI prompt when workflow_run event has success conclusion", async () => {
