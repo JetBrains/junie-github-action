@@ -16,6 +16,10 @@ type GitHubFile =
     | NonNullable<RestEndpointMethodTypes["repos"]["getCommit"]["response"]["data"]["files"]>[number]
     | NonNullable<RestEndpointMethodTypes["repos"]["compareCommits"]["response"]["data"]["files"]>[number];
 type ReviewComment = RestEndpointMethodTypes["pulls"]["listReviewComments"]["response"]["data"][number];
+type ReviewCommentCondition = {
+    commentText: string;
+    codeLine: string;
+}
 
 export const TEST_WORKFLOW_FILE_PATHS = {
     workflowFilePathInTestDirectory: "test/workflows/junie.yml",
@@ -144,10 +148,7 @@ export class Client {
             async () => {
                 const { data: comments } = await this.getAllReviewComments(prNumber);
 
-                if (condition(comments)) {
-                    return true;
-                }
-                return false;
+                return (condition(comments));
             }
         );
     }
@@ -176,44 +177,18 @@ export class Client {
         return foundPR!;
     }
 
-    async checkInlineComments(
+    async getInlineComments(
         prNumber: number,
-        check: (comment: {
-            commentText: string;
-            codeLine: string;
-        }) => boolean,
-        minCount: number = 1
-    ): Promise<void> {
-        console.log(`Checking inline comments on PR #${prNumber}...`);
+        condition: (comment: ReviewCommentCondition) => boolean
+    ): Promise<ReviewComment[]> {
+        console.log(`Getting inline comments on PR #${prNumber}...`);
+        const { data: comments } = await this.getAllReviewComments(prNumber);
+        const filteredComments = comments.filter(comment => condition({
+            commentText: comment.body || "",
+            codeLine: (comment.diff_hunk || "").split('\n')[(comment.diff_hunk || "").split('\n').length - 1] || ""
+        }));
 
-        await startPoll(
-            `Inline comments don't match expectations for PR #${prNumber}`,
-            {},
-            async () => {
-                const { data: comments } = await this.getAllReviewComments(prNumber);
-
-                let matchCount = 0;
-                for (const comment of comments) {
-                    const diffLines = (comment.diff_hunk || "").split('\n');
-                    const codeLine = diffLines[diffLines.length - 1] || "";
-
-                    const result = check({
-                        commentText: comment.body || "",
-                        codeLine: codeLine
-                    });
-
-                    if (result) {
-                        matchCount++;
-                    }
-                }
-                console.log(`Found ${matchCount} matching inline comment(s) (required: ${minCount}).`);
-
-                if (matchCount >= minCount) {
-                    return true;
-                }
-                return false;
-            }
-        );
+        return filteredComments;
     }
 
     createIssue(issueTitle: string, issueBody: string, repoName?: string) {
@@ -326,19 +301,13 @@ export class Client {
     }
 
     conditionCodeBeforeSuggestionIncludes(includesText: string) {
-        return (comment: {
-            commentText: string;
-            codeLine: string;
-        }): boolean => {
+        return (comment: ReviewCommentCondition): boolean => {
             return comment.codeLine.includes(includesText);
         }
     }
 
     conditionInlineCommentIncludes(includesText: string) {
-        return (comment: {
-            commentText: string;
-            codeLine: string;
-        }): boolean => {
+        return (comment: ReviewCommentCondition): boolean => {
             return comment.commentText.includes(includesText);
         }
     }
