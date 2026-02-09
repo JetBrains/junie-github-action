@@ -103,7 +103,7 @@ export class NewGitHubPromptFormatter {
             customJunieArgs.push(...parsed.args);
         }
 
-        const prOrIssueInfo = this.getPrOrIssueInfo(context, fetchedData);
+        const prOrIssueInfo = this.getPrOrIssueInfo(context, fetchedData, userInstruction);
         const commitsInfo = this.getCommitsInfo(fetchedData);
         const timelineInfo = this.getTimelineInfo(fetchedData);
         const reviewsInfo = this.getReviewsInfo(fetchedData);
@@ -282,20 +282,29 @@ Description: ${jira.issueDescription}${commentsInfo}
         return currentComment.databaseId.toString();
     }
 
-    private getPrOrIssueInfo(context: JunieExecutionContext, fetchedData: FetchedData): string | undefined {
+    private getPrOrIssueInfo(context: JunieExecutionContext, fetchedData: FetchedData, userInstruction?: string): string | undefined {
         if (context.isPR) {
-            const prInfo = this.getPrInfo(fetchedData);
+            const prInfo = this.getPrInfo(fetchedData, userInstruction);
             return prInfo ? `<pull_request_info>\n${prInfo}\n</pull_request_info>` : undefined;
         } else if (isTriggeredByUserInteraction(context) && !isPushEvent(context)) {
-            const issueInfo = this.getIssueInfo(fetchedData);
+            const issueInfo = this.getIssueInfo(fetchedData, userInstruction);
             return issueInfo ? `<issue_info>\n${issueInfo}\n</issue_info>` : undefined;
         }
         return undefined
     }
 
-    private getPrInfo(fetchedData: FetchedData): string {
+    private getPrInfo(fetchedData: FetchedData, userInstruction?: string): string {
         const pr = fetchedData.pullRequest;
         if (!pr) return "";
+
+        // Add PR body only if it's not already in userInstruction (to avoid duplication)
+        const shouldIncludeBody = pr.body &&
+                                   pr.body.trim().length > 0 &&
+                                   (!userInstruction || !userInstruction.includes(pr.body));
+
+        const bodySection = shouldIncludeBody
+            ? `\nDescription:\n${pr.body}`
+            : '';
 
         return `PR Number: #${pr.number}
 Title: ${pr.title}
@@ -304,17 +313,26 @@ State: ${pr.state}
 Branch: ${pr.headRefName} -> ${pr.baseRefName}
 Base Commit: ${pr.baseRefOid}
 Head Commit: ${pr.headRefOid}
-Stats: +${pr.additions}/-${pr.deletions} (${pr.changedFiles} files, ${pr.commits.totalCount} commits)`
+Stats: +${pr.additions}/-${pr.deletions} (${pr.changedFiles} files, ${pr.commits.totalCount} commits)${bodySection}`
     }
 
-    private getIssueInfo(fetchedData: FetchedData): string {
+    private getIssueInfo(fetchedData: FetchedData, userInstruction?: string): string {
         const issue = fetchedData.issue;
         if (!issue) return "";
+
+        // Add issue body only if it's not already in userInstruction (to avoid duplication)
+        const shouldIncludeBody = issue.body &&
+                                   issue.body.trim().length > 0 &&
+                                   (!userInstruction || !userInstruction.includes(issue.body));
+
+        const bodySection = shouldIncludeBody
+            ? `\nDescription:\n${issue.body}`
+            : '';
 
         return `Issue Number: #${issue.number}
 Title: ${issue.title}
 Author: @${issue.author?.login}
-State: ${issue.state}`
+State: ${issue.state}${bodySection}`
     }
 
     private getCommitsInfo(fetchedData: FetchedData): string | undefined {

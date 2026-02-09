@@ -770,6 +770,151 @@ junie-args: --model="gpt-4" --timeout=30 --model="claude-opus-4-5"`,
         });
     });
 
+    describe("Issue/PR body inclusion", () => {
+        test("should include PR body when triggered by comment", async () => {
+            const context = createMockContext({
+                eventName: "issue_comment",
+                isPR: true,
+                payload: {
+                    ...createMockContext().payload,
+                    comment: {
+                        body: "Please fix this @junie-agent"
+                    }
+                }
+            });
+
+            const fetchedData: FetchedData = {
+                pullRequest: {
+                    number: 1,
+                    title: "Test PR",
+                    body: "This is the PR description",
+                    author: {login: "author"},
+                    state: "OPEN",
+                    headRefName: "feature",
+                    baseRefName: "main",
+                    baseRefOid: "abc123",
+                    headRefOid: "def456",
+                    additions: 10,
+                    deletions: 5,
+                    changedFiles: 2,
+                    commits: {totalCount: 3, nodes: []}
+                } as any
+            };
+
+            const result = await formatter.generatePrompt(context, fetchedData, createMockBranchInfo());
+
+            expect(result.prompt).toContain("This is the PR description");
+            expect(result.prompt).toContain("Description:");
+        });
+
+        test("should NOT include PR body when triggered by PR event itself", async () => {
+            const context = createMockContext({
+                eventName: "pull_request",
+                isPR: true,
+                payload: {
+                    ...createMockContext().payload,
+                    pull_request: {
+                        ...createMockContext().payload.pull_request,
+                        body: "This is the PR description"
+                    }
+                }
+            });
+
+            const fetchedData: FetchedData = {
+                pullRequest: {
+                    number: 1,
+                    title: "Test PR",
+                    body: "This is the PR description",
+                    author: {login: "author"},
+                    state: "OPEN",
+                    headRefName: "feature",
+                    baseRefName: "main",
+                    baseRefOid: "abc123",
+                    headRefOid: "def456",
+                    additions: 10,
+                    deletions: 5,
+                    changedFiles: 2,
+                    commits: {totalCount: 3, nodes: []}
+                } as any
+            };
+
+            const result = await formatter.generatePrompt(context, fetchedData, createMockBranchInfo());
+
+            // Body should be in user_instruction section, not in PR info
+            expect(result.prompt).toContain("This is the PR description");
+            // But should NOT have "Description:" label in PR info section
+            const prInfoMatch = result.prompt.match(/<pull_request_info>[\s\S]*?<\/pull_request_info>/);
+            if (prInfoMatch) {
+                expect(prInfoMatch[0]).not.toContain("Description:");
+            }
+        });
+
+        test("should include issue body when triggered by comment", async () => {
+            const context = createMockContext({
+                eventName: "issue_comment",
+                isPR: false,
+                payload: {
+                    ...createMockContext().payload,
+                    comment: {
+                        body: "Please fix this @junie-agent"
+                    }
+                }
+            });
+
+            const fetchedData: FetchedData = {
+                issue: {
+                    number: 1,
+                    title: "Test Issue",
+                    body: "This is the issue description",
+                    author: {login: "author"},
+                    state: "OPEN"
+                } as any
+            };
+
+            const result = await formatter.generatePrompt(context, fetchedData, createMockBranchInfo());
+
+            expect(result.prompt).toContain("This is the issue description");
+            expect(result.prompt).toContain("Description:");
+        });
+
+        test("should NOT include issue body when triggered by issue event itself", async () => {
+            const context = createMockContext({
+                eventName: "issues",
+                isPR: false,
+                payload: {
+                    ...createMockContext().payload,
+                    issue: {
+                        number: 1,
+                        title: "Test Issue",
+                        body: "This is the issue description",
+                        author: {login: "author"},
+                        state: "open"
+                    }
+                }
+            });
+
+            const fetchedData: FetchedData = {
+                issue: {
+                    number: 1,
+                    title: "Test Issue",
+                    body: "This is the issue description",
+                    author: {login: "author"},
+                    state: "OPEN"
+                } as any
+            };
+
+            const result = await formatter.generatePrompt(context, fetchedData, createMockBranchInfo());
+
+            // Body should be in user_instruction section, not in issue info
+            expect(result.prompt).toContain("This is the issue description");
+            // But should NOT have "Description:" label in issue info section
+            const issueInfoMatch = result.prompt.match(/<issue_info>[\s\S]*?<\/issue_info>/);
+            if (issueInfoMatch) {
+                expect(issueInfoMatch[0]).not.toContain("Description:");
+            }
+        });
+    });
+
     describe("Workflow modification note", () => {
         test("should include WORKFLOW_MODIFICATION_NOTE when isDefaultToken is true", async () => {
             const context = createMockContext({
