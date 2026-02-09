@@ -285,6 +285,17 @@ When Junie creates a PR or pushes commits, the following workflows will **NOT be
 
 **Why?** This is a GitHub security feature designed to prevent accidental infinite workflow loops.
 
+**⚠️ The default token CANNOT modify workflow files in `.github/workflows/` directory.**
+
+If Junie attempts to modify, create, or delete files in the `.github/workflows/` directory, GitHub will reject the push with an error:
+
+```
+refusing to allow a GitHub App to create or update workflow without `workflows` permission
+```
+
+
+**To enable workflow file modifications**, you must use a custom token (PAT or GitHub App token) with the `workflow` scope as described below.
+
 #### Using a Custom Token
 
 To allow Junie's changes to trigger other workflows, provide a custom token:
@@ -302,22 +313,27 @@ To allow Junie's changes to trigger other workflows, provide a custom token:
 
 - Go to GitHub Settings → Developer settings → Personal access tokens → Fine-grained tokens
 - Grant `repo` scope (or fine-grained: Contents, Pull requests, Issues permissions)
+- **If Junie needs to modify workflow files:** Also grant `workflow` scope (or fine-grained: Workflows read and write permission)
 - Store in repository secrets as `CUSTOM_GITHUB_TOKEN`
 
 ##### 2. GitHub App Token (Recommended for organizations)
 
-GitHub App tokens
+GitHub App tokens provide fine-grained, auditable access control.
 
 **Setup steps:**
 
-a. **Install Your App to the Repository:**
+a. **Create and configure the GitHub App:**
+   - Set repository permissions: Contents (read/write), Pull requests (read/write), Issues (read/write)
+   - **If Junie needs to modify workflow files:** Also enable Workflows (read/write) permission
 
-b. **Add secrets to repository:**
+b. **Install your app to the repository**
+
+c. **Add secrets to repository:**
    - Go to repository Settings → Secrets and variables → Actions
    - Add `APP_ID` with your App ID
    - Add `APP_PRIVATE_KEY` with the entire contents of the `.pem` file
 
-e. **Use in workflow:**
+d. **Use in workflow:**
 
 ```yaml
 jobs:
