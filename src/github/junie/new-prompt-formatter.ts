@@ -10,8 +10,8 @@ import {
     isReferencedEventNode
 } from "../api/queries";
 import {
-    isCodeReviewEvent,
     isFixCIEvent,
+    isFixCodeReviewEvent,
     isIssueCommentEvent,
     isIssuesEvent,
     isJiraWorkflowDispatchEvent,
@@ -133,7 +133,7 @@ ${actorInfo ? actorInfo : ""}
     private extractKeyWords(context: JunieExecutionContext, fetchedData: FetchedData, branchInfo: BranchInfo) {
         const issue = fetchedData.pullRequest || fetchedData.issue;
 
-        const isCodeReview = isCodeReviewEvent(context)
+        const isCodeReview = isFixCodeReviewEvent(context)
         const isFixCI = isFixCIEvent(context)
         const isMinorFix = isMinorFixEvent(context)
 

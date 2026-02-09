@@ -1,5 +1,5 @@
 import {COMMIT_MESSAGE_TEMPLATE, PR_BODY_TEMPLATE, PR_TITLE_TEMPLATE} from "../constants/github";
-import {JunieExecutionContext, isTriggeredByUserInteraction, isJiraWorkflowDispatchEvent, isCodeReviewEvent} from "../github/context";
+import {JunieExecutionContext, isTriggeredByUserInteraction, isJiraWorkflowDispatchEvent} from "../github/context";
 import {execSync} from 'child_process';
 import * as core from "@actions/core";
 import {ENV_VARS, OUTPUT_VARS} from "../constants/environment";
@@ -126,14 +126,6 @@ async function getActionToDo(context: JunieExecutionContext): Promise<ActionType
     if (context.inputs.silentMode) {
         console.log('Silent mode enabled - no git operations will be performed');
         return ActionType.NOTHING;
-    }
-    
-    // Code review is a read-only operation - skip all commit/push actions
-    if (isCodeReviewEvent(context)) {
-        console.log('Code review event detected - no git operations will be performed');
-        const initCommentId = process.env[OUTPUT_VARS.INIT_COMMENT_ID];
-        core.setOutput(OUTPUT_VARS.ACTION_TO_DO, initCommentId ? ActionType.WRITE_COMMENT : ActionType.NOTHING);
-        return initCommentId ? ActionType.WRITE_COMMENT : ActionType.NOTHING;
     }
     const isNewBranch = process.env[OUTPUT_VARS.IS_NEW_BRANCH] === 'true';
     const workingBranch = process.env[OUTPUT_VARS.WORKING_BRANCH]!;

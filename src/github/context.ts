@@ -493,7 +493,7 @@ export function isFixCIEvent(context: JunieExecutionContext) {
     return isFixCIInPrompt || isFixCIInComment;
 }
 
-export function isCodeReviewEvent(context: JunieExecutionContext) {
+export function isFixCodeReviewEvent(context: JunieExecutionContext) {
     const isCodeReviewInPrompt = context.inputs.prompt?.includes(CODE_REVIEW_ACTION);
     const isCodeReviewInComment = isReviewOrCommentHasCodeReviewTrigger(context);
     console.log(`Code review detection: inPrompt=${isCodeReviewInPrompt}, inComment=${isCodeReviewInComment}`);
