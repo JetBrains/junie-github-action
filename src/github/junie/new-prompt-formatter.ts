@@ -10,8 +10,8 @@ import {
     isReferencedEventNode
 } from "../api/queries";
 import {
-    isFixCIEvent,
     isCodeReviewEvent,
+    isFixCIEvent,
     isIssueCommentEvent,
     isIssuesEvent,
     isJiraWorkflowDispatchEvent,
@@ -26,7 +26,14 @@ import {
 } from "../context";
 import {downloadJiraAttachmentsAndRewriteText} from "./attachment-downloader";
 import {sanitizeContent} from "../../utils/sanitizer";
-import {createCodeReviewPrompt, createFixCIFailuresPrompt, createMinorFixPrompt, GIT_OPERATIONS_NOTE, MINOR_FIX_ACTION} from "../../constants/github";
+import {
+    createCodeReviewPrompt,
+    createFixCIFailuresPrompt,
+    createMinorFixPrompt,
+    GIT_OPERATIONS_NOTE,
+    MINOR_FIX_ACTION,
+    WORKFLOW_MODIFICATION_NOTE
+} from "../../constants/github";
 import {extractJunieArgs} from "../../utils/junie-args-parser";
 import {BranchInfo} from "../operations/branch";
 
@@ -37,7 +44,23 @@ export interface GeneratePromptResult {
 
 export class NewGitHubPromptFormatter {
 
-    async generatePrompt(context: JunieExecutionContext, fetchedData: FetchedData, branchInfo: BranchInfo, attachGithubContextToCustomPrompt: boolean = true): Promise<GeneratePromptResult> {
+    private getImportantNotes(isDefaultToken: boolean): string {
+        let notes = GIT_OPERATIONS_NOTE;
+        if (isDefaultToken) {
+            notes += WORKFLOW_MODIFICATION_NOTE;
+        }
+        return notes;
+    }
+
+    async generatePrompt(context: JunieExecutionContext, fetchedData: FetchedData, branchInfo: BranchInfo, attachGithubContextToCustomPrompt: boolean = true, isDefaultToken: boolean = false): Promise<GeneratePromptResult> {
+        const result = await this.buildPrompt(context, fetchedData, branchInfo, attachGithubContextToCustomPrompt)
+        return {
+            prompt: result.prompt + this.getImportantNotes(isDefaultToken),
+            customJunieArgs: result.customJunieArgs
+        }
+    }
+
+    private async buildPrompt(context: JunieExecutionContext, fetchedData: FetchedData, branchInfo: BranchInfo, attachGithubContextToCustomPrompt: boolean = true): Promise<GeneratePromptResult> {
         let customJunieArgs: string[] = [];
 
         let prompt = context.inputs.prompt || undefined;
@@ -52,7 +75,7 @@ export class NewGitHubPromptFormatter {
 
         // If user provided custom prompt and doesn't want GitHub context, sanitize and return it
         if (prompt && !attachGithubContextToCustomPrompt) {
-            const finalPrompt = sanitizeContent(prompt + GIT_OPERATIONS_NOTE);
+            const finalPrompt = sanitizeContent(prompt);
             return {
                 prompt: finalPrompt,
                 customJunieArgs
@@ -97,7 +120,6 @@ ${timelineInfo ? timelineInfo : ""}
 ${reviewsInfo ? reviewsInfo : ""}
 ${changedFilesInfo ? changedFilesInfo : ""}
 ${actorInfo ? actorInfo : ""}
-${GIT_OPERATIONS_NOTE}
 `;
 
         // Sanitize the entire prompt once to prevent prompt injection attacks
@@ -119,7 +141,7 @@ ${GIT_OPERATIONS_NOTE}
             const branchName = branchInfo.prBaseBranch || branchInfo.baseBranch;
             const diffPoint = context.isPR ? String(context.entityNumber) : branchName;
             console.log(`Using CODE REVIEW prompt for diffPoint: ${diffPoint}`);
-            return  createCodeReviewPrompt(diffPoint);
+            return createCodeReviewPrompt(diffPoint);
         } else if (isFixCI) {
             const branchName = branchInfo.prBaseBranch || branchInfo.baseBranch;
             const diffPoint = context.isPR && context.entityNumber ? String(context.entityNumber) : branchName;
@@ -162,22 +184,22 @@ ${GIT_OPERATIONS_NOTE}
 
         return undefined;
     }
-  
+
     private async generateJiraPrompt(context: JunieExecutionContext): Promise<string> {
         const jira = context.payload as JiraIssuePayload;
 
         // Format comments
         const commentsInfo = jira.comments.length > 0
             ? '\n\nComments:\n' + jira.comments.map(comment => {
-                const date = new Date(comment.created).toLocaleString('en-US', {
-                    year: 'numeric',
-                    month: 'short',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                });
-                return `[${date}] ${comment.author}:\n${comment.body}`;
-            }).join('\n\n')
+            const date = new Date(comment.created).toLocaleString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            return `[${date}] ${comment.author}:\n${comment.body}`;
+        }).join('\n\n')
             : '';
 
         // Form the complete prompt text
@@ -189,7 +211,6 @@ Summary: ${jira.issueSummary}
 
 Description: ${jira.issueDescription}${commentsInfo}
 </jira_issue>
-${GIT_OPERATIONS_NOTE}
 `;
 
         // Download all attachments referenced in text (single pass), then return

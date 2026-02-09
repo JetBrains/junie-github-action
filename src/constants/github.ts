@@ -223,6 +223,12 @@ export function createJunieCommentMarker(workflowName: string): string {
  */
 export const GIT_OPERATIONS_NOTE = "\n\nIMPORTANT: Do NOT commit or push changes. The system will handle all git operations (staging, committing, and pushing) automatically.";
 
+/**
+ * Important note about workflow modification restrictions when using default token.
+ * Warns the AI that workflow files in .github/ directory cannot be modified with default GITHUB_TOKEN.
+ */
+export const WORKFLOW_MODIFICATION_NOTE = "\n\nIMPORTANT: You CANNOT modify files in the `.github/` directory (including workflow files). If changes to workflow files are required, you can only suggest them in your response. Do NOT attempt to create, modify, or delete any files in `.github/` directory.";
+
 export const INIT_COMMENT_BODY = "Hey, it's Junie by JetBrains! I started working..."
 
 export const PR_BODY_TEMPLATE = (junieBody: string, issueId?: number) => `

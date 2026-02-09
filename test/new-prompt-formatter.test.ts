@@ -769,4 +769,52 @@ junie-args: --model="gpt-4" --timeout=30 --model="claude-opus-4-5"`,
             expect(result.prompt).toContain("Some comment with junie-args:");
         });
     });
+
+    describe("Workflow modification note", () => {
+        test("should include WORKFLOW_MODIFICATION_NOTE when isDefaultToken is true", async () => {
+            const context = createMockContext({
+                inputs: {
+                    ...createMockContext().inputs,
+                    prompt: "Fix this bug"
+                }
+            });
+            const fetchedData: FetchedData = {};
+
+            const result = await formatter.generatePrompt(context, fetchedData, createMockBranchInfo(), true, true);
+
+            expect(result.prompt).toContain("You CANNOT modify files in the `.github/` directory");
+            expect(result.prompt).toContain("If changes to workflow files are required, you can only suggest them");
+        });
+
+        test("should NOT include WORKFLOW_MODIFICATION_NOTE when isDefaultToken is false", async () => {
+            const context = createMockContext({
+                inputs: {
+                    ...createMockContext().inputs,
+                    prompt: "Fix this bug"
+                }
+            });
+            const fetchedData: FetchedData = {};
+
+            const result = await formatter.generatePrompt(context, fetchedData, createMockBranchInfo(), true, false);
+
+            expect(result.prompt).not.toContain("You CANNOT modify files in the `.github/` directory");
+            expect(result.prompt).not.toContain("If changes to workflow files are required, you can only suggest them");
+        });
+
+        test("should always include GIT_OPERATIONS_NOTE regardless of token type", async () => {
+            const context = createMockContext({
+                inputs: {
+                    ...createMockContext().inputs,
+                    prompt: "Fix this bug"
+                }
+            });
+            const fetchedData: FetchedData = {};
+
+            const resultWithDefault = await formatter.generatePrompt(context, fetchedData, createMockBranchInfo(), true, true);
+            const resultWithCustom = await formatter.generatePrompt(context, fetchedData, createMockBranchInfo(), true, false);
+
+            expect(resultWithDefault.prompt).toContain("Do NOT commit or push changes");
+            expect(resultWithCustom.prompt).toContain("Do NOT commit or push changes");
+        });
+    });
 });

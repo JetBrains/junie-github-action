@@ -2,7 +2,6 @@ import {
     isCodeReviewEvent,
     isIssueCommentEvent,
     isIssuesEvent,
-    isMinorFixEvent,
     isPullRequestEvent,
     isPullRequestReviewCommentEvent,
     isPullRequestReviewEvent,
@@ -46,7 +45,8 @@ export async function prepareJunieTask(
     context: JunieExecutionContext,
     branchInfo: BranchInfo,
     octokit: Octokits,
-    enabledMcpServers: string[] = []
+    enabledMcpServers: string[] = [],
+    isDefaultToken: boolean = false
 ) {
     const owner = context.payload.repository.owner.login;
     const repo = context.payload.repository.name;
@@ -72,7 +72,7 @@ export async function prepareJunieTask(
             fetchedData = await fetcher.fetchIssueData(owner, repo, context.entityNumber, triggerTime);
         }
 
-        const promptResult = await formatter.generatePrompt(context, fetchedData, branchInfo, context.inputs.attachGithubContextToCustomPrompt);
+        const promptResult = await formatter.generatePrompt(context, fetchedData, branchInfo, context.inputs.attachGithubContextToCustomPrompt, isDefaultToken);
         let promptText = promptResult.prompt;
         customJunieArgs = promptResult.customJunieArgs;
 
