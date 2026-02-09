@@ -116,6 +116,7 @@ Your task is to analyze CI failures and suggest fixes WITHOUT implementing them.
 3. If failed checks WERE found, analyze each failure:
    - Open and explore relevant source files to understand the context
    - Do NOT run tests, build, or make any modifications to the codebase.
+   - Do NOT suggest changes to workflow files under the .github directory.
    - Identify the failing step and error message. 
    - Determine the root cause (test failure, build error, linting issue, timeout, flaky test, etc.)
    - Correlate the error with changes in the PR diff. 
