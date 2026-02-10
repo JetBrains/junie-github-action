@@ -425,6 +425,44 @@ describe("prepareJunieTask", () => {
             expect(result.task).toContain("Read the Pull Request diff");
         });
 
+        test("should trigger code review prompt from comment when inputs.prompt is empty", async () => {
+            const context = createMockContext({
+                eventName: "pull_request_review",
+                eventAction: "submitted",  // Important: eventAction must be "submitted" or "edited"
+                isPR: true,
+                entityNumber: 123,
+                inputs: {
+                    prompt: ""  // Empty prompt - trigger comes from comment
+                },
+                payload: {
+                    action: "submitted",
+                    pull_request: {
+                        number: 123,
+                        title: "Test PR",
+                        updated_at: "2024-01-01T00:00:00Z"
+                    },
+                    review: {
+                        id: 456,
+                        user: {login: "reviewer"},
+                        body: "Please do code-review for this PR",
+                        submitted_at: "2024-01-01T00:00:00Z"
+                    },
+                    repository: {
+                        owner: {login: "owner"},
+                        name: "repo"
+                    }
+                } as any
+            });
+            const octokit = createMockOctokit();
+
+            const result = await prepareJunieTask(context, branchInfo, octokit);
+
+            expect(result).toBeDefined();
+            expect(result.task).toBeDefined();
+            // Should detect code-review trigger from comment and generate code review prompt
+            expect(result.task).toContain("Read the Pull Request diff");
+        });
+
         test("should not trigger fix CI prompt when workflow_run event has success conclusion", async () => {
             const context = createMockContext({
                 eventName: "workflow_run" as any,
