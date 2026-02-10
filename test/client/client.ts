@@ -15,6 +15,11 @@ type GitHubFile =
     | RestEndpointMethodTypes["pulls"]["listFiles"]["response"]["data"][number]
     | NonNullable<RestEndpointMethodTypes["repos"]["getCommit"]["response"]["data"]["files"]>[number]
     | NonNullable<RestEndpointMethodTypes["repos"]["compareCommits"]["response"]["data"]["files"]>[number];
+type ReviewComment = RestEndpointMethodTypes["pulls"]["listReviewComments"]["response"]["data"][number];
+type ReviewCommentCondition = {
+    commentText: string;
+    codeLine: string;
+}
 
 export const TEST_WORKFLOW_FILE_PATHS = {
     workflowFilePathInTestDirectory: "test/workflows/junie.yml",
@@ -32,7 +37,22 @@ export class Client {
     }
 
     async createTestRepo(): Promise<string> {
-        const repoName = `junie-test-${Date.now()}`;
+        const stack = new Error().stack || '';
+        const stackLines = stack.split('\n');
+
+        let testName = 'unknown';
+        for (const line of stackLines) {
+            if (line.includes('test/integration/')) {
+                const match = line.match(/test\/integration\/([^.]+)\.test\.ts/);
+                if (match) {
+                    testName = match[1];
+                    break;
+                }
+            }
+        }
+
+        const timestamp = Date.now();
+        const repoName = `junie-test-${testName}-${timestamp}`;
         console.log(`Creating test repository: ${this.org}/${repoName}`);
 
         await this.octokit.repos.createInOrg({
@@ -62,6 +82,8 @@ export class Client {
             workflowFilePathInRepo,
             "Add Junie workflow"
         );
+
+        await new Promise(resolve => setTimeout(resolve, 6000));
     }
 
     async deleteTestRepo(repoName: string): Promise<void> {
@@ -114,6 +136,23 @@ export class Client {
         return foundReaction!;
     }
 
+    async waitForInlineComments(
+        prNumber: number,
+        condition: (comments: ReviewComment[]) => boolean | Promise<boolean>
+    ): Promise<void> {
+        console.log(`Waiting for condition in inline comment(s) on PR #${prNumber}...`);
+
+        await startPoll(
+            `Not enough inline comments found for PR #${prNumber}`,
+            {},
+            async () => {
+                const { data: comments } = await this.getAllReviewComments(prNumber);
+
+                return (condition(comments));
+            }
+        );
+    }
+
     async waitForPR(
         condition: (pr: PullRequest) => boolean | Promise<boolean>
     ): Promise<PullRequest> {
@@ -136,6 +175,20 @@ export class Client {
         );
 
         return foundPR!;
+    }
+
+    async getInlineComments(
+        prNumber: number,
+        condition: (comment: ReviewCommentCondition) => boolean
+    ): Promise<ReviewComment[]> {
+        console.log(`Getting inline comments on PR #${prNumber}...`);
+        const { data: comments } = await this.getAllReviewComments(prNumber);
+        const filteredComments = comments.filter(comment => condition({
+            commentText: comment.body || "",
+            codeLine: (comment.diff_hunk || "").split('\n')[(comment.diff_hunk || "").split('\n').length - 1] || ""
+        }));
+
+        return filteredComments;
     }
 
     createIssue(issueTitle: string, issueBody: string, repoName?: string) {
@@ -247,6 +300,25 @@ export class Client {
         };
     }
 
+    conditionCodeBeforeSuggestionIncludes(includesText: string) {
+        return (comment: ReviewCommentCondition): boolean => {
+            return comment.codeLine.includes(includesText);
+        }
+    }
+
+    conditionInlineCommentIncludes(includesText: string) {
+        return (comment: ReviewCommentCondition): boolean => {
+            return comment.commentText.includes(includesText);
+        }
+    }
+
+    conditionInlineCommentsAtLeast(minCount: number = 1) {
+        return (comments: ReviewComment[]) => {
+            console.log(`Found ${comments.length} inline comment(s) (required: ${minCount}).`);
+            return comments.length >= minCount
+        }
+    }
+
     async getBranch(repoName: string) {
         return this.octokit.repos.getBranch({
             owner: this.org,
@@ -289,6 +361,14 @@ export class Client {
             owner: this.org,
             repo: this.currentRepo,
             comment_id: commentId,
+        });
+    }
+
+    private async getAllReviewComments(prNumber: number){
+        return this.octokit.pulls.listReviewComments({
+            owner: this.org,
+            repo: this.currentRepo,
+            pull_number: prNumber,
         });
     }
 }
