@@ -98,7 +98,7 @@ Additional instructions:
 export function createFixCIFailuresPrompt(diffPoint: string): string {
     const diffCommand = `gh pr diff ${diffPoint}`
     return `
-Your task is to analyze CI failures and suggest fixes WITHOUT implementing them. Follow these steps:
+Your task is to analyze CI failures and fix them. Follow these steps:
 
 ### Steps to follow
 1. Gather Information
@@ -115,47 +115,32 @@ Your task is to analyze CI failures and suggest fixes WITHOUT implementing them.
 
 3. If failed checks WERE found, analyze each failure:
    - Open and explore relevant source files to understand the context
-   - Do NOT run tests, build, or make any modifications to the codebase.
    - Identify the failing step and error message. 
    - Determine the root cause (test failure, build error, linting issue, timeout, flaky test, etc.)
    - Correlate the error with changes in the PR diff. 
    - Determine if the failure is related to the PR diff or a pre-existing issue
-   - Do not use the 'post_inline_review_comment' tool. Suggest changes only as shown in the template below.
 
-4. Submit your analysis using EXACTLY the output format described below. You MUST always follow this template structure precisely, do not add an extra section or change the format.
+4. Implement the Fix
+   - Make the necessary changes to fix the CI failures.
+   - Keep changes minimal and focused on fixing the specific failures.
+   - Follow the existing code style and conventions in the repository.
+   - Do NOT make unrelated changes or "improvements" beyond what is needed to fix the CI.
 
-### Output Format
----
-## 🔴 CI Failure Analysis
+5. Validation
+   - Ensure your changes compile/build successfully.
+   - Run relevant tests if applicable.
+   - Verify the fix addresses the CI failure.
 
-**Failed Check:** [check name]
-**Failed Step:** [step name if identifiable]
-**Error Type:** [test failure / build error / lint error / timeout / other]
+### Guidelines
+- **Scope**: Only make changes directly related to fixing the CI failures. Do not refactor or "improve" unrelated code.
+- **Style**: Match the existing code style, naming conventions, and patterns in the repository.
+- **Safety**: Be conservative with changes. When in doubt, make the smaller change.
+- **Testing**: If you modify logic, ensure existing tests still pass. Add tests only if explicitly needed.
 
-### Error Details
-\`\`\`
-[relevant error message/stack trace - keep concise]
-\`\`\`
+### Output
+Submit a brief summary of the changes you made and why they fix the CI failures.
 
-### Root Cause
-[1-3 sentences explaining why this failed]
-
-### Correlation with PR Changes
-[Explain which files/changes in this PR likely caused the failure, or state if it appears unrelated]
-
-## 🔧 Suggested Fix
-
-### What needs to change
-[Clear description of the fix approach]
-
-### Files to modify
-- \`File.ts:Line:\`: [what needs to change and why]
-
-### Code changes
-\`\`\`[language]
-// Suggested code snippet or pseudocode
-\`\`\`
----
+IMPORTANT: Do NOT commit or push changes. The system will handle all git operations (staging, committing, and pushing) automatically.
 `;
 }
 
