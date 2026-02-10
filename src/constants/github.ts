@@ -129,16 +129,17 @@ Your task is to analyze CI failures and fix them. Follow these steps:
 5. Validation
    - Ensure your changes compile/build successfully.
    - Run relevant tests if applicable.
-   - Verify the fix addresses the CI failure.
+   - Verify the fix addresses the CI failure. If you are unsure, revert any change made in this session.
 
 ### Guidelines
 - **Scope**: Only make changes directly related to fixing the CI failures. Do not refactor or "improve" unrelated code.
 - **Style**: Match the existing code style, naming conventions, and patterns in the repository.
 - **Safety**: Be conservative with changes. When in doubt, make the smaller change.
 - **Testing**: If you modify logic, ensure existing tests still pass. Add tests only if explicitly needed.
+- **Certainty**: Do NOT apply any changes unless you are 100% certain the CI checks will pass after your fix. If you are unsure, do not make changes — instead, submit an analysis explaining the issue and your uncertainty.
 
 ### Output
-Submit a brief summary of the changes you made and why they fix the CI failures.
+Submit a brief summary of the changes you made and why they fix the CI failures. If you did not make changes due to uncertainty, explain why.
 
 IMPORTANT: Do NOT commit or push changes. The system will handle all git operations (staging, committing, and pushing) automatically.
 `;
