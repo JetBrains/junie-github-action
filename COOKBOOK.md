@@ -326,7 +326,10 @@ on:
 
 jobs:
   analyze-failure:
-    if: github.event.workflow_run.conclusion == 'failure'
+    # Don't run on Junie's own PRs to avoid infinite loops
+    if: |
+      github.event.workflow_run.conclusion == 'failure' &&
+      !startsWith(github.event.workflow_run.head_branch, 'junie/')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -374,7 +377,10 @@ on:
 
 jobs:
   analyze-failure:
-    if: github.event.workflow_run.conclusion == 'failure'
+    # Don't run on Junie's own PRs to avoid infinite loops
+    if: |
+      github.event.workflow_run.conclusion == 'failure' &&
+      !startsWith(github.event.workflow_run.head_branch, 'junie/')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -431,10 +437,11 @@ This works with any workflow that has issue/PR comment triggers configured. The 
 
 **How it works:**
 1. Triggers when your CI workflow completes with failure or when someone uses `@junie-agent fix-ci`
-2. Uses MCP GitHub Checks Server to fetch error logs
-3. Analyzes the failure and identifies root cause
-4. Provides detailed analysis with suggested fixes
-5. Updates the same comment on subsequent runs (via `use_single_comment`)
+2. Skips Junie's own branches (`junie/`) to prevent infinite loops if Junie's fix causes another CI failure
+3. Uses MCP GitHub Checks Server to fetch error logs
+4. Analyzes the failure and identifies root cause
+5. Provides detailed analysis with suggested fixes
+6. Updates the same comment on subsequent runs (via `use_single_comment`)
 
 **Advanced:**
 - Integrate with issue tracker (create bug report if fix is complex)
