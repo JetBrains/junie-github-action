@@ -1,6 +1,5 @@
 import {describe, test, beforeAll, afterAll} from "bun:test";
 import {INIT_COMMENT_BODY, SUCCESS_FEEDBACK_COMMENT} from "../../src/constants/github";
-import {e2eConfig} from "../config/test-config";
 import { testClient } from "../client/client";
 
 describe("Trigger Junie in Issue", () => {
@@ -16,7 +15,7 @@ describe("Trigger Junie in Issue", () => {
       if (repoName && testPassed) {
         await testClient.deleteTestRepo(repoName);
       } else if (repoName) {
-        console.log(`⚠️ Keeping failed test repo: ${e2eConfig.org}/${repoName}`);
+        console.log(`⚠️ Keeping failed test repo: ${testClient.org}/${repoName}`);
       }
     });
 
@@ -27,7 +26,7 @@ describe("Trigger Junie in Issue", () => {
         const functionName = "get_greeting()";
         const issueBody = `@junie-agent in src folder created by you add a file ${functionFile} containing a function ${functionName} that returns a string Hello, world!. Also create a ${requirementsFile} file.`;
 
-        console.log(`Creating issue: "${issueTitle}" in ${e2eConfig.org}/${repoName}`);
+        console.log(`Creating issue: "${issueTitle}" in ${testClient.org}/${repoName}`);
 
         const {data: issue} = await testClient.createIssue(issueTitle, issueBody, repoName)
 

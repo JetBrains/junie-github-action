@@ -1,6 +1,5 @@
 import {describe, test, beforeAll, afterAll} from "bun:test";
 import {INIT_COMMENT_BODY, SUCCESS_FEEDBACK_COMMENT} from "../../src/constants/github";
-import {e2eConfig} from "../config/test-config";
 import {testClient} from "../client/client";
 
 describe("Trigger Junie in Issue Comment", () => {
@@ -16,7 +15,7 @@ describe("Trigger Junie in Issue Comment", () => {
         if (repoName && testPassed) {
             await testClient.deleteTestRepo(repoName);
         } else if (repoName) {
-            console.log(`⚠️ Keeping failed test repo: ${e2eConfig.org}/${repoName}`);
+            console.log(`⚠️ Keeping failed test repo: ${testClient.org}/${repoName}`);
         }
     });
 
@@ -26,7 +25,7 @@ describe("Trigger Junie in Issue Comment", () => {
         const filename = "math_ops.ts";
         const functionName = "calculate_factorial(n)";
 
-        console.log(`Creating issue: "${issueTitle}" in ${e2eConfig.org}/${repoName}`);
+        console.log(`Creating issue: "${issueTitle}" in ${testClient.org}/${repoName}`);
         const {data: issue} = await testClient.createIssue(issueTitle, issueBody, repoName);
         const issueNumber = issue.number;
         console.log(`Issue created: #${issueNumber}`);

@@ -1,6 +1,5 @@
 import {describe, test, beforeAll, afterAll} from "bun:test";
 import {INIT_COMMENT_BODY, SUCCESS_FEEDBACK_COMMENT} from "../../src/constants/github";
-import {e2eConfig} from "../config/test-config";
 import {testClient} from "../client/client";
 
 describe("Trigger Junie in PR comment", () => {
@@ -16,7 +15,7 @@ describe("Trigger Junie in PR comment", () => {
         if (repoName && testPassed) {
             await testClient.deleteTestRepo(repoName);
         } else if (repoName) {
-            console.log(`⚠️ Keeping failed test repo: ${e2eConfig.org}/${repoName}`);
+            console.log(`⚠️ Keeping failed test repo: ${testClient.org}/${repoName}`);
         }
     });
 
@@ -25,7 +24,7 @@ describe("Trigger Junie in PR comment", () => {
         const filename = "math_utils.py";
         const content = "def divide(a, b):\n    return a / b\n";
 
-        console.log(`Setting up PR in ${e2eConfig.org}/${repoName}`);
+        console.log(`Setting up PR in ${testClient.org}/${repoName}`);
 
         const {data: mainBranch} = await testClient.getBranch(repoName);
 

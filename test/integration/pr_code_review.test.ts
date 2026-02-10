@@ -1,6 +1,5 @@
 import {describe, test, beforeAll, afterAll, expect} from "bun:test";
 import {INIT_COMMENT_BODY, SUCCESS_FEEDBACK_COMMENT} from "../../src/constants/github";
-import {e2eConfig} from "../config/test-config";
 import {testClient} from "../client/client";
 
 describe("Code Review: Built-in", () => {
@@ -20,7 +19,7 @@ describe("Code Review: Built-in", () => {
         if (repoName && testPassed) {
             await testClient.deleteTestRepo(repoName);
         } else if (repoName) {
-            console.log(`⚠️ Keeping failed test repo: ${e2eConfig.org}/${repoName}`);
+            console.log(`⚠️ Keeping failed test repo: ${testClient.org}/${repoName}`);
         }
     });
 
@@ -64,7 +63,8 @@ describe("Code Review: Built-in", () => {
                         && (testClient.conditionInlineCommentIncludes("a + b")(comment) || testClient.conditionInlineCommentIncludes("(a, b)")(comment));
                 }
             );
-            expect(filteredComments.length).toBe(2);
+            const expectedLength = 2;
+            expect(filteredComments.length, `Length of filtered comments is not ${expectedLength}. All filtered comments: ${filteredComments}`).toBe(expectedLength);
             await testClient.waitForJunieComment(prNumber, SUCCESS_FEEDBACK_COMMENT);
             testPassed = true;
         },
@@ -85,7 +85,7 @@ describe("Code Review: On-Demand via comment", () => {
         if (repoName && testPassed) {
             await testClient.deleteTestRepo(repoName);
         } else if (repoName) {
-            console.log(`⚠️ Keeping failed test repo: ${e2eConfig.org}/${repoName}`);
+            console.log(`⚠️ Keeping failed test repo: ${testClient.org}/${repoName}`);
         }
     });
 
@@ -134,7 +134,8 @@ describe("Code Review: On-Demand via comment", () => {
                         && (testClient.conditionInlineCommentIncludes("avg(arr)")(comment) || testClient.conditionInlineCommentIncludes("length")(comment));
                 }
             );
-            expect(filteredComments.length).toBe(2);
+            const expectedLength = 2;
+            expect(filteredComments.length, `Length of filtered comments is not ${expectedLength}. All filtered comments: ${filteredComments}`).toBe(expectedLength);
             await testClient.waitForJunieComment(prNumber, SUCCESS_FEEDBACK_COMMENT);
             testPassed = true;
         },
