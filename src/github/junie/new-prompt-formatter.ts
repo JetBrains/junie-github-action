@@ -69,9 +69,8 @@ export class NewGitHubPromptFormatter {
             const parsed = extractJunieArgs(prompt);
             prompt = parsed.cleanedText;
             customJunieArgs.push(...parsed.args);
-            prompt = this.extractKeyWords(context, fetchedData, branchInfo) || prompt
-
         }
+        prompt = this.extractKeyWords(context, fetchedData, branchInfo) || prompt;
 
         // If user provided custom prompt and doesn't want GitHub context, sanitize and return it
         if (prompt && !attachGithubContextToCustomPrompt) {
