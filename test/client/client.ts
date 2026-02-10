@@ -15,12 +15,13 @@ type GitHubFile =
     | RestEndpointMethodTypes["pulls"]["listFiles"]["response"]["data"][number]
     | NonNullable<RestEndpointMethodTypes["repos"]["getCommit"]["response"]["data"]["files"]>[number]
     | NonNullable<RestEndpointMethodTypes["repos"]["compareCommits"]["response"]["data"]["files"]>[number];
-type Repository = RestEndpointMethodTypes["repos"]["listForOrg"]["response"]["data"][number];
 type ReviewComment = RestEndpointMethodTypes["pulls"]["listReviewComments"]["response"]["data"][number];
 type ReviewCommentCondition = {
     commentText: string;
     codeLine: string;
 }
+type PullRequestDetailed = RestEndpointMethodTypes["pulls"]["get"]["response"]["data"];
+type CheckRunsResponse = RestEndpointMethodTypes["checks"]["listForRef"]["response"]["data"];
 
 export const TEST_WORKFLOW_FILE_PATHS = {
     workflowFilePathInTestDirectory: "test/workflows/junie.yml",
@@ -70,13 +71,19 @@ export class Client {
     async setupWorkflow(
         repoName: string,
         workflowFilePathInRepo: string = TEST_WORKFLOW_FILE_PATHS.workflowFilePathInRepo,
-        workflowFilePathInTestDirectory: string = TEST_WORKFLOW_FILE_PATHS.workflowFilePathInTestDirectory
+        workflowFilePathInTestDirectory: string = TEST_WORKFLOW_FILE_PATHS.workflowFilePathInTestDirectory,
+        modifications?: (content: string) => string
     ): Promise<void> {
         const workflowPath = path.join(process.cwd(), workflowFilePathInTestDirectory);
         let workflowContent = fs.readFileSync(workflowPath, "utf-8");
-        const currentBranch = process.env.CURRENT_BRANCH || "v0";
+        const currentBranch = process.env.CURRENT_BRANCH || "main";
 
-        workflowContent = workflowContent.replace(/@v0/g, `@${currentBranch}`);
+        workflowContent = workflowContent.replace(/@main/g, `@${currentBranch}`);
+
+        if (modifications) {
+            workflowContent = modifications(workflowContent);
+        }
+
         await this.createOrUpdateFileContents(
             repoName,
             Buffer.from(workflowContent).toString("base64"),
@@ -190,6 +197,44 @@ export class Client {
         return foundPR!;
     }
 
+
+    async waitForSuccessfulCI(prNumber: number): Promise<void> {
+        console.log(`Waiting for CI checks to pass on PR #${prNumber}...`);
+        await startPoll(
+            `CI checks did not pass on PR #${prNumber}`,
+            {},
+            async () => {
+                const pr = await this.getPullRequest(prNumber);
+
+                const checkRuns = await this.getListOfChecks(pr.head.sha);
+
+                if (checkRuns.total_count === 0) {
+                    console.log(`No CI checks found yet for PR #${prNumber}`);
+                    return false;
+                }
+
+                const completedRun = checkRuns.check_runs.every(
+                    check => check.status === 'completed'
+                );
+                const successfulRun = checkRuns.check_runs.every(
+                    check => check.conclusion === 'success'
+                );
+
+                if (!completedRun) {
+                    console.log(`CI checks still running on PR #${prNumber}...`);
+                    return false;
+                }
+
+                if (successfulRun) {
+                    console.log(`All CI checks passed on PR #${prNumber}`);
+                    return true;
+                }
+                console.log(`CI run failed on PR #${prNumber}`);
+                return false;
+            }
+        );
+    }
+
     async getInlineComments(
         prNumber: number,
         condition: (comment: ReviewCommentCondition) => boolean
@@ -202,6 +247,23 @@ export class Client {
         }));
 
         return filteredComments;
+    }
+
+    async getPullRequest(prNumber: number): Promise<PullRequestDetailed> {
+        return this.octokit.pulls.get({
+            owner: this.org,
+            repo: this.currentRepo,
+            pull_number: prNumber,
+        }).then(response => response.data);
+    }
+
+    async getListOfChecks(ref: string): Promise<CheckRunsResponse> {
+        const { data } = await this.octokit.checks.listForRef({
+            owner: this.org,
+            repo: this.currentRepo,
+            ref: ref,
+        });
+        return data;
     }
 
     createIssue(issueTitle: string, issueBody: string, repoName?: string) {
@@ -309,7 +371,7 @@ export class Client {
 
     conditionIncludes(titles: string[]) {
         return (pr: PullRequest) => {
-            return titles.some(title => pr.title.includes(title));
+            return titles.some(title => pr.title.toLowerCase().includes(title));
         };
     }
 
