@@ -306,7 +306,7 @@ jobs:
 
 **Problem:** CI fails with cryptic errors. Developers waste time SSH-ing into runners, reading logs, and reproducing issues locally.
 
-**Solution:** Junie analyzes failed CI runs, identifies root causes, and proposes fixes.
+**Solution:** Junie analyzes failed CI runs, identifies root causes, and implements fixes automatically.
 
 ### Option A: Use Built-in Fix CI (Recommended)
 
@@ -348,6 +348,7 @@ jobs:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
           allowed_mcp_servers: "mcp_github_checks_server"
           use_single_comment: "true"
+          create_new_branch_for_pr: "true"
           prompt: "fix-ci"
 ```
 
@@ -357,7 +358,7 @@ The built-in fix-ci prompt:
 - **Retrieves failed check information** using MCP GitHub Checks Server
 - **Analyzes root causes** - test failures, build errors, linting issues, timeouts, flaky tests
 - **Correlates with PR changes** - determines if failure is related to the PR or pre-existing
-- **Provides structured output** - failed check details, error messages, root cause analysis, and suggested fixes
+- **Implements fixes automatically** - analyzes the issue and creates a PR with the fix (when `create_new_branch_for_pr` is enabled)
 
 ### Option B: Custom Fix CI Prompt
 
@@ -399,6 +400,7 @@ jobs:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
           allowed_mcp_servers: "mcp_github_checks_server"
           use_single_comment: "true"
+          create_new_branch_for_pr: "true"
           prompt: |
             CI workflow "${{ github.event.workflow_run.name }}" failed. Diagnose, provide analytics and suggest fix.
 
@@ -440,8 +442,8 @@ This works with any workflow that has issue/PR comment triggers configured. The 
 2. Skips Junie's own branches (`junie/`) to prevent infinite loops if Junie's fix causes another CI failure
 3. Uses MCP GitHub Checks Server to fetch error logs
 4. Analyzes the failure and identifies root cause
-5. Provides detailed analysis with suggested fixes
-6. Updates the same comment on subsequent runs (via `use_single_comment`)
+5. Implements the fix in the codebase
+6. Creates a new branch and PR with the fix (via `create_new_branch_for_pr`)
 
 **Advanced:**
 - Integrate with issue tracker (create bug report if fix is complex)
