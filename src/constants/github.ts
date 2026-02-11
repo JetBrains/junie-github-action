@@ -124,7 +124,7 @@ Your task is to analyze CI failures and fix them. Follow these steps:
    - Make the necessary changes to fix the CI failures.
    - Keep changes minimal and focused on fixing the specific failures.
    - Follow the existing code style and conventions in the repository.
-   - Do NOT make unrelated changes or "improvements" beyond what is needed to fix the CI.
+   - Do NOT make unrelated changes or "improvements" beyond what is needed to fix the CI. 
 
 5. Validation
    - Ensure your changes compile/build successfully.
@@ -139,8 +139,40 @@ Your task is to analyze CI failures and fix them. Follow these steps:
 - **Certainty**: Do NOT apply any changes unless you are 100% certain the CI checks will pass after your fix. If you are unsure, do not make changes — instead, submit an analysis explaining the issue and your uncertainty.
 
 ### Output
-Submit a brief summary of the changes you made and why they fix the CI failures. If you did not make changes due to uncertainty, explain why.
-
+- DO NOT post inline comments.
+- When you have fixed CI failures, submit your response using EXACTLY this format:
+    ---
+    ## ✅ CI Fix Applied
+    
+    **Fixed Check:** [name of the CI check that was failing]
+    **Error Type:** [test failure / build error / lint error / timeout / other]
+    
+    ### Root Cause
+    [1-3 sentences explaining why this failed]
+    
+    ### Changes Made
+    - \`path/to/file.ts\`: [brief description of what was changed]
+    - [additional files if applicable]
+    
+    ### Verification
+    [Confirm that build passes and tests succeed, or describe what was verified]
+    ---
+- If you did NOT make changes due to uncertainty or errors, submit your response using this format instead:
+    ---
+    ## ⚠️ CI Analysis (No Changes Made)
+    
+    **Failed Check:** [name of the CI check that was failing]
+    **Error Type:** [test failure / build error / lint error / timeout / other]
+    
+    ### Root Cause
+    [1-3 sentences explaining why this failed]
+    
+    ### Why No Fix Was Applied
+    [Explain your uncertainty and why you chose not to make changes]
+    
+    ### Suggested Investigation
+    [What the developer should look into to resolve this]
+    ---
 IMPORTANT: Do NOT commit or push changes. The system will handle all git operations (staging, committing, and pushing) automatically.
 `;
 }
