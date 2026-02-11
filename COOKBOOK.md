@@ -359,6 +359,9 @@ The built-in fix-ci prompt:
 - **Analyzes root causes** - test failures, build errors, linting issues, timeouts, flaky tests
 - **Correlates with PR changes** - determines if failure is related to the PR or pre-existing
 - **Implements fixes automatically** - analyzes the issue and creates a PR with the fix (when `create_new_branch_for_pr` is enabled)
+- **Structured output format** - provides consistent, parseable responses in one of two formats:
+  - **✅ CI Fix Applied**: When Junie successfully fixes the issue, includes the fixed check name, error type, root cause, changes made, and verification status
+  - **⚠️ CI Analysis (No Changes Made)**: When Junie cannot fix the issue with certainty, includes the failed check name, error type, root cause, explanation of why no fix was applied, and suggested investigation steps
 
 ### Option B: Custom Fix CI Prompt
 
