@@ -89,7 +89,7 @@ export async function initializeJunieExecution({
         isFixCI: isFixCIEvent(context)
     })
 
-    await prepareJunieTask(context, branchInfo, octokit, mcpConfig.enabledServers, tokenConfig.isDefaultToken())
+    await prepareJunieTask(context, branchInfo, octokit, mcpConfig.enabledServers, tokenConfig.isDefaultToken(), tokenConfig.workingToken)
 }
 
 async function shouldHandle(context: JunieExecutionContext, octokit: Octokits): Promise<boolean> {

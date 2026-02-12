@@ -1,4 +1,4 @@
-import {ISSUE_QUERY, IssueQueryResponse, PULL_REQUEST_QUERY, PullRequestQueryResponse, GraphQLPullRequest, GraphQLIssue, GraphQLIssueCommentNode, GraphQLReviewNode, GraphQLReviewCommentNode} from "../api/queries";
+import {ISSUE_QUERY, IssueQueryResponse, PULL_REQUEST_QUERY, PullRequestQueryResponse, GraphQLPullRequest, GraphQLIssue} from "../api/queries";
 import {Octokits} from "./client";
 import { executeWithRetry } from "../../utils/retry";
 import {
@@ -6,7 +6,6 @@ import {
     filterReviewsToTriggerTime,
     isBodySafeToUse
 } from "./time-filter";
-import {downloadAttachmentsAndRewriteText} from "../junie/attachment-downloader";
 
 /**
  * GraphQL-based data fetcher - fetches all data in a single request
@@ -14,19 +13,6 @@ import {downloadAttachmentsAndRewriteText} from "../junie/attachment-downloader"
  */
 export class GraphQLGitHubDataFetcher {
     constructor(private octokit: Octokits) {}
-
-    /**
-     * Downloads attachments for a text/bodyHTML pair and returns the processed text
-     */
-    private async processAttachments(body: string, bodyHTML: string): Promise<string> {
-        try {
-            return await downloadAttachmentsAndRewriteText(body, bodyHTML);
-        } catch (error) {
-            console.error('Failed to process attachments:', error);
-            // Return original body if processing fails
-            return body;
-        }
-    }
 
     /**
      * Execute a GraphQL query with retry logic for transient failures
@@ -89,54 +75,15 @@ export class GraphQLGitHubDataFetcher {
             );
         }
 
-        // Process attachments in PR body
-        const processedPrBody = bodyIsSafe && pr.body ?
-            await this.processAttachments(pr.body, pr.bodyHTML) : "";
-
-        // Process attachments in timeline comments
-        const processedTimelineNodes = await Promise.all(
-            filteredTimelineNodes.map(async (node) => {
-                if (node.__typename === "IssueComment" && node.body) {
-                    const processedBody = await this.processAttachments(node.body, node.bodyHTML);
-                    return {...node, body: processedBody};
-                }
-                return node;
-            })
-        );
-
-        // Process attachments in reviews and review comments
-        const processedReviews = await Promise.all(
-            reviewsWithFilteredComments.map(async (review) => {
-                const processedReviewBody = review.body ?
-                    await this.processAttachments(review.body, review.bodyHTML) : "";
-
-                const processedComments = await Promise.all(
-                    review.comments.nodes.map(async (comment) => {
-                        if (comment.body) {
-                            const processedBody = await this.processAttachments(comment.body, comment.bodyHTML);
-                            return {...comment, body: processedBody};
-                        }
-                        return comment;
-                    })
-                );
-
-                return {
-                    ...review,
-                    body: processedReviewBody,
-                    comments: {nodes: processedComments}
-                };
-            })
-        );
-
-        // Create filtered PR object with processed attachments
+        // Create filtered PR object
         const filteredPR: GraphQLPullRequest = {
             ...pr,
-            body: processedPrBody,
+            body: bodyIsSafe ? pr.body : "",
             timelineItems: {
-                nodes: processedTimelineNodes
+                nodes: filteredTimelineNodes
             },
             reviews: {
-                nodes: processedReviews
+                nodes: reviewsWithFilteredComments
             }
         };
 
@@ -175,27 +122,12 @@ export class GraphQLGitHubDataFetcher {
             );
         }
 
-        // Process attachments in issue body
-        const processedIssueBody = bodyIsSafe && issue.body ?
-            await this.processAttachments(issue.body, issue.bodyHTML) : "";
-
-        // Process attachments in timeline comments
-        const processedTimelineNodes = await Promise.all(
-            filteredTimelineNodes.map(async (node) => {
-                if (node.__typename === "IssueComment" && node.body) {
-                    const processedBody = await this.processAttachments(node.body, node.bodyHTML);
-                    return {...node, body: processedBody};
-                }
-                return node;
-            })
-        );
-
-        // Create filtered issue object with processed attachments
+        // Create filtered issue object
         const filteredIssue: GraphQLIssue = {
             ...issue,
-            body: processedIssueBody,
+            body: bodyIsSafe ? issue.body : "",
             timelineItems: {
-                nodes: processedTimelineNodes
+                nodes: filteredTimelineNodes
             }
         };
 
