@@ -62,20 +62,21 @@ function extractAttachmentsFromHtml(bodyHtml: string): Map<string, string> {
     const signedUrlRegex = /https:\/\/private-user-images\.githubusercontent\.com\/\d+\/(\d+-[a-f0-9-]+)\.(png|jpg|jpeg|gif|webp)\?jwt=[^"'\s]+/gi;
     const signedMatches = [...bodyHtml.matchAll(signedUrlRegex)];
 
-    for (const match of signedMatches) {
-        const signedUrl = match[0];
-        const fileId = match[1]; // e.g., "548975708-79533cdb-b822-48ec-a58c-9b2d1cb0eabc"
-
-        // Construct original URL from file ID
-        const originalUrl = `https://github.com/user-attachments/assets/${fileId}`;
-
-        urlMap.set(originalUrl, signedUrl);
-        console.log(`Found image with signed URL: ${fileId}`);
-    }
-
     // Then, find all regular attachment URLs (files, or images without signed URLs)
     const attachmentUrlRegex = /https:\/\/github\.com\/user-attachments\/(assets|files)\/[^"'\s)]+/g;
     const attachmentMatches = [...bodyHtml.matchAll(attachmentUrlRegex)];
+
+
+    for (const match of signedMatches) {
+        const signedUrl = match[0];
+        const fileId: string = match[1]; // e.g., "548975708-79533cdb-b822-48ec-a58c-9b2d1cb0eabc"
+
+        // Construct original URL from file ID
+        const d = attachmentMatches.find(m => fileId.includes(m[0].split("/").pop()!))!.pop()
+        urlMap.set(d, signedUrl);
+        console.log(`Found image with signed URL: ${fileId}`);
+    }
+
 
     for (const match of attachmentMatches) {
         const url = match[0];
