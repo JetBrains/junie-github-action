@@ -27,6 +27,7 @@ export async function acquireGitHubAuthentication(): Promise<GitHubTokenConfig> 
 
     core.setSecret(workingToken);
     core.setOutput(OUTPUT_VARS.EJ_AUTH_GITHUB_TOKEN, workingToken);
+    core.exportVariable(ENV_VARS.GITHUB_TOKEN, workingToken);
 
     return {
         workingToken,
