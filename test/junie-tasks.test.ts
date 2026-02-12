@@ -458,9 +458,9 @@ describe("prepareJunieTask", () => {
             const result = await prepareJunieTask(context, branchInfo, octokit);
 
             expect(result).toBeDefined();
-            expect(result.task).toBeDefined();
-            // Should detect code-review trigger from comment and generate code review prompt
-            expect(result.task).toContain("Read the Pull Request diff");
+            expect(result.codeReview).toBeDefined();
+            // Should detect code-review trigger from comment and create codeReview task
+            expect(result.codeReview?.diffCommand).toContain("gh pr diff 123");
         });
 
         test("should not trigger fix CI prompt when workflow_run event has success conclusion", async () => {
