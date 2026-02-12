@@ -55,46 +55,36 @@ async function downloadFile(url: string, originalUrl: string): Promise<string> {
  * Returns map: originalUrl -> downloadUrl (signed URL if available, otherwise original URL)
  */
 function extractAttachmentsFromHtml(bodyHtml: string): Map<string, string> {
+    console.log(`Extracting attachments from HTML (${bodyHtml.length} chars)`);
     const urlMap = new Map<string, string>();
 
-    // Find all signed URLs (images with JWT tokens)
-    const signedUrlRegex = /https:\/\/private-user-images\.githubusercontent\.com\/[^"]+\?jwt=[^"]+/g;
+    // First, find all attachments with signed URLs (images)
+    const signedUrlRegex = /https:\/\/private-user-images\.githubusercontent\.com\/\d+\/(\d+-[a-f0-9-]+)\.(png|jpg|jpeg|gif|webp)\?jwt=[^"'\s]+/gi;
     const signedMatches = [...bodyHtml.matchAll(signedUrlRegex)];
-    const fileIdToSignedUrl = new Map<string, string>();
 
     for (const match of signedMatches) {
         const signedUrl = match[0];
+        const fileId = match[1]; // e.g., "548975708-79533cdb-b822-48ec-a58c-9b2d1cb0eabc"
 
-        // Extract file ID from signed URL (between last / and ?jwt)
-        const fileIdMatch = signedUrl.match(/\/([^/]+)\?jwt=/);
-        if (fileIdMatch) {
-            const fileIdWithExt = fileIdMatch[1]; // e.g., "548975708-79533cdb-b822-48ec-a58c-9b2d1cb0eabc.png"
-            const fileId = fileIdWithExt.replace(/\.\w+$/, ''); // Remove extension
+        // Construct original URL from file ID
+        const originalUrl = `https://github.com/user-attachments/assets/${fileId}`;
 
-            // Store both full ID and UUID-only variant
-            fileIdToSignedUrl.set(fileId, signedUrl);
-
-            // Also store UUID-only variant (without numeric prefix)
-            const uuidOnly = fileId.replace(/^\d+-/, '');
-            if (uuidOnly !== fileId) {
-                fileIdToSignedUrl.set(uuidOnly, signedUrl);
-            }
-        }
+        urlMap.set(originalUrl, signedUrl);
+        console.log(`Found image with signed URL: ${fileId}`);
     }
 
-    // Find all original attachment URLs (what appears in markdown/HTML content)
+    // Then, find all regular attachment URLs (files, or images without signed URLs)
     const attachmentUrlRegex = /https:\/\/github\.com\/user-attachments\/(assets|files)\/[^"'\s)]+/g;
     const attachmentMatches = [...bodyHtml.matchAll(attachmentUrlRegex)];
 
     for (const match of attachmentMatches) {
-        const originalUrl = match[0];
-        const fileIdFromUrl = originalUrl.split('/').pop();
+        const url = match[0];
 
-        if (!fileIdFromUrl) continue;
-
-        // Check if we have a signed URL for this file ID
-        const downloadUrl = fileIdToSignedUrl.get(fileIdFromUrl) || originalUrl;
-        urlMap.set(originalUrl, downloadUrl);
+        // Only add if we don't already have a signed URL for this attachment
+        if (!urlMap.has(url)) {
+            urlMap.set(url, url); // Use original URL as download URL
+            console.log(`Found attachment without signed URL: ${url}`);
+        }
     }
 
     console.log(`Total attachments found: ${urlMap.size}`);
