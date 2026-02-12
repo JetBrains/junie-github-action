@@ -48,7 +48,7 @@ inputs:
   junie_version:
     description: "Version of Junie to use"
     required: false
-    default: "624.1.0"
+    default: "744.2"
   model:
     description: "Model to use for the primary agent. Available: gpt-5-2025-08-07, gpt-5.2-codex, gpt-5.2-2025-12-11, claude-sonnet-4-5-20250929, claude-opus-4-5-20251101, gemini-3-pro-preview, gemini-3-flash-preview, grok-4-1-fast-reasoning"
     required: false
@@ -196,16 +196,13 @@ runs:
         echo "Writing Junie output to: ${JUNIE_OUTPUT_FILE}"
         echo "Reading Junie input from: ${JUNIE_INPUT_FILE}"
 
-        # Read JSON from file and pass via JUNIE_TASK environment variable
-        # JUNIE_TASK parses directly as JunieTask which supports codeReview
-        export JUNIE_TASK=$(cat "${JUNIE_INPUT_FILE}")
-        echo "JUNIE_TASK: ${JUNIE_TASK}"
-
+        # Read from file via stdin to avoid ARG_MAX limit for large prompts
         junie --cache-dir="${WORKING_DIR}" \
               --output-format="json" \
+              --input-format="json" \
               --json-output-file="${JUNIE_OUTPUT_FILE}" \
               --auth="${CLI_TOKEN}" \
-              ${JUNIE_FLAGS}
+              ${JUNIE_FLAGS} < "${JUNIE_INPUT_FILE}"
 
         # Export the file path instead of the content
         echo "json_output_file=${JUNIE_OUTPUT_FILE}" >> $GITHUB_OUTPUT
