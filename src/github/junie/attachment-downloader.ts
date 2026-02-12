@@ -15,16 +15,46 @@ export const ATTACHMENT_PATTERNS = {
     legacy: /https:\/\/user-images\.githubusercontent\.com\/[^\s)]+/g
 } as const;
 
-async function downloadFile(url: string, githubToken?: string): Promise<string> {
-    // Add authentication header for GitHub URLs
-    const headers: Record<string, string> = {};
-    if (githubToken && (url.includes('github.com') || url.includes('githubusercontent.com'))) {
-        headers['Authorization'] = `token ${githubToken}`;
+/**
+ * Extracts authenticated attachment URLs from HTML.
+ * bodyHTML contains URLs with short-lived JWT tokens as query parameters.
+ * Returns a map of base URL (without query params) -> authenticated URL (with JWT).
+ */
+function extractAuthenticatedUrls(bodyHTML: string): Map<string, string> {
+    const urlMap = new Map<string, string>();
+
+    // Extract URLs from <a> tags (for file attachments)
+    const linkPattern = /<a[^>]+href="([^"]*(?:user-attachments|githubusercontent\.com)[^"]*)"[^>]*>/g;
+    for (const match of bodyHTML.matchAll(linkPattern)) {
+        const fullUrl = match[1];
+        const baseUrl = fullUrl.split('?')[0]; // Remove query params to get base URL
+        urlMap.set(baseUrl, fullUrl);
     }
 
-    const response = await fetch(url, { headers });
+    // Extract URLs from <img> tags (for images)
+    const imgPattern = /<img[^>]+src="([^"]*(?:user-attachments|githubusercontent\.com)[^"]*)"[^>]*>/g;
+    for (const match of bodyHTML.matchAll(imgPattern)) {
+        const fullUrl = match[1];
+        const baseUrl = fullUrl.split('?')[0];
+        urlMap.set(baseUrl, fullUrl);
+    }
+
+    return urlMap;
+}
+
+async function downloadFile(url: string): Promise<string> {
+    const isGitHubUrl = url.includes('github.com') || url.includes('githubusercontent.com');
+    const hasTokenInUrl = url.includes('token=') || url.includes('jwt=');
+
+    if (isGitHubUrl && hasTokenInUrl) {
+        console.log(`Downloading GitHub attachment with JWT token: ${url.split('?')[0]}`);
+    } else if (isGitHubUrl) {
+        console.log(`Downloading public GitHub attachment: ${url.split('?')[0]}`);
+    }
+
+    const response = await fetch(url);
     if (!response.ok) {
-        throw new Error(`Failed to download ${url}: ${response.status} ${response.statusText}`);
+        throw new Error(`Failed to download ${url.split('?')[0]}: ${response.status} ${response.statusText}`);
     }
 
     const arrayBuffer = await response.arrayBuffer();
@@ -55,24 +85,44 @@ async function downloadFile(url: string, githubToken?: string): Promise<string> 
 
 /**
  * Downloads all attachments found in text and replaces URLs with local paths.
+ *
+ * Authentication strategy:
+ * - Private repos: Uses JWT tokens from bodyHTML (embedded in URLs as query params)
+ * - Public repos: Downloads without authentication
+ *
  * Handles:
  * - Image tags: src="https://github.com/user-attachments/assets/..."
  * - Markdown images: ![](https://github.com/user-attachments/assets/...)
  * - Markdown files: (https://github.com/user-attachments/files/...)
  * - Legacy images: https://user-images.githubusercontent.com/...
  *
- * @param text - Text containing attachment URLs
- * @param githubToken - GitHub token for authenticating downloads from GitHub
+ * @param text - Text containing attachment URLs (markdown format from body field)
+ * @param bodyHTML - HTML version with authenticated URLs containing JWT tokens for private repos
  */
-export async function downloadAttachmentsAndRewriteText(text: string, githubToken?: string): Promise<string> {
+export async function downloadAttachmentsAndRewriteText(text: string, bodyHTML: string): Promise<string> {
     let updatedText = text;
+
+    // Extract authenticated URLs from bodyHTML
+    // These URLs contain short-lived JWT tokens required for downloading from private repo
+    const authenticatedUrls = extractAuthenticatedUrls(bodyHTML);
+
+    if (authenticatedUrls.size > 0) {
+        console.log(`Found ${authenticatedUrls.size} authenticated attachment URLs in bodyHTML`);
+    }
+
+    // Helper function to get authenticated URL if available, otherwise return original
+    const getAuthenticatedUrl = (url: string): string => {
+        const baseUrl = url.split('?')[0]; // Remove any existing query params
+        return authenticatedUrls.get(baseUrl) || url;
+    };
 
     // Handle HTML image tags with user-attachments URLs
     const imgMatches = [...text.matchAll(ATTACHMENT_PATTERNS.imgTag)];
     for (const match of imgMatches) {
         const url = match[1];
         try {
-            const localPath = await downloadFile(url, githubToken);
+            const urlToDownload = getAuthenticatedUrl(url);
+            const localPath = await downloadFile(urlToDownload);
             updatedText = updatedText.replace(match[0], `src="${localPath}"`);
         } catch (error) {
             console.error(`Failed to download image: ${url}`, error);
@@ -84,7 +134,8 @@ export async function downloadAttachmentsAndRewriteText(text: string, githubToke
     for (const match of mdImgMatches) {
         const url = match[1];
         try {
-            const localPath = await downloadFile(url, githubToken);
+            const urlToDownload = getAuthenticatedUrl(url);
+            const localPath = await downloadFile(urlToDownload);
             updatedText = updatedText.replace(match[1], localPath);
         } catch (error) {
             console.error(`Failed to download markdown image: ${url}`, error);
@@ -96,7 +147,8 @@ export async function downloadAttachmentsAndRewriteText(text: string, githubToke
     for (const match of fileMatches) {
         const url = match[1];
         try {
-            const localPath = await downloadFile(url, githubToken);
+            const urlToDownload = getAuthenticatedUrl(url);
+            const localPath = await downloadFile(urlToDownload);
             updatedText = updatedText.replace(match[0], `(${localPath})`);
         } catch (error) {
             console.error(`Failed to download file: ${url}`, error);
@@ -108,7 +160,8 @@ export async function downloadAttachmentsAndRewriteText(text: string, githubToke
     for (const match of legacyMatches) {
         const url = match[0];
         try {
-            const localPath = await downloadFile(url, githubToken);
+            const urlToDownload = getAuthenticatedUrl(url);
+            const localPath = await downloadFile(urlToDownload);
             updatedText = updatedText.replace(url, localPath);
         } catch (error) {
             console.error(`Failed to download legacy image: ${url}`, error);
