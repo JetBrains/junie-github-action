@@ -161,7 +161,7 @@ jobs:
           use_single_comment: "true"
           prompt: |
             Your task is to:
-            1. Get the Pull Request diff using `gh pr diff ${{ github.event.pull_request.head.ref }}`
+            1. Get the Pull Request diff using `gh pr diff ${{ github.event.pull_request.number }}`
             2. Review this diff according to the criteria below
             3. Output summary following the template below using `submit` action
 
@@ -284,7 +284,7 @@ jobs:
             - If nothing to update, don't make changes
 
             Procedure:
-            Use gh pr diff ${{ github.event.pull_request.head.ref }} to get a diff of the PR.
+            Use gh pr diff ${{ github.event.pull_request.number }} to get a diff of the PR.
 ```
 
 </details>
@@ -523,7 +523,7 @@ jobs:
             No secrets detected in this commit.
 
             Procedure:
-            Use gh pr diff ${{ github.event.pull_request.head.ref }} to get a diff of the PR. 
+            Use gh pr diff ${{ github.event.pull_request.number }} to get a diff of the PR. 
 
             Only provide feedback without modifying files.
 
