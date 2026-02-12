@@ -15,8 +15,14 @@ export const ATTACHMENT_PATTERNS = {
     legacy: /https:\/\/user-images\.githubusercontent\.com\/[^\s)]+/g
 } as const;
 
-async function downloadFile(url: string): Promise<string> {
-    const response = await fetch(url);
+async function downloadFile(url: string, githubToken?: string): Promise<string> {
+    // Add authentication header for GitHub URLs
+    const headers: Record<string, string> = {};
+    if (githubToken && (url.includes('github.com') || url.includes('githubusercontent.com'))) {
+        headers['Authorization'] = `token ${githubToken}`;
+    }
+
+    const response = await fetch(url, { headers });
     if (!response.ok) {
         throw new Error(`Failed to download ${url}: ${response.status} ${response.statusText}`);
     }
@@ -54,8 +60,11 @@ async function downloadFile(url: string): Promise<string> {
  * - Markdown images: ![](https://github.com/user-attachments/assets/...)
  * - Markdown files: (https://github.com/user-attachments/files/...)
  * - Legacy images: https://user-images.githubusercontent.com/...
+ *
+ * @param text - Text containing attachment URLs
+ * @param githubToken - GitHub token for authenticating downloads from GitHub
  */
-export async function downloadAttachmentsAndRewriteText(text: string): Promise<string> {
+export async function downloadAttachmentsAndRewriteText(text: string, githubToken?: string): Promise<string> {
     let updatedText = text;
 
     // Handle HTML image tags with user-attachments URLs
@@ -63,7 +72,7 @@ export async function downloadAttachmentsAndRewriteText(text: string): Promise<s
     for (const match of imgMatches) {
         const url = match[1];
         try {
-            const localPath = await downloadFile(url);
+            const localPath = await downloadFile(url, githubToken);
             updatedText = updatedText.replace(match[0], `src="${localPath}"`);
         } catch (error) {
             console.error(`Failed to download image: ${url}`, error);
@@ -75,7 +84,7 @@ export async function downloadAttachmentsAndRewriteText(text: string): Promise<s
     for (const match of mdImgMatches) {
         const url = match[1];
         try {
-            const localPath = await downloadFile(url);
+            const localPath = await downloadFile(url, githubToken);
             updatedText = updatedText.replace(match[1], localPath);
         } catch (error) {
             console.error(`Failed to download markdown image: ${url}`, error);
@@ -87,7 +96,7 @@ export async function downloadAttachmentsAndRewriteText(text: string): Promise<s
     for (const match of fileMatches) {
         const url = match[1];
         try {
-            const localPath = await downloadFile(url);
+            const localPath = await downloadFile(url, githubToken);
             updatedText = updatedText.replace(match[0], `(${localPath})`);
         } catch (error) {
             console.error(`Failed to download file: ${url}`, error);
@@ -99,7 +108,7 @@ export async function downloadAttachmentsAndRewriteText(text: string): Promise<s
     for (const match of legacyMatches) {
         const url = match[0];
         try {
-            const localPath = await downloadFile(url);
+            const localPath = await downloadFile(url, githubToken);
             updatedText = updatedText.replace(url, localPath);
         } catch (error) {
             console.error(`Failed to download legacy image: ${url}`, error);

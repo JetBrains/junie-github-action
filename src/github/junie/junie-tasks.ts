@@ -20,9 +20,9 @@ import {CliInput} from "./types/junie";
 import {generateMcpToolsPrompt} from "../../mcp/mcp-prompts";
 import {junieArgsToString} from "../../utils/junie-args-parser";
 
-async function getValidatedTextTask(text: string): Promise<string> {
+async function getValidatedTextTask(text: string, githubToken?: string): Promise<string> {
     // Download attachments and rewrite URLs in the text
-    return await downloadAttachmentsAndRewriteText(text)
+    return await downloadAttachmentsAndRewriteText(text, githubToken)
 }
 
 function getTriggerTime(context: JunieExecutionContext): string | undefined {
@@ -45,7 +45,8 @@ export async function prepareJunieTask(
     branchInfo: BranchInfo,
     octokit: Octokits,
     enabledMcpServers: string[] = [],
-    isDefaultToken: boolean = false
+    isDefaultToken: boolean = false,
+    githubToken?: string
 ) {
     const owner = context.payload.repository.owner.login;
     const repo = context.payload.repository.name;
@@ -82,7 +83,7 @@ export async function prepareJunieTask(
             promptText = promptText + mcpToolsPrompt;
         }
 
-        junieCLITask.task = await getValidatedTextTask(promptText);
+        junieCLITask.task = await getValidatedTextTask(promptText, githubToken);
     }
 
     if (!junieCLITask.task && !junieCLITask.mergeTask) {
