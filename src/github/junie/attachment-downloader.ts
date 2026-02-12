@@ -51,10 +51,20 @@ function extractSignedUrlsFromHtml(bodyHtml: string): Map<string, string> {
     // Extract signed URLs from HTML
     const signedUrlRegex = /https:\/\/private-user-images\.githubusercontent\.com\/[^"'\s]+\?jwt=[^"'\s]+/g;
     const signedUrls = bodyHtml.match(signedUrlRegex) || [];
+    console.log(`Found ${signedUrls.length} signed URLs in HTML`);
 
     // Extract original URLs from HTML (both in markdown and HTML img tags)
     const originalUrlRegex = /https:\/\/github\.com\/user-attachments\/(assets|files)\/[^"'\s)]+/g;
     const originalUrls = bodyHtml.match(originalUrlRegex) || [];
+    console.log(`Found ${originalUrls.length} original attachment URLs in HTML`);
+
+    if (originalUrls.length > 0) {
+        console.log('Original URLs:', originalUrls);
+    }
+    if (signedUrls.length > 0 && originalUrls.length === 0) {
+        console.warn('Found signed URLs but no original URLs - this is unexpected');
+        console.log('HTML sample:', bodyHtml.substring(0, 300));
+    }
 
     // Map original URLs to signed URLs (they appear in the same order in HTML)
     for (let i = 0; i < Math.min(originalUrls.length, signedUrls.length); i++) {
@@ -62,6 +72,7 @@ function extractSignedUrlsFromHtml(bodyHtml: string): Map<string, string> {
         const signed = signedUrls[i];
         if (original && signed) {
             urlMap.set(original, signed);
+            console.log(`Mapped: ${original} -> signed URL`);
         }
     }
 
