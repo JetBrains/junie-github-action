@@ -12,34 +12,20 @@ import {downloadAttachmentsFromHtml, replaceAttachmentsInText} from "../junie/at
  * Process timeline comments: download attachments and replace URLs
  */
 async function processTimelineComments(
-    octokit: Octokits,
-    owner: string,
-    repo: string,
     comments: GraphQLIssueCommentNode[]
 ): Promise<GraphQLIssueCommentNode[]> {
     return Promise.all(
         comments.map(async (comment) => {
-            if (!comment.body) return comment;
+            if (!comment.body || !comment.bodyHTML) return comment;
 
             try {
-                // Get HTML version of comment
-                const commentResponse = await octokit.rest.issues.getComment({
-                    owner,
-                    repo,
-                    comment_id: comment.databaseId,
-                    mediaType: { format: "full+json" },
-                });
-                const bodyHtml = commentResponse.data.body_html;
-
-                if (bodyHtml) {
-                    const commentAttachments = await downloadAttachmentsFromHtml(bodyHtml);
-                    return {
-                        ...comment,
-                        body: commentAttachments.size > 0
-                            ? replaceAttachmentsInText(comment.body, commentAttachments)
-                            : comment.body
-                    };
-                }
+                const commentAttachments = await downloadAttachmentsFromHtml(comment.bodyHTML);
+                return {
+                    ...comment,
+                    body: commentAttachments.size > 0
+                        ? replaceAttachmentsInText(comment.body, commentAttachments)
+                        : comment.body
+                };
             } catch (error) {
                 console.error(`Failed to process comment attachments:`, error);
             }
@@ -96,26 +82,14 @@ export class GraphQLGitHubDataFetcher {
 
         // Process PR body: download attachments and replace URLs
         let processedBody = "";
-        if (bodyIsSafe && pr.body) {
+        if (bodyIsSafe && pr.body && pr.bodyHTML) {
             console.log(`Processing attachments for PR #${pullNumber}`);
             try {
-                const prResponse = await this.octokit.rest.pulls.get({
-                    owner,
-                    repo,
-                    pull_number: pullNumber,
-                    mediaType: { format: "full+json" },
-                });
-                const bodyHtml = (prResponse.data as any).body_html;
-                if (bodyHtml) {
-                    console.log(`Retrieved HTML body for PR #${pullNumber} (${bodyHtml.length} chars)`);
-                    const bodyAttachments = await downloadAttachmentsFromHtml(bodyHtml);
-                    processedBody = bodyAttachments.size > 0
-                        ? replaceAttachmentsInText(pr.body, bodyAttachments)
-                        : pr.body;
-                } else {
-                    console.warn(`No HTML body returned for PR #${pullNumber}`);
-                    processedBody = pr.body;
-                }
+                console.log(`Using GraphQL bodyHTML for PR #${pullNumber} (${pr.bodyHTML.length} chars)`);
+                const bodyAttachments = await downloadAttachmentsFromHtml(pr.bodyHTML);
+                processedBody = bodyAttachments.size > 0
+                    ? replaceAttachmentsInText(pr.body, bodyAttachments)
+                    : pr.body;
             } catch (error) {
                 console.error(`Failed to process PR body attachments:`, error);
                 processedBody = pr.body;
@@ -136,9 +110,6 @@ export class GraphQLGitHubDataFetcher {
         );
 
         const processedTimelineNodes = await processTimelineComments(
-            this.octokit,
-            owner,
-            repo,
             filteredTimelineNodes
         );
 
@@ -159,23 +130,12 @@ export class GraphQLGitHubDataFetcher {
 
                 // Process review body
                 let processedReviewBody = review.body;
-                if (review.body) {
+                if (review.body && review.bodyHTML) {
                     try {
-                        const reviewResponse = await this.octokit.rest.pulls.getReview({
-                            owner,
-                            repo,
-                            pull_number: pullNumber,
-                            review_id: review.databaseId,
-                            mediaType: { format: "full+json" },
-                        });
-                        const bodyHtml = reviewResponse.data.body_html;
-
-                        if (bodyHtml) {
-                            const reviewAttachments = await downloadAttachmentsFromHtml(bodyHtml);
-                            processedReviewBody = reviewAttachments.size > 0
-                                ? replaceAttachmentsInText(review.body, reviewAttachments)
-                                : review.body;
-                        }
+                        const reviewAttachments = await downloadAttachmentsFromHtml(review.bodyHTML);
+                        processedReviewBody = reviewAttachments.size > 0
+                            ? replaceAttachmentsInText(review.body, reviewAttachments)
+                            : review.body;
                     } catch (error) {
                         console.error(`Failed to process review body attachments:`, error);
                     }
@@ -184,26 +144,16 @@ export class GraphQLGitHubDataFetcher {
                 // Process each review comment
                 const processedReviewComments = await Promise.all(
                     filteredReviewComments.map(async (comment) => {
-                        if (!comment.body) return comment;
+                        if (!comment.body || !comment.bodyHTML) return comment;
 
                         try {
-                            const commentResponse = await this.octokit.rest.pulls.getReviewComment({
-                                owner,
-                                repo,
-                                comment_id: comment.databaseId,
-                                mediaType: { format: "full+json" },
-                            });
-                            const bodyHtml = commentResponse.data.body_html;
-
-                            if (bodyHtml) {
-                                const commentAttachments = await downloadAttachmentsFromHtml(bodyHtml);
-                                return {
-                                    ...comment,
-                                    body: commentAttachments.size > 0
-                                        ? replaceAttachmentsInText(comment.body, commentAttachments)
-                                        : comment.body
-                                };
-                            }
+                            const commentAttachments = await downloadAttachmentsFromHtml(comment.bodyHTML);
+                            return {
+                                ...comment,
+                                body: commentAttachments.size > 0
+                                    ? replaceAttachmentsInText(comment.body, commentAttachments)
+                                    : comment.body
+                            };
                         } catch (error) {
                             console.error(`Failed to process review comment attachments:`, error);
                         }
@@ -265,27 +215,14 @@ export class GraphQLGitHubDataFetcher {
 
         // Process issue body: download attachments and replace URLs
         let processedBody = "";
-        if (bodyIsSafe && issue.body) {
+        if (bodyIsSafe && issue.body && issue.bodyHTML) {
             console.log(`Processing attachments for issue #${issueNumber}`);
             try {
-                const issueResponse = await this.octokit.rest.issues.get({
-                    owner,
-                    repo,
-                    issue_number: issueNumber,
-                    mediaType: { format: "full+json" },
-                });
-                const bodyHtml = issueResponse.data.body_html;
-
-                if (bodyHtml) {
-                    console.log(`Retrieved HTML body for issue #${issueNumber} (${bodyHtml.length} chars)`);
-                    const bodyAttachments = await downloadAttachmentsFromHtml(bodyHtml);
-                    processedBody = bodyAttachments.size > 0
-                        ? replaceAttachmentsInText(issue.body, bodyAttachments)
-                        : issue.body;
-                } else {
-                    console.warn(`No HTML body returned for issue #${issueNumber}`);
-                    processedBody = issue.body;
-                }
+                console.log(`Using GraphQL bodyHTML for issue #${issueNumber} (${issue.bodyHTML.length} chars)`);
+                const bodyAttachments = await downloadAttachmentsFromHtml(issue.bodyHTML);
+                processedBody = bodyAttachments.size > 0
+                    ? replaceAttachmentsInText(issue.body, bodyAttachments)
+                    : issue.body;
             } catch (error) {
                 console.error(`Failed to process issue body attachments:`, error);
                 processedBody = issue.body;
@@ -306,9 +243,6 @@ export class GraphQLGitHubDataFetcher {
         );
 
         const processedTimelineNodes = await processTimelineComments(
-            this.octokit,
-            owner,
-            repo,
             filteredTimelineNodes
         );
 

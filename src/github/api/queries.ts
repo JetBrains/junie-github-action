@@ -55,6 +55,7 @@ export const PULL_REQUEST_QUERY = `
               id
               databaseId
               body
+              bodyHTML
               author {
                 login
               }
@@ -74,6 +75,7 @@ export const PULL_REQUEST_QUERY = `
               login
             }
             body
+            bodyHTML
             state
             submittedAt
             lastEditedAt
@@ -85,6 +87,7 @@ export const PULL_REQUEST_QUERY = `
                 id
                 databaseId
                 body
+                bodyHTML
                 path
                 position
                 diffHunk
@@ -131,6 +134,7 @@ export const ISSUE_QUERY = `
               id
               databaseId
               body
+              bodyHTML
               author {
                 login
               }
@@ -163,6 +167,7 @@ export interface GraphQLIssueCommentNode {
     id: string;
     databaseId: number;
     body: string;
+    bodyHTML: string;
     author: GraphQLUser | null;
     createdAt: string;
     lastEditedAt: string | null;
@@ -199,6 +204,7 @@ export interface GraphQLReviewCommentNode {
     id: string;
     databaseId: number;
     body: string;
+    bodyHTML: string;
     path: string;
     position: number | null;
     diffHunk: string;
@@ -218,6 +224,7 @@ export interface GraphQLReviewNode {
     databaseId: number;
     author: GraphQLUser | null;
     body: string;
+    bodyHTML: string;
     state: string;
     submittedAt: string;
     lastEditedAt: string | null;
