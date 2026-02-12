@@ -46,6 +46,7 @@ async function downloadFileFromSignedUrl(signedUrl: string, originalUrl: string)
  * Extract signed URLs from HTML and map them to original URLs
  */
 function extractSignedUrlsFromHtml(bodyHtml: string): Map<string, string> {
+    console.log(`Extracting signed URLs from HTML...${bodyHtml}`);
     const urlMap = new Map<string, string>();
 
     // Extract signed URLs from HTML
