@@ -28,6 +28,7 @@ function extractAuthenticatedUrls(bodyHTML: string): Map<string, string> {
     for (const match of bodyHTML.matchAll(linkPattern)) {
         const fullUrl = match[1];
         const baseUrl = fullUrl.split('?')[0]; // Remove query params to get base URL
+        console.log(`[DEBUG] Found <a> tag: baseUrl="${baseUrl}", fullUrl="${fullUrl}"`);
         urlMap.set(baseUrl, fullUrl);
     }
 
@@ -36,6 +37,7 @@ function extractAuthenticatedUrls(bodyHTML: string): Map<string, string> {
     for (const match of bodyHTML.matchAll(imgPattern)) {
         const fullUrl = match[1];
         const baseUrl = fullUrl.split('?')[0];
+        console.log(`[DEBUG] Found <img> tag: baseUrl="${baseUrl}", fullUrl="${fullUrl}"`);
         urlMap.set(baseUrl, fullUrl);
     }
 
@@ -113,7 +115,12 @@ export async function downloadAttachmentsAndRewriteText(text: string, bodyHTML: 
     // Helper function to get authenticated URL if available, otherwise return original
     const getAuthenticatedUrl = (url: string): string => {
         const baseUrl = url.split('?')[0]; // Remove any existing query params
-        return authenticatedUrls.get(baseUrl) || url;
+        const authenticatedUrl = authenticatedUrls.get(baseUrl);
+        console.log(`[DEBUG] Looking up: "${url}" -> baseUrl: "${baseUrl}" -> found: ${authenticatedUrl ? 'YES' : 'NO'}`);
+        if (authenticatedUrl) {
+            console.log(`[DEBUG] Using authenticated URL: "${authenticatedUrl}"`);
+        }
+        return authenticatedUrl || url;
     };
 
     // Handle HTML image tags with user-attachments URLs
