@@ -1,5 +1,5 @@
 import {COMMIT_MESSAGE_TEMPLATE, PR_BODY_TEMPLATE, PR_TITLE_TEMPLATE} from "../constants/github";
-import {JunieExecutionContext, isTriggeredByUserInteraction, isJiraWorkflowDispatchEvent, isCodeReviewEvent} from "../github/context";
+import {JunieExecutionContext, isTriggeredByUserInteraction, isJiraWorkflowDispatchEvent} from "../github/context";
 import {execSync} from 'child_process';
 import * as core from "@actions/core";
 import {ENV_VARS, OUTPUT_VARS} from "../constants/environment";
@@ -131,7 +131,6 @@ async function getActionToDo(context: JunieExecutionContext): Promise<ActionType
         console.log('Silent mode enabled - no git operations will be performed');
         return ActionType.NOTHING;
     }
-
     const isNewBranch = process.env[OUTPUT_VARS.IS_NEW_BRANCH] === 'true';
     const workingBranch = process.env[OUTPUT_VARS.WORKING_BRANCH]!;
     const baseBranch = process.env[OUTPUT_VARS.BASE_BRANCH]!;
