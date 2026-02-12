@@ -97,6 +97,7 @@ export class GraphQLGitHubDataFetcher {
         // Process PR body: download attachments and replace URLs
         let processedBody = "";
         if (bodyIsSafe && pr.body) {
+            console.log(`Processing attachments for PR #${pullNumber}`);
             try {
                 const prResponse = await this.octokit.rest.pulls.get({
                     owner,
@@ -106,16 +107,25 @@ export class GraphQLGitHubDataFetcher {
                 });
                 const bodyHtml = (prResponse.data as any).body_html;
                 if (bodyHtml) {
+                    console.log(`Retrieved HTML body for PR #${pullNumber} (${bodyHtml.length} chars)`);
                     const bodyAttachments = await downloadAttachmentsFromHtml(bodyHtml);
                     processedBody = bodyAttachments.size > 0
                         ? replaceAttachmentsInText(pr.body, bodyAttachments)
                         : pr.body;
                 } else {
+                    console.warn(`No HTML body returned for PR #${pullNumber}`);
                     processedBody = pr.body;
                 }
             } catch (error) {
                 console.error(`Failed to process PR body attachments:`, error);
                 processedBody = pr.body;
+            }
+        } else {
+            if (!bodyIsSafe) {
+                console.log(`PR #${pullNumber} body is not safe to use (edited after trigger)`);
+            }
+            if (!pr.body) {
+                console.log(`PR #${pullNumber} has no body`);
             }
         }
 
@@ -256,6 +266,7 @@ export class GraphQLGitHubDataFetcher {
         // Process issue body: download attachments and replace URLs
         let processedBody = "";
         if (bodyIsSafe && issue.body) {
+            console.log(`Processing attachments for issue #${issueNumber}`);
             try {
                 const issueResponse = await this.octokit.rest.issues.get({
                     owner,
@@ -266,16 +277,25 @@ export class GraphQLGitHubDataFetcher {
                 const bodyHtml = issueResponse.data.body_html;
 
                 if (bodyHtml) {
+                    console.log(`Retrieved HTML body for issue #${issueNumber} (${bodyHtml.length} chars)`);
                     const bodyAttachments = await downloadAttachmentsFromHtml(bodyHtml);
                     processedBody = bodyAttachments.size > 0
                         ? replaceAttachmentsInText(issue.body, bodyAttachments)
                         : issue.body;
                 } else {
+                    console.warn(`No HTML body returned for issue #${issueNumber}`);
                     processedBody = issue.body;
                 }
             } catch (error) {
                 console.error(`Failed to process issue body attachments:`, error);
                 processedBody = issue.body;
+            }
+        } else {
+            if (!bodyIsSafe) {
+                console.log(`Issue #${issueNumber} body is not safe to use (edited after trigger)`);
+            }
+            if (!issue.body) {
+                console.log(`Issue #${issueNumber} has no body`);
             }
         }
 

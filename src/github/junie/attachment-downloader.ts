@@ -2,7 +2,7 @@ import {writeFile, mkdir} from "fs/promises";
 import {join} from "path";
 import {JiraAttachment} from "../context";
 import {getJiraClient} from "../jira/client";
-import {fileTypeFromBuffer} from "file-type";
+import mime from "mime-types";
 
 const DOWNLOAD_DIR = "/tmp/github-attachments";
 const JIRA_DOWNLOAD_DIR = "/tmp/jira-attachments";
@@ -23,14 +23,14 @@ async function downloadFileFromSignedUrl(signedUrl: string, originalUrl: string)
 
     let filename = originalUrl.split('/').pop() || `attachment-${Date.now()}`;
 
-    // If filename doesn't have extension, try to detect it from file content
+    // If filename doesn't have extension, try to get it from Content-Type header
     if (!filename.includes('.')) {
-        const fileType = await fileTypeFromBuffer(buffer);
-        if (fileType) {
-            filename = `${filename}.${fileType.ext}`;
-        } else {
-            // Fallback to .bin if we can't detect the type
-            filename = `${filename}.bin`;
+        const contentType = response.headers.get('content-type');
+        if (contentType) {
+            const ext = mime.extension(contentType);
+            if (ext) {
+                filename = `${filename}.${ext}`;
+            }
         }
     }
 
