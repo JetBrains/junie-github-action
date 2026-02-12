@@ -55,12 +55,15 @@ async function downloadFile(url: string, originalUrl: string): Promise<string> {
  * Returns map: originalUrl -> downloadUrl (signed URL if available, otherwise original URL)
  */
 function extractAttachmentsFromHtml(bodyHtml: string): Map<string, string> {
-    console.log(`Extracting attachments from HTML (${bodyHtml.length} chars)`);
     const urlMap = new Map<string, string>();
 
     // First, find all attachments with signed URLs (images)
     const signedUrlRegex = /https:\/\/private-user-images\.githubusercontent\.com\/\d+\/(\d+-[a-f0-9-]+)\.(png|jpg|jpeg|gif|webp)\?jwt=[^"'\s]+/gi;
     const signedMatches = [...bodyHtml.matchAll(signedUrlRegex)];
+
+    // Then, find all regular attachment URLs (files, or images without signed URLs)
+    const attachmentUrlRegex = /https:\/\/github\.com\/user-attachments\/(assets|files)\/[^"'\s)]+/g;
+    const attachmentMatches = [...bodyHtml.matchAll(attachmentUrlRegex)];
 
     for (const match of signedMatches) {
         const signedUrl = match[0];
@@ -70,12 +73,7 @@ function extractAttachmentsFromHtml(bodyHtml: string): Map<string, string> {
         const originalUrl = `https://github.com/user-attachments/assets/${fileId}`;
 
         urlMap.set(originalUrl, signedUrl);
-        console.log(`Found image with signed URL: ${fileId}`);
     }
-
-    // Then, find all regular attachment URLs (files, or images without signed URLs)
-    const attachmentUrlRegex = /https:\/\/github\.com\/user-attachments\/(assets|files)\/[^"'\s)]+/g;
-    const attachmentMatches = [...bodyHtml.matchAll(attachmentUrlRegex)];
 
     for (const match of attachmentMatches) {
         const url = match[0];
@@ -83,29 +81,63 @@ function extractAttachmentsFromHtml(bodyHtml: string): Map<string, string> {
         // Only add if we don't already have a signed URL for this attachment
         if (!urlMap.has(url)) {
             urlMap.set(url, url); // Use original URL as download URL
-            console.log(`Found attachment without signed URL: ${url}`);
         }
     }
 
-    console.log(`Total attachments found: ${urlMap.size}`);
+    if (urlMap.size > 0) {
+        console.log(`Found ${urlMap.size} attachment(s) in HTML`);
+    }
 
     return urlMap;
 }
 
 /**
+ * Escape special regex characters in a string
+ */
+function escapeRegex(str: string): string {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
  * Replace attachment URLs in text with local paths
+ * Finds all GitHub attachment URLs in text and matches them with downloaded files by file ID
  */
 function replaceAttachmentUrls(text: string, downloadedUrlsMap: Map<string, string>): string {
     let updatedText = text;
 
-    for (const [originalUrl, localPath] of downloadedUrlsMap) {
-        // Handle HTML image tags
-        const imgPattern = new RegExp(`src="${originalUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`, 'g');
-        updatedText = updatedText.replace(imgPattern, `src="${localPath}"`);
+    // Find all GitHub attachment URLs in the text
+    const attachmentRegex = /https:\/\/github\.com\/user-attachments\/(assets|files)\/[^\s)">]+/g;
+    const urlsInText = [...text.matchAll(attachmentRegex)].map(match => match[0]);
 
-        // Handle markdown images and file links
-        const mdPattern = new RegExp(originalUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
-        updatedText = updatedText.replace(mdPattern, localPath);
+    for (const urlInText of urlsInText) {
+        // Extract file ID from URL (last part after /)
+        const fileIdInText = urlInText.split('/').pop();
+        if (!fileIdInText) continue;
+
+        // Try to find matching downloaded file
+        let localPath: string | undefined;
+
+        // First, try exact match
+        if (downloadedUrlsMap.has(urlInText)) {
+            localPath = downloadedUrlsMap.get(urlInText);
+        } else {
+            // Try matching by file ID (handles both with and without numeric prefix)
+            for (const [downloadedUrl, downloadedPath] of downloadedUrlsMap) {
+                const fileIdDownloaded = downloadedUrl.split('/').pop();
+                if (!fileIdDownloaded) continue;
+
+                if (fileIdDownloaded.includes(fileIdInText)) {
+                    localPath = downloadedPath;
+                    break;
+                }
+            }
+        }
+
+        // Replace URL with local path if found
+        if (localPath) {
+            const escapedUrl = escapeRegex(urlInText);
+            updatedText = updatedText.replace(new RegExp(escapedUrl, 'g'), localPath);
+        }
     }
 
     return updatedText;
