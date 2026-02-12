@@ -47,8 +47,8 @@ export const PULL_REQUEST_QUERY = `
           }
         }
 
-        # Timeline events (comments, cross-references, etc)
-        timelineItems(first: 100, itemTypes: [ISSUE_COMMENT, CROSS_REFERENCED_EVENT, REFERENCED_EVENT]) {
+        # Timeline events (comments only)
+        timelineItems(first: 100, itemTypes: [ISSUE_COMMENT]) {
           nodes {
             __typename
             ... on IssueComment {
@@ -61,28 +61,6 @@ export const PULL_REQUEST_QUERY = `
               createdAt
               lastEditedAt
               url
-            }
-            ... on CrossReferencedEvent {
-              source {
-                ... on Issue {
-                  number
-                  title
-                  url
-                }
-                ... on PullRequest {
-                  number
-                  title
-                  url
-                }
-              }
-              createdAt
-            }
-            ... on ReferencedEvent {
-              commit {
-                oid
-                message
-              }
-              createdAt
             }
           }
         }
@@ -145,8 +123,8 @@ export const ISSUE_QUERY = `
         updatedAt
         lastEditedAt
 
-        # Timeline events
-        timelineItems(first: 100, itemTypes: [ISSUE_COMMENT, CROSS_REFERENCED_EVENT, REFERENCED_EVENT]) {
+        # Timeline events (comments only)
+        timelineItems(first: 100, itemTypes: [ISSUE_COMMENT]) {
           nodes {
             __typename
             ... on IssueComment {
@@ -159,28 +137,6 @@ export const ISSUE_QUERY = `
               createdAt
               lastEditedAt
               url
-            }
-            ... on CrossReferencedEvent {
-              source {
-                ... on Issue {
-                  number
-                  title
-                  url
-                }
-                ... on PullRequest {
-                  number
-                  title
-                  url
-                }
-              }
-              createdAt
-            }
-            ... on ReferencedEvent {
-              commit {
-                oid
-                message
-              }
-              createdAt
             }
           }
         }
@@ -213,29 +169,7 @@ export interface GraphQLIssueCommentNode {
     url: string;
 }
 
-export interface GraphQLReferencedEventNode {
-    __typename: "ReferencedEvent";
-    commit: GraphQLCommit | null;
-    createdAt: string;
-}
-
-export interface GraphQLCrossReferencedSource {
-    __typename: "PullRequest" | "Issue";
-    number: number;
-    title: string;
-    url: string;
-}
-
-export interface GraphQLCrossReferencedEventNode {
-    __typename: "CrossReferencedEvent";
-    source: GraphQLCrossReferencedSource | null;
-    createdAt: string;
-}
-
-export type GraphQLTimelineItemNode =
-    | GraphQLIssueCommentNode
-    | GraphQLReferencedEventNode
-    | GraphQLCrossReferencedEventNode;
+export type GraphQLTimelineItemNode = GraphQLIssueCommentNode;
 
 export interface GraphQLTimelineItems {
     nodes: GraphQLTimelineItemNode[];
@@ -345,17 +279,9 @@ export interface IssueQueryResponse {
     };
 }
 
-// Type guards for timeline items
+// Type guard for timeline items (now only comments)
 export function isIssueCommentNode(node: GraphQLTimelineItemNode): node is GraphQLIssueCommentNode {
     return node.__typename === "IssueComment";
-}
-
-export function isReferencedEventNode(node: GraphQLTimelineItemNode): node is GraphQLReferencedEventNode {
-    return node.__typename === "ReferencedEvent";
-}
-
-export function isCrossReferencedEventNode(node: GraphQLTimelineItemNode): node is GraphQLCrossReferencedEventNode {
-    return node.__typename === "CrossReferencedEvent";
 }
 
 // Query to get current authenticated user/bot information

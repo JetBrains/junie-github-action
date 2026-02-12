@@ -10,7 +10,37 @@ describe("GraphQLGitHubDataFetcher", () => {
     beforeEach(() => {
         mockOctokit = {
             graphql: mock(() => Promise.resolve({})) as any,
-            rest: {} as any
+            rest: {
+                pulls: {
+                    get: mock(() => Promise.resolve({
+                        data: {
+                            body_html: '<p>PR description</p>'
+                        }
+                    })) as any,
+                    getReview: mock(() => Promise.resolve({
+                        data: {
+                            body_html: '<p>Review body</p>'
+                        }
+                    })) as any,
+                    getReviewComment: mock(() => Promise.resolve({
+                        data: {
+                            body_html: '<p>Review comment</p>'
+                        }
+                    })) as any
+                },
+                issues: {
+                    get: mock(() => Promise.resolve({
+                        data: {
+                            body_html: '<p>Issue description</p>'
+                        }
+                    })) as any,
+                    getComment: mock(() => Promise.resolve({
+                        data: {
+                            body_html: '<p>Comment body</p>'
+                        }
+                    })) as any
+                }
+            } as any
         };
         fetcher = new GraphQLGitHubDataFetcher(mockOctokit);
     });

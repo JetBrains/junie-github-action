@@ -2,50 +2,26 @@ import {writeFile, mkdir} from "fs/promises";
 import {join} from "path";
 import {JiraAttachment} from "../context";
 import {getJiraClient} from "../jira/client";
-import {execFile} from "child_process";
-import {promisify} from "util";
 import {fileTypeFromBuffer} from "file-type";
-
-const execFilePromise = promisify(execFile);
 
 const DOWNLOAD_DIR = "/tmp/github-attachments";
 const JIRA_DOWNLOAD_DIR = "/tmp/jira-attachments";
 
-// Export regex patterns for testing
-export const ATTACHMENT_PATTERNS = {
-    imgTag: /src="(https:\/\/github\.com\/user-attachments\/assets\/[^"]+)"/g,
-    markdownImg: /!\[[^\]]*\]\((https:\/\/github\.com\/user-attachments\/assets\/[^)]+)\)/g,
-    file: /\((https:\/\/github\.com\/user-attachments\/files\/[^)]+)\)/g,
-    legacy: /https:\/\/user-images\.githubusercontent\.com\/[^\s)]+/g
-} as const;
-
-async function downloadFile(url: string): Promise<string> {
-    let buffer: Buffer;
-
-    // Use gh CLI for GitHub URLs (it handles authentication automatically via GITHUB_TOKEN)
-    if (url.includes('github.com') || url.includes('githubusercontent.com')) {
-        try {
-            const {stdout} = await execFilePromise('gh', ['api', url], {
-                encoding: 'buffer',
-                maxBuffer: 50 * 1024 * 1024 // 50MB max
-            });
-            buffer = stdout;
-        } catch (error) {
-            throw new Error(`Failed to download ${url} via gh api: ${error}`);
-        }
-    } else {
-        // Fallback to fetch for non-GitHub URLs
-        const response = await fetch(url);
-        if (!response.ok) {
-            throw new Error(`Failed to download ${url}: ${response.status} ${response.statusText}`);
-        }
-        const arrayBuffer = await response.arrayBuffer();
-        buffer = Buffer.from(arrayBuffer);
+/**
+ * Download file from a signed URL (no authentication needed)
+ */
+async function downloadFileFromSignedUrl(signedUrl: string, originalUrl: string): Promise<string> {
+    const response = await fetch(signedUrl);
+    if (!response.ok) {
+        throw new Error(`Failed to download ${originalUrl}: ${response.status} ${response.statusText}`);
     }
+
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
 
     await mkdir(DOWNLOAD_DIR, {recursive: true});
 
-    let filename = url.split('/').pop() || `attachment-${Date.now()}`;
+    let filename = originalUrl.split('/').pop() || `attachment-${Date.now()}`;
 
     // If filename doesn't have extension, try to detect it from file content
     if (!filename.includes('.')) {
@@ -61,73 +37,94 @@ async function downloadFile(url: string): Promise<string> {
     const localPath = join(DOWNLOAD_DIR, filename);
 
     await writeFile(localPath, buffer);
-    console.log(`✓ Downloaded: ${url} -> ${localPath}`);
+    console.log(`✓ Downloaded: ${originalUrl} -> ${localPath}`);
 
     return localPath;
 }
 
 /**
- * Downloads all attachments found in text and replaces URLs with local paths.
- * Handles:
- * - Image tags: src="https://github.com/user-attachments/assets/..."
- * - Markdown images: ![](https://github.com/user-attachments/assets/...)
- * - Markdown files: (https://github.com/user-attachments/files/...)
- * - Legacy images: https://user-images.githubusercontent.com/...
- *
- * @param text - Text containing attachment URLs
+ * Extract signed URLs from HTML and map them to original URLs
  */
-export async function downloadAttachmentsAndRewriteText(text: string): Promise<string> {
+function extractSignedUrlsFromHtml(bodyHtml: string): Map<string, string> {
+    const urlMap = new Map<string, string>();
+
+    // Extract signed URLs from HTML
+    const signedUrlRegex = /https:\/\/private-user-images\.githubusercontent\.com\/[^"'\s]+\?jwt=[^"'\s]+/g;
+    const signedUrls = bodyHtml.match(signedUrlRegex) || [];
+
+    // Extract original URLs from HTML (both in markdown and HTML img tags)
+    const originalUrlRegex = /https:\/\/github\.com\/user-attachments\/(assets|files)\/[^"'\s)]+/g;
+    const originalUrls = bodyHtml.match(originalUrlRegex) || [];
+
+    // Map original URLs to signed URLs (they appear in the same order in HTML)
+    for (let i = 0; i < Math.min(originalUrls.length, signedUrls.length); i++) {
+        const original = originalUrls[i];
+        const signed = signedUrls[i];
+        if (original && signed) {
+            urlMap.set(original, signed);
+        }
+    }
+
+    return urlMap;
+}
+
+/**
+ * Replace attachment URLs in text with local paths
+ */
+function replaceAttachmentUrls(text: string, downloadedUrlsMap: Map<string, string>): string {
     let updatedText = text;
 
-    // Handle HTML image tags with user-attachments URLs
-    const imgMatches = [...text.matchAll(ATTACHMENT_PATTERNS.imgTag)];
-    for (const match of imgMatches) {
-        const url = match[1];
-        try {
-            const localPath = await downloadFile(url);
-            updatedText = updatedText.replace(match[0], `src="${localPath}"`);
-        } catch (error) {
-            console.error(`Failed to download image: ${url}`, error);
-        }
-    }
+    for (const [originalUrl, localPath] of downloadedUrlsMap) {
+        // Handle HTML image tags
+        const imgPattern = new RegExp(`src="${originalUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`, 'g');
+        updatedText = updatedText.replace(imgPattern, `src="${localPath}"`);
 
-    // Handle markdown images: ![alt](url)
-    const mdImgMatches = [...text.matchAll(ATTACHMENT_PATTERNS.markdownImg)];
-    for (const match of mdImgMatches) {
-        const url = match[1];
-        try {
-            const localPath = await downloadFile(url);
-            updatedText = updatedText.replace(match[1], localPath);
-        } catch (error) {
-            console.error(`Failed to download markdown image: ${url}`, error);
-        }
-    }
-
-    // Handle markdown file links: [text](url)
-    const fileMatches = [...text.matchAll(ATTACHMENT_PATTERNS.file)];
-    for (const match of fileMatches) {
-        const url = match[1];
-        try {
-            const localPath = await downloadFile(url);
-            updatedText = updatedText.replace(match[0], `(${localPath})`);
-        } catch (error) {
-            console.error(`Failed to download file: ${url}`, error);
-        }
-    }
-
-    // Handle legacy user-images URLs
-    const legacyMatches = [...text.matchAll(ATTACHMENT_PATTERNS.legacy)];
-    for (const match of legacyMatches) {
-        const url = match[0];
-        try {
-            const localPath = await downloadFile(url);
-            updatedText = updatedText.replace(url, localPath);
-        } catch (error) {
-            console.error(`Failed to download legacy image: ${url}`, error);
-        }
+        // Handle markdown images and file links
+        const mdPattern = new RegExp(originalUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+        updatedText = updatedText.replace(mdPattern, localPath);
     }
 
     return updatedText;
+}
+
+/**
+ * Download attachments from HTML and get a map of original URLs to local paths.
+ *
+ * @param bodyHtml - HTML body from GitHub API (with signed URLs)
+ * @returns Map of original URLs to local file paths
+ */
+export async function downloadAttachmentsFromHtml(bodyHtml: string): Promise<Map<string, string>> {
+    // Extract signed URLs from HTML
+    const signedUrlsMap = extractSignedUrlsFromHtml(bodyHtml);
+
+    if (signedUrlsMap.size === 0) {
+        return new Map();
+    }
+
+    const downloadedUrlsMap = new Map<string, string>();
+
+    // Download all attachments using signed URLs
+    for (const [originalUrl, signedUrl] of signedUrlsMap) {
+        try {
+            const localPath = await downloadFileFromSignedUrl(signedUrl, originalUrl);
+            downloadedUrlsMap.set(originalUrl, localPath);
+        } catch (error) {
+            console.error(`Failed to download ${originalUrl}:`, error);
+        }
+    }
+
+    if (downloadedUrlsMap.size > 0) {
+        console.log(`Downloaded ${downloadedUrlsMap.size} attachment(s)`);
+    }
+
+    return downloadedUrlsMap;
+}
+
+/**
+ * Helper function to replace attachment URLs in text with local paths
+ */
+export function replaceAttachmentsInText(text: string, urlMap: Map<string, string>): string {
+    return replaceAttachmentUrls(text, urlMap);
 }
 
 /**

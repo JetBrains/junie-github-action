@@ -4,10 +4,7 @@ import {
     GraphQLFileNode,
     GraphQLReviewCommentNode,
     GraphQLReviewNode,
-    GraphQLTimelineItemNode,
-    isCrossReferencedEventNode,
-    isIssueCommentNode,
-    isReferencedEventNode
+    GraphQLTimelineItemNode
 } from "../api/queries";
 import {
     isFixCIEvent,
@@ -368,36 +365,14 @@ State: ${issue.state}${bodySection}`
     private formatTimelineItems(timelineNodes: GraphQLTimelineItemNode[]): string {
         const eventTexts: string[] = [];
 
-        for (const node of timelineNodes) {
-            let eventText: string | null = null;
-
-            if (isIssueCommentNode(node)) {
-                const author = node.author?.login;
-                const body = node.body;
-                const createdAt = node.createdAt;
-                eventText = `[${createdAt}] Comment by @${author}:
+        // All timeline nodes are now comments (IssueComment only)
+        for (const comment of timelineNodes) {
+            const author = comment.author?.login;
+            const body = comment.body;
+            const createdAt = comment.createdAt;
+            const eventText = `[${createdAt}] Comment by @${author}:
 ${body}`;
-            } else if (isReferencedEventNode(node)) {
-                const commitId = node.commit?.oid;
-                if (commitId) {
-                    const hash = commitId.substring(0, 7);
-                    const message = node.commit?.message;
-                    const createdAt = node.createdAt;
-                    eventText = `[${createdAt}] Referenced commit ${hash}${message ? `: ${message}` : ''}`;
-                }
-            } else if (isCrossReferencedEventNode(node)) {
-                const source = node.source;
-                if (source) {
-                    const createdAt = node.createdAt;
-                    const isPullRequest = source.__typename === 'PullRequest';
-                    const type = isPullRequest ? 'PR' : 'Issue';
-                    eventText = `[${createdAt}] Cross-referenced from ${type} #${source.number}: ${source.title}`;
-                }
-            }
-
-            if (eventText) {
-                eventTexts.push(eventText);
-            }
+            eventTexts.push(eventText);
         }
 
         return eventTexts.join('\n\n');
