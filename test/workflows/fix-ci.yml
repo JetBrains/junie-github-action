@@ -26,6 +26,7 @@ jobs:
       - uses: JetBrains/junie-github-action@main
         with:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
+          custom_github_token: ${{ secrets.PAT_TOKEN }}
           allowed_mcp_servers: "mcp_github_checks_server"
           use_single_comment: "true"
           create_new_branch_for_pr: "true"
