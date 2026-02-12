@@ -1,8 +1,12 @@
 import {writeFile, mkdir} from "fs/promises";
 import {join} from "path";
-import mime from "mime-types";
 import {JiraAttachment} from "../context";
 import {getJiraClient} from "../jira/client";
+import {execFile} from "child_process";
+import {promisify} from "util";
+import {fileTypeFromBuffer} from "file-type";
+
+const execFilePromise = promisify(execFile);
 
 const DOWNLOAD_DIR = "/tmp/github-attachments";
 const JIRA_DOWNLOAD_DIR = "/tmp/jira-attachments";
@@ -15,33 +19,42 @@ export const ATTACHMENT_PATTERNS = {
     legacy: /https:\/\/user-images\.githubusercontent\.com\/[^\s)]+/g
 } as const;
 
-async function downloadFile(url: string, githubToken?: string): Promise<string> {
-    // Add authentication header for GitHub URLs
-    const headers: Record<string, string> = {};
-    if (githubToken && (url.includes('github.com') || url.includes('githubusercontent.com'))) {
-        headers['Authorization'] = `token ${githubToken}`;
-    }
+async function downloadFile(url: string): Promise<string> {
+    let buffer: Buffer;
 
-    const response = await fetch(url, { headers });
-    if (!response.ok) {
-        throw new Error(`Failed to download ${url}: ${response.status} ${response.statusText}`);
+    // Use gh CLI for GitHub URLs (it handles authentication automatically via GITHUB_TOKEN)
+    if (url.includes('github.com') || url.includes('githubusercontent.com')) {
+        try {
+            const {stdout} = await execFilePromise('gh', ['api', url], {
+                encoding: 'buffer',
+                maxBuffer: 50 * 1024 * 1024 // 50MB max
+            });
+            buffer = stdout;
+        } catch (error) {
+            throw new Error(`Failed to download ${url} via gh api: ${error}`);
+        }
+    } else {
+        // Fallback to fetch for non-GitHub URLs
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Failed to download ${url}: ${response.status} ${response.statusText}`);
+        }
+        const arrayBuffer = await response.arrayBuffer();
+        buffer = Buffer.from(arrayBuffer);
     }
-
-    const arrayBuffer = await response.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
 
     await mkdir(DOWNLOAD_DIR, {recursive: true});
 
     let filename = url.split('/').pop() || `attachment-${Date.now()}`;
 
-    // If filename doesn't have extension, try to get it from Content-Type
+    // If filename doesn't have extension, try to detect it from file content
     if (!filename.includes('.')) {
-        const contentType = response.headers.get('content-type');
-        if (contentType) {
-            const ext = mime.extension(contentType);
-            if (ext) {
-                filename = `${filename}.${ext}`;
-            }
+        const fileType = await fileTypeFromBuffer(buffer);
+        if (fileType) {
+            filename = `${filename}.${fileType.ext}`;
+        } else {
+            // Fallback to .bin if we can't detect the type
+            filename = `${filename}.bin`;
         }
     }
 
@@ -62,9 +75,8 @@ async function downloadFile(url: string, githubToken?: string): Promise<string> 
  * - Legacy images: https://user-images.githubusercontent.com/...
  *
  * @param text - Text containing attachment URLs
- * @param githubToken - GitHub token for authenticating downloads from GitHub
  */
-export async function downloadAttachmentsAndRewriteText(text: string, githubToken?: string): Promise<string> {
+export async function downloadAttachmentsAndRewriteText(text: string): Promise<string> {
     let updatedText = text;
 
     // Handle HTML image tags with user-attachments URLs
@@ -72,7 +84,7 @@ export async function downloadAttachmentsAndRewriteText(text: string, githubToke
     for (const match of imgMatches) {
         const url = match[1];
         try {
-            const localPath = await downloadFile(url, githubToken);
+            const localPath = await downloadFile(url);
             updatedText = updatedText.replace(match[0], `src="${localPath}"`);
         } catch (error) {
             console.error(`Failed to download image: ${url}`, error);
@@ -84,7 +96,7 @@ export async function downloadAttachmentsAndRewriteText(text: string, githubToke
     for (const match of mdImgMatches) {
         const url = match[1];
         try {
-            const localPath = await downloadFile(url, githubToken);
+            const localPath = await downloadFile(url);
             updatedText = updatedText.replace(match[1], localPath);
         } catch (error) {
             console.error(`Failed to download markdown image: ${url}`, error);
@@ -96,7 +108,7 @@ export async function downloadAttachmentsAndRewriteText(text: string, githubToke
     for (const match of fileMatches) {
         const url = match[1];
         try {
-            const localPath = await downloadFile(url, githubToken);
+            const localPath = await downloadFile(url);
             updatedText = updatedText.replace(match[0], `(${localPath})`);
         } catch (error) {
             console.error(`Failed to download file: ${url}`, error);
@@ -108,7 +120,7 @@ export async function downloadAttachmentsAndRewriteText(text: string, githubToke
     for (const match of legacyMatches) {
         const url = match[0];
         try {
-            const localPath = await downloadFile(url, githubToken);
+            const localPath = await downloadFile(url);
             updatedText = updatedText.replace(url, localPath);
         } catch (error) {
             console.error(`Failed to download legacy image: ${url}`, error);

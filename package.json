@@ -13,6 +13,7 @@
     "@modelcontextprotocol/sdk": "^1.25.2",
     "@octokit/rest": "^22.0.1",
     "@octokit/webhooks-types": "^7.6.1",
+    "file-type": "^21.3.0",
     "jira.js": "^5.2.2",
     "marklassian": "^1.1.0",
     "mime-types": "^3.0.2",
