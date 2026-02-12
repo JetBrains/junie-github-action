@@ -1,4 +1,5 @@
 import {
+    isCodeReviewEvent,
     isIssueCommentEvent,
     isIssuesEvent,
     isPullRequestEvent,
@@ -55,6 +56,10 @@ export async function prepareJunieTask(
 
     if (context.inputs.resolveConflicts || isReviewOrCommentHasResolveConflictsTrigger(context)) {
         junieCLITask.mergeTask = {branch: branchInfo.prBaseBranch || branchInfo.baseBranch}
+    } else if (isCodeReviewEvent(context)) {
+        const diffPoint = context.isPR ? String(context.entityNumber) : branchInfo.prBaseBranch || branchInfo.baseBranch;
+        const diffCommand = `gh pr diff ${diffPoint}`;
+        junieCLITask.codeReview = {diffCommand}
     } else {
         const formatter = new NewGitHubPromptFormatter();
         let fetchedData: FetchedData = {};
@@ -85,7 +90,7 @@ export async function prepareJunieTask(
         junieCLITask.task = await getValidatedTextTask(promptText);
     }
 
-    if (!junieCLITask.task && !junieCLITask.mergeTask) {
+    if (!junieCLITask.task && !junieCLITask.mergeTask && !junieCLITask.codeReview) {
         throw new Error("No task was created. Please check your inputs.");
     }
 
