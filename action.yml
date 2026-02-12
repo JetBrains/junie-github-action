@@ -197,16 +197,13 @@ runs:
         echo "Writing Junie output to: ${JUNIE_OUTPUT_FILE}"
         echo "Reading Junie input from: ${JUNIE_INPUT_FILE}"
 
-        # Read JSON from file and pass via JUNIE_TASK environment variable
-        # JUNIE_TASK parses directly as JunieTask which supports codeReview
-        export JUNIE_TASK=$(cat "${JUNIE_INPUT_FILE}")
-        echo "JUNIE_TASK: ${JUNIE_TASK}"
-
+        # Read from file via stdin to avoid ARG_MAX limit for large prompts
         junie --cache-dir="${WORKING_DIR}" \
               --output-format="json" \
+              --input-format="json" \
               --json-output-file="${JUNIE_OUTPUT_FILE}" \
               --auth="${CLI_TOKEN}" \
-              ${JUNIE_FLAGS}
+              ${JUNIE_FLAGS} < "${JUNIE_INPUT_FILE}"
 
         # Export the file path instead of the content
         echo "json_output_file=${JUNIE_OUTPUT_FILE}" >> $GITHUB_OUTPUT
