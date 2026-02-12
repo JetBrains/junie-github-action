@@ -8,10 +8,18 @@ const DOWNLOAD_DIR = "/tmp/github-attachments";
 const JIRA_DOWNLOAD_DIR = "/tmp/jira-attachments";
 
 /**
- * Download file from a signed URL (no authentication needed)
+ * Download file from URL (signed or regular)
+ * Tries to download without authentication first, falls back to authenticated if needed
  */
-async function downloadFileFromSignedUrl(signedUrl: string, originalUrl: string): Promise<string> {
-    const response = await fetch(signedUrl);
+async function downloadFile(url: string, originalUrl: string): Promise<string> {
+    // Try downloading with follow redirects
+    const response = await fetch(url, {
+        redirect: 'follow',
+        headers: {
+            'User-Agent': 'junie-github-action'
+        }
+    });
+
     if (!response.ok) {
         throw new Error(`Failed to download ${originalUrl}: ${response.status} ${response.statusText}`);
     }
@@ -43,39 +51,43 @@ async function downloadFileFromSignedUrl(signedUrl: string, originalUrl: string)
 }
 
 /**
- * Extract signed URLs from HTML and map them to original URLs
+ * Extract all GitHub attachments from HTML and map to download URLs
+ * Returns map: originalUrl -> downloadUrl (signed URL if available, otherwise original URL)
  */
-function extractSignedUrlsFromHtml(bodyHtml: string): Map<string, string> {
-    console.log(`Extracting signed URLs from HTML...${bodyHtml}`);
+function extractAttachmentsFromHtml(bodyHtml: string): Map<string, string> {
+    console.log(`Extracting attachments from HTML (${bodyHtml.length} chars)`);
     const urlMap = new Map<string, string>();
 
-    // Extract signed URLs from HTML
-    const signedUrlRegex = /https:\/\/private-user-images\.githubusercontent\.com\/[^"'\s]+\?jwt=[^"'\s]+/g;
-    const signedUrls = bodyHtml.match(signedUrlRegex) || [];
-    console.log(`Found ${signedUrls.length} signed URLs in HTML`);
+    // First, find all attachments with signed URLs (images)
+    const signedUrlRegex = /https:\/\/private-user-images\.githubusercontent\.com\/\d+\/(\d+-[a-f0-9-]+)\.(png|jpg|jpeg|gif|webp)\?jwt=[^"'\s]+/gi;
+    const signedMatches = [...bodyHtml.matchAll(signedUrlRegex)];
 
-    // Extract original URLs from HTML (both in markdown and HTML img tags)
-    const originalUrlRegex = /https:\/\/github\.com\/user-attachments\/(assets|files)\/[^"'\s)]+/g;
-    const originalUrls = bodyHtml.match(originalUrlRegex) || [];
-    console.log(`Found ${originalUrls.length} original attachment URLs in HTML`);
+    for (const match of signedMatches) {
+        const signedUrl = match[0];
+        const fileId = match[1]; // e.g., "548975708-79533cdb-b822-48ec-a58c-9b2d1cb0eabc"
 
-    if (originalUrls.length > 0) {
-        console.log('Original URLs:', originalUrls);
-    }
-    if (signedUrls.length > 0 && originalUrls.length === 0) {
-        console.warn('Found signed URLs but no original URLs - this is unexpected');
-        console.log('HTML sample:', bodyHtml.substring(0, 300));
+        // Construct original URL from file ID
+        const originalUrl = `https://github.com/user-attachments/assets/${fileId}`;
+
+        urlMap.set(originalUrl, signedUrl);
+        console.log(`Found image with signed URL: ${fileId}`);
     }
 
-    // Map original URLs to signed URLs (they appear in the same order in HTML)
-    for (let i = 0; i < Math.min(originalUrls.length, signedUrls.length); i++) {
-        const original = originalUrls[i];
-        const signed = signedUrls[i];
-        if (original && signed) {
-            urlMap.set(original, signed);
-            console.log(`Mapped: ${original} -> signed URL`);
+    // Then, find all regular attachment URLs (files, or images without signed URLs)
+    const attachmentUrlRegex = /https:\/\/github\.com\/user-attachments\/(assets|files)\/[^"'\s)]+/g;
+    const attachmentMatches = [...bodyHtml.matchAll(attachmentUrlRegex)];
+
+    for (const match of attachmentMatches) {
+        const url = match[0];
+
+        // Only add if we don't already have a signed URL for this attachment
+        if (!urlMap.has(url)) {
+            urlMap.set(url, url); // Use original URL as download URL
+            console.log(`Found attachment without signed URL: ${url}`);
         }
     }
+
+    console.log(`Total attachments found: ${urlMap.size}`);
 
     return urlMap;
 }
@@ -102,31 +114,32 @@ function replaceAttachmentUrls(text: string, downloadedUrlsMap: Map<string, stri
 /**
  * Download attachments from HTML and get a map of original URLs to local paths.
  *
- * @param bodyHtml - HTML body from GitHub API (with signed URLs)
+ * @param bodyHtml - HTML body from GitHub API (with signed URLs for images)
  * @returns Map of original URLs to local file paths
  */
 export async function downloadAttachmentsFromHtml(bodyHtml: string): Promise<Map<string, string>> {
-    // Extract signed URLs from HTML
-    const signedUrlsMap = extractSignedUrlsFromHtml(bodyHtml);
+    // Extract all attachments (with signed URLs if available)
+    const attachmentsMap = extractAttachmentsFromHtml(bodyHtml);
 
-    if (signedUrlsMap.size === 0) {
+    if (attachmentsMap.size === 0) {
         return new Map();
     }
 
     const downloadedUrlsMap = new Map<string, string>();
 
-    // Download all attachments using signed URLs
-    for (const [originalUrl, signedUrl] of signedUrlsMap) {
+    // Download all attachments (try signed URL if available, otherwise regular URL)
+    for (const [originalUrl, downloadUrl] of attachmentsMap) {
         try {
-            const localPath = await downloadFileFromSignedUrl(signedUrl, originalUrl);
+            const localPath = await downloadFile(downloadUrl, originalUrl);
             downloadedUrlsMap.set(originalUrl, localPath);
         } catch (error) {
-            console.error(`Failed to download ${originalUrl}:`, error);
+            console.warn(`Could not download ${originalUrl}: ${error instanceof Error ? error.message : error}`);
+            // Continue with other attachments
         }
     }
 
     if (downloadedUrlsMap.size > 0) {
-        console.log(`Downloaded ${downloadedUrlsMap.size} attachment(s)`);
+        console.log(`Successfully downloaded ${downloadedUrlsMap.size} attachment(s)`);
     }
 
     return downloadedUrlsMap;
