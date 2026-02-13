@@ -34,6 +34,7 @@ A powerful GitHub Action that integrates [Junie](https://www.jetbrains.com/junie
 - **Single Comment Mode**: Update a single comment instead of creating multiple comments for each run (per workflow)
 - **Comprehensive Feedback**: Updates via GitHub comments with links to PRs and commits
 - **Rich Job Summaries**: Beautiful markdown reports in GitHub Actions with execution details
+- **Attachment Support**: Automatically downloads and processes attachments from GitHub issues and PRs
 - **Security-First Design**: Built-in sanitization against prompt injection and automated redaction of sensitive information like GitHub tokens
 - **MCP Extensibility**: Integrate custom Model Context Protocol servers for enhanced capabilities
 - **Runs on Your Infrastructure**: Executes entirely on your GitHub runners
@@ -366,12 +367,14 @@ jobs:
 2. **Validation**: Verifies permissions and checks if the actor is human (when applicable - see Security Considerations)
 3. **Branch Management**: Creates or checks out the appropriate working branch
 4. **Task Preparation**: Converts GitHub context into a Junie-compatible task, applying security sanitization to user-submitted content to prevent prompt injection
-5. **MCP Setup**: Configures enabled MCP servers for enhanced capabilities
+5. **Attachment Processing**: Automatically downloads attachments from issues, PRs, and comments
+   - Downloaded files are made available to Junie for analysis and context
+6. **MCP Setup**: Configures enabled MCP servers for enhanced capabilities
    - **Checks Server**: Analyze CI failures if explicitly enabled
    - **Inline Comment Server**: Automatically enabled for PR code review suggestions
-6. **Junie Execution**: Runs Junie CLI with the prepared task and connected MCP tools
-7. **Result Processing**: Analyzes changes, determines the action (commit, PR, or comment), and sanitizes Junie's output to redact tokens and prevent self-triggering
-8. **Feedback**: Updates GitHub with results, PR links, and commit information
+7. **Junie Execution**: Runs Junie CLI with the prepared task and connected MCP tools
+8. **Result Processing**: Analyzes changes, determines the action (commit, PR, or comment), and sanitizes Junie's output to redact tokens and prevent self-triggering
+9. **Feedback**: Updates GitHub with results, PR links, and commit information
 
 ## Security Considerations
 

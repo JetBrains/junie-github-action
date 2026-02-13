@@ -57,8 +57,8 @@ async function downloadFile(url: string, originalUrl: string): Promise<string> {
 function extractAttachmentsFromHtml(bodyHtml: string): Map<string, string> {
     const urlMap = new Map<string, string>();
 
-    // First, find all attachments with signed URLs (images)
-    const signedUrlRegex = /https:\/\/private-user-images\.githubusercontent\.com\/\d+\/(\d+-[a-f0-9-]+)\.(png|jpg|jpeg|gif|webp)\?jwt=[^"'\s]+/gi;
+    // First, find all attachments with signed URLs
+    const signedUrlRegex = /https:\/\/private-user-images\.githubusercontent\.com\/[^"]+\?jwt=[^"]+/g;
     const signedMatches = [...bodyHtml.matchAll(signedUrlRegex)];
 
     // Then, find all regular attachment URLs (files, or images without signed URLs)
@@ -67,7 +67,16 @@ function extractAttachmentsFromHtml(bodyHtml: string): Map<string, string> {
 
     for (const match of signedMatches) {
         const signedUrl = match[0];
-        const fileId = match[1]; // e.g., "548975708-79533cdb-b822-48ec-a58c-9b2d1cb0eabc"
+
+        // Extract filename from signed URL
+        // Format: https://private-user-images.githubusercontent.com/123456/filename.ext?jwt=...
+        const urlWithoutQuery = signedUrl.split('?')[0];
+        const filename = urlWithoutQuery.split('/').pop();
+
+        if (!filename) continue;
+
+        // Remove file extension to get file ID
+        const fileId = filename.replace(/\.[^.]+$/, '');
 
         // Construct original URL from file ID
         const originalUrl = `https://github.com/user-attachments/assets/${fileId}`;
