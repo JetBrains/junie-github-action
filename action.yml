@@ -172,6 +172,7 @@ runs:
       shell: bash
       id: junie-run
       env:
+        JUNIE_DEBUG_REASONING_SUMMARY: "true"
         JUNIE_GUIDELINES_FILENAME: ${{ inputs.junie_guidelines_filename }}
         CLI_TOKEN: ${{ steps.prepare.outputs.EJ_CLI_TOKEN }}
         JUNIE_INPUT_FILE: ${{ steps.prepare.outputs.JUNIE_INPUT_FILE }}
