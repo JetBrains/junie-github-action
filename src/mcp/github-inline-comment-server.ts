@@ -5,6 +5,7 @@ import {StdioServerTransport} from "@modelcontextprotocol/sdk/server/stdio.js";
 import {z} from "zod";
 import {Octokit} from "@octokit/rest";
 import {GITHUB_API_URL} from "../github/api/config";
+import {readFile} from "fs/promises";
 
 /**
  * GitHub Inline Comment MCP Server
@@ -25,9 +26,11 @@ interface ServerConfig {
 interface InlineCommentParams {
     filePath: string;
     commentBody: string;
+    code_block: string;
+    code_suggestion?: string;  // Optional - if not provided, no suggestion block
+    // Internal fields (set automatically)
     lineNumber?: number;
     startLineNumber?: number;
-    diffSide?: "LEFT" | "RIGHT";
 }
 
 interface CommentResult {
@@ -69,36 +72,94 @@ function loadConfiguration(): ServerConfig {
 }
 
 /**
+ * Reads file content from the local filesystem
+ * Assumes the server is running in the project directory on the correct branch
+ */
+async function fetchFileContent(filePath: string): Promise<string> {
+    try {
+        return await readFile(filePath, "utf-8");
+    } catch (error: any) {
+        throw new Error(`Failed to read file ${filePath}: ${error.message}`);
+    }
+}
+
+/**
+ * Finds line numbers for the given code_block in file content
+ */
+function findLinesForCode(
+    fileContent: string,
+    code_block: string
+): { startLine: number; endLine: number } | null {
+    const fileLines = fileContent.split("\n");
+    const searchLines = code_block.split("\n");
+    const numLines = searchLines.length;
+
+    // Try to find exact match
+    for (let i = 0; i <= fileLines.length - numLines; i++) {
+        let match = true;
+        for (let j = 0; j < numLines; j++) {
+            if (fileLines[i + j] !== searchLines[j]) {
+                match = false;
+                break;
+            }
+        }
+
+        if (match) {
+            return {
+                startLine: i + 1, // 1-based indexing
+                endLine: i + numLines,
+            };
+        }
+    }
+
+    // Try normalized match (trimmed lines)
+    for (let i = 0; i <= fileLines.length - numLines; i++) {
+        let match = true;
+        for (let j = 0; j < numLines; j++) {
+            if (fileLines[i + j].trim() !== searchLines[j].trim()) {
+                match = false;
+                break;
+            }
+        }
+
+        if (match) {
+            return {
+                startLine: i + 1,
+                endLine: i + numLines,
+            };
+        }
+    }
+
+    return null;
+}
+
+/**
  * Validates inline comment parameters
  */
 function validateCommentParams(params: InlineCommentParams): {
     valid: boolean;
     error?: string;
 } {
-    // Check that either lineNumber or both startLineNumber and lineNumber are provided
-    if (!params.lineNumber && !params.startLineNumber) {
+    if (!params.code_block) {
         return {
             valid: false,
-            error: "Must provide either lineNumber (for single-line) or both startLineNumber and lineNumber (for multi-line)",
+            error: "code_block must be provided",
         };
     }
 
-    // If startLineNumber is provided, lineNumber must also be provided and greater
-    if (params.startLineNumber) {
+    if (!params.code_block.trim()) {
+        return {
+            valid: false,
+            error: "code_block cannot be empty",
+        };
+    }
 
-        if (!params.lineNumber) {
-            return {
-                valid: false,
-                error: "lineNumber is required when startLineNumber is specified",
-            };
-        }
-
-        if (params.startLineNumber > params.lineNumber) {
-            return {
-                valid: false,
-                error: `startLineNumber (${params.startLineNumber}) must be less than or equal to lineNumber (${params.lineNumber})`,
-            };
-        }
+    // If code_suggestion is provided, validate it
+    if (params.code_suggestion && !params.code_suggestion.trim()) {
+        return {
+            valid: false,
+            error: "code_suggestion cannot be empty if provided",
+        };
     }
 
     return {valid: true};
@@ -108,15 +169,11 @@ function validateCommentParams(params: InlineCommentParams): {
  * Creates an inline review comment on a PR
  */
 async function createInlineComment(
+    octokit: Octokit,
     config: ServerConfig,
     params: InlineCommentParams
 ): Promise<CommentResult> {
     try {
-        const octokit = new Octokit({
-            auth: config.token,
-            baseUrl: config.apiUrl,
-        });
-
         // Prepare the comment request
         const requestParams: any = {
             owner: config.owner,
@@ -125,16 +182,13 @@ async function createInlineComment(
             body: params.commentBody,
             path: params.filePath,
             commit_id: config.commitSha,
-            side: params.diffSide || "RIGHT",
+            side: "RIGHT",
         };
 
-        // Determine if this is a single-line or multi-line comment
-        const isMultiLine = params.startLineNumber !== undefined;
-
-        if (isMultiLine) {
+        if (params.startLineNumber) {
             // Multi-line comment
             requestParams.start_line = params.startLineNumber;
-            requestParams.start_side = params.diffSide || "RIGHT";
+            requestParams.start_side = "RIGHT";
             requestParams.line = params.lineNumber;
         } else {
             // Single-line comment
@@ -179,6 +233,11 @@ async function createInlineComment(
 async function initializeServer() {
     const config = loadConfiguration();
 
+    const octokit = new Octokit({
+        auth: config.token,
+        baseUrl: config.apiUrl,
+    });
+
     const server = new McpServer({
         name: "Junie GitHub Inline Comment Server",
         version: "1.0.0",
@@ -188,92 +247,134 @@ async function initializeServer() {
     server.registerTool(
         "post_inline_review_comment",
         {
-            description: "Posts an inline code review comment on a specific file and line in the pull request. Supports GitHub's suggestion syntax for proposing code changes.",
+            description: "Posts an inline code review comment on a pull request. Can optionally include a code suggestion. Automatically finds the code location by searching for code_block.",
             inputSchema: {
                 filePath: z
                     .string()
                     .describe("The file path to comment on (e.g., 'src/utils/helper.ts')"),
+                code_block: z
+                    .string()
+                    .describe("The exact code block to comment on (can be multiple lines). Must match existing code in the file exactly. IMPORTANT: Include enough context to make this block unique in the file. If the code appears multiple times (e.g., closing braces, common patterns), the first match will be used. Add surrounding lines to ensure uniqueness."),
                 commentBody: z
                     .string()
-                    .describe("The comment text (supports markdown and GitHub code suggestion blocks). For code suggestions, use: ```suggestion\\nreplacement code\\n``` explanation of this suggestion. IMPORTANT: The suggestion block will REPLACE the ENTIRE line range (single line or startLineNumber to lineNumber). Ensure the replacement is syntactically complete and valid. Also if you provide a suggestion block explain the reason"),
-                lineNumber: z
-                    .number()
-                    .int()
-                    .positive()
+                    .describe("The comment text. If code_suggestion is provided, this will be displayed after the suggestion block as explanation."),
+                code_suggestion: z
+                    .string()
                     .optional()
-                    .describe("Line number for single-line comments, or end line for multi-line comments (required if startLineNumber is not provided)"),
-                startLineNumber: z
-                    .number()
-                    .int()
-                    .positive()
-                    .optional()
-                    .describe("Start line for multi-line comments (use with lineNumber parameter for the end line)"),
-                diffSide: z
-                    .enum(["LEFT", "RIGHT"])
-                    .optional()
-                    .describe("Side of the diff to comment on: LEFT (old code) or RIGHT (new code). Defaults to RIGHT."),
+                    .describe("Optional: The suggested replacement code (can be multiple lines). If provided, creates a GitHub suggestion block that will REPLACE the ENTIRE code_block range. IMPORTANT: Ensure the replacement is syntactically complete, properly indented, and includes all necessary code. Partial line replacements will break the code. If omitted, creates a regular comment without suggestion."),
             },
         },
-        async ({filePath, commentBody, lineNumber, startLineNumber, diffSide}) => {
-            const params: InlineCommentParams = {
-                filePath,
-                commentBody,
-                lineNumber,
-                startLineNumber,
-                diffSide,
-            };
+        async ({filePath, code_block, code_suggestion, commentBody}) => {
+            try {
+                const params: InlineCommentParams = {
+                    filePath,
+                    code_block,
+                    code_suggestion,
+                    commentBody,
+                };
 
-            // Validate parameters
-            const validation = validateCommentParams(params);
-            if (!validation.valid) {
+                // Validate parameters
+                const validation = validateCommentParams(params);
+                if (!validation.valid) {
+                    return {
+                        content: [
+                            {
+                                type: "text" as const,
+                                text: JSON.stringify({
+                                    status: "error",
+                                    error: validation.error,
+                                }, null, 2),
+                            },
+                        ],
+                        isError: true,
+                    };
+                }
+
+                // Read file content from local filesystem
+                const fileContent = await fetchFileContent(filePath);
+
+                // Find line numbers for code_block
+                const lines = findLinesForCode(fileContent, code_block);
+                if (!lines) {
+                    return {
+                        content: [
+                            {
+                                type: "text" as const,
+                                text: JSON.stringify({
+                                    status: "error",
+                                    error: "Could not find code_block in the file",
+                                    details: "Make sure code_block exactly matches the code in the file. Check for whitespace and line breaks.",
+                                }, null, 2),
+                            },
+                        ],
+                        isError: true,
+                    };
+                }
+
+                // Generate comment body
+                let fullCommentBody: string;
+                if (code_suggestion) {
+                    // With suggestion block
+                    const suggestionBlock = `\`\`\`suggestion\n${code_suggestion}\n\`\`\``;
+                    fullCommentBody = `${suggestionBlock}\n\n${commentBody}`;
+                } else {
+                    // Without suggestion - just the comment
+                    fullCommentBody = commentBody;
+                }
+
+                // Set line numbers for GitHub API
+                params.startLineNumber = lines.startLine < lines.endLine ? lines.startLine : undefined;
+                params.lineNumber = lines.endLine;
+                params.commentBody = fullCommentBody;
+
+                // Create the comment
+                const result = await createInlineComment(octokit, config, params);
+
+                if (result.success) {
+                    const responseData = {
+                        status: "success",
+                        comment_id: result.commentId,
+                        html_url: result.url,
+                        file: params.filePath,
+                        line_range: params.startLineNumber
+                            ? `${params.startLineNumber}-${params.lineNumber}`
+                            : `${params.lineNumber}`,
+                    };
+
+                    return {
+                        content: [
+                            {
+                                type: "text" as const,
+                                text: JSON.stringify(responseData, null, 2),
+                            },
+                        ],
+                    };
+                } else {
+                    const errorData = {
+                        status: "error",
+                        error: result.error,
+                        details: result.details,
+                    };
+
+                    return {
+                        content: [
+                            {
+                                type: "text" as const,
+                                text: JSON.stringify(errorData, null, 2),
+                            },
+                        ],
+                        isError: true,
+                    };
+                }
+            } catch (error: any) {
                 return {
                     content: [
                         {
                             type: "text" as const,
                             text: JSON.stringify({
                                 status: "error",
-                                error: validation.error,
+                                error: error.message || "Unknown error occurred",
                             }, null, 2),
-                        },
-                    ],
-                    isError: true,
-                };
-            }
-
-            // Create the comment
-            const result = await createInlineComment(config, params);
-
-            if (result.success) {
-                const responseData = {
-                    status: "success",
-                    comment_id: result.commentId,
-                    html_url: result.url,
-                    file: params.filePath,
-                    line_range: params.startLineNumber
-                        ? `${params.startLineNumber}-${params.lineNumber}`
-                        : `${params.lineNumber}`,
-                };
-
-                return {
-                    content: [
-                        {
-                            type: "text" as const,
-                            text: JSON.stringify(responseData, null, 2),
-                        },
-                    ],
-                };
-            } else {
-                const errorData = {
-                    status: "error",
-                    error: result.error,
-                    details: result.details,
-                };
-
-                return {
-                    content: [
-                        {
-                            type: "text" as const,
-                            text: JSON.stringify(errorData, null, 2),
                         },
                     ],
                     isError: true,
