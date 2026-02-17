@@ -155,7 +155,7 @@ function validateCommentParams(params: InlineCommentParams): {
     }
 
     // If code_suggestion is provided, validate it
-    if (params.code_suggestion !== undefined && !params.code_suggestion.trim()) {
+    if (params.code_suggestion && !params.code_suggestion.trim()) {
         return {
             valid: false,
             error: "code_suggestion cannot be empty if provided",
@@ -185,10 +185,7 @@ async function createInlineComment(
             side: "RIGHT",
         };
 
-        // Determine if this is a single-line or multi-line comment
-        const isMultiLine = params.startLineNumber !== undefined;
-
-        if (isMultiLine) {
+        if (params.startLineNumber) {
             // Multi-line comment
             requestParams.start_line = params.startLineNumber;
             requestParams.start_side = "RIGHT";
@@ -257,14 +254,14 @@ async function initializeServer() {
                     .describe("The file path to comment on (e.g., 'src/utils/helper.ts')"),
                 code_block: z
                     .string()
-                    .describe("The exact code block to comment on (can be multiple lines). Must match existing code in the file exactly. This is used to find the line numbers."),
+                    .describe("The exact code block to comment on (can be multiple lines). Must match existing code in the file exactly. IMPORTANT: Include enough context to make this block unique in the file. If the code appears multiple times (e.g., closing braces, common patterns), the first match will be used. Add surrounding lines to ensure uniqueness."),
                 commentBody: z
                     .string()
                     .describe("The comment text. If code_suggestion is provided, this will be displayed after the suggestion block as explanation."),
                 code_suggestion: z
                     .string()
                     .optional()
-                    .describe("Optional: The suggested replacement code (can be multiple lines). If provided, creates a GitHub suggestion block. If omitted, creates a regular comment without suggestion."),
+                    .describe("Optional: The suggested replacement code (can be multiple lines). If provided, creates a GitHub suggestion block that will REPLACE the ENTIRE code_block range. IMPORTANT: Ensure the replacement is syntactically complete, properly indented, and includes all necessary code. Partial line replacements will break the code. If omitted, creates a regular comment without suggestion."),
             },
         },
         async ({filePath, code_block, code_suggestion, commentBody}) => {
