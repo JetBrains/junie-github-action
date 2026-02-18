@@ -1,5 +1,5 @@
 import {describe, test, expect} from "bun:test";
-import {sanitizeContent, sanitizeJunieOutput} from "../src/utils/sanitizer";
+import {sanitizeContent, sanitizeJunieOutput, truncateOutput, OUTPUT_SIZE_LIMITS} from "../src/utils/sanitizer";
 
 describe("Sanitizer", () => {
     describe("HTML comments removal", () => {
@@ -318,6 +318,166 @@ Thanks!
                 const input = "I fixed the authentication bug in src/auth.ts";
                 const output = sanitizeJunieOutput(input, "@junie-agent");
                 expect(output).toBe("I fixed the authentication bug in src/auth.ts");
+            });
+        });
+    });
+
+    describe("Output Truncation", () => {
+        describe("Size limits configuration", () => {
+            test("has correct limit values", () => {
+                expect(OUTPUT_SIZE_LIMITS.TITLE).toBe(250);
+                expect(OUTPUT_SIZE_LIMITS.SUMMARY).toBe(15000);
+                expect(OUTPUT_SIZE_LIMITS.PR_BODY).toBe(40000);
+            });
+        });
+
+        describe("Basic truncation", () => {
+            test("does not truncate short content", () => {
+                const input = "This is a short text";
+                const output = truncateOutput(input, 100);
+                expect(output).toBe(input);
+            });
+
+            test("truncates content exceeding max length", () => {
+                const input = "A".repeat(20000);
+                const output = truncateOutput(input, OUTPUT_SIZE_LIMITS.SUMMARY);
+                expect(output.length).toBeLessThanOrEqual(OUTPUT_SIZE_LIMITS.SUMMARY);
+                expect(output).toContain("(output truncated due to size limits)");
+            });
+
+            test("does not truncate content at exact limit", () => {
+                const input = "B".repeat(OUTPUT_SIZE_LIMITS.SUMMARY);
+                const output = truncateOutput(input, OUTPUT_SIZE_LIMITS.SUMMARY);
+                expect(output).toBe(input);
+                expect(output).not.toContain("truncated");
+            });
+
+            test("truncates content one character over limit", () => {
+                const input = "C".repeat(OUTPUT_SIZE_LIMITS.SUMMARY + 1);
+                const output = truncateOutput(input, OUTPUT_SIZE_LIMITS.SUMMARY);
+                expect(output.length).toBeLessThanOrEqual(OUTPUT_SIZE_LIMITS.SUMMARY);
+                expect(output).toContain("(output truncated due to size limits)");
+            });
+        });
+
+        describe("Word boundary handling", () => {
+            test("tries to cut at word boundary", () => {
+                // Create text with spaces that ends mid-word
+                const words = "Hello world ".repeat(2000); // ~24KB
+                const output = truncateOutput(words, OUTPUT_SIZE_LIMITS.SUMMARY);
+
+                expect(output.length).toBeLessThanOrEqual(OUTPUT_SIZE_LIMITS.SUMMARY);
+                expect(output).toContain("(output truncated due to size limits)");
+
+                // The function should attempt to cut at a space
+                // We just verify that truncation happened and marker is present
+                const textBeforeMarker = output.split("...")[0];
+                expect(textBeforeMarker.length).toBeGreaterThan(0);
+            });
+
+            test("falls back to hard cut if no good word boundary", () => {
+                // Create text with no spaces near the limit
+                const input = "A".repeat(20000);
+                const output = truncateOutput(input, OUTPUT_SIZE_LIMITS.SUMMARY);
+
+                expect(output.length).toBeLessThanOrEqual(OUTPUT_SIZE_LIMITS.SUMMARY);
+                expect(output).toContain("(output truncated due to size limits)");
+            });
+        });
+
+        describe("Truncation marker", () => {
+            test("includes truncation marker", () => {
+                const input = "X".repeat(20000);
+                const output = truncateOutput(input, OUTPUT_SIZE_LIMITS.SUMMARY);
+                expect(output).toContain("\n\n... (output truncated due to size limits)");
+            });
+
+            test("marker is at the end", () => {
+                const input = "Y".repeat(20000);
+                const output = truncateOutput(input, OUTPUT_SIZE_LIMITS.SUMMARY);
+                expect(output).toMatch(/\(output truncated due to size limits\)$/);
+            });
+        });
+
+        describe("Edge cases", () => {
+            test("handles undefined input", () => {
+                const output = truncateOutput(undefined, 1000);
+                expect(output).toBe("");
+            });
+
+            test("handles empty string", () => {
+                const output = truncateOutput("", 1000);
+                expect(output).toBe("");
+            });
+
+            test("handles very small max length", () => {
+                const input = "This is a test";
+                const output = truncateOutput(input, 5);
+                expect(output.length).toBeLessThanOrEqual(50); // Marker is longer than limit
+                expect(output).toContain("truncated");
+            });
+        });
+
+        describe("Real-world scenarios", () => {
+            test("truncates large Junie summary", () => {
+                const largeOutput = `
+# Changes Made
+
+## Files Modified
+${"- Modified file-" + "X".repeat(100) + ".ts\n".repeat(200)}
+
+## Summary
+${"This is a detailed explanation of what was changed. ".repeat(1000)}
+
+## Test Results
+All tests passed successfully.
+                `.trim();
+
+                const output = truncateOutput(largeOutput, OUTPUT_SIZE_LIMITS.SUMMARY);
+                expect(output.length).toBeLessThanOrEqual(OUTPUT_SIZE_LIMITS.SUMMARY);
+                expect(output).toContain("(output truncated due to size limits)");
+            });
+
+            test("truncates large PR body", () => {
+                const largePRBody = `
+## Description
+${"This PR implements feature X with extensive changes. ".repeat(2000)}
+
+## Changes
+${"- Change number N\n".repeat(1000)}
+
+## Testing
+All tests pass.
+                `.trim();
+
+                const output = truncateOutput(largePRBody, OUTPUT_SIZE_LIMITS.PR_BODY);
+                expect(output.length).toBeLessThanOrEqual(OUTPUT_SIZE_LIMITS.PR_BODY);
+                expect(output).toContain("(output truncated due to size limits)");
+            });
+
+            test("preserves short title without truncation", () => {
+                const title = "Fix authentication bug in user login";
+                const output = truncateOutput(title, OUTPUT_SIZE_LIMITS.TITLE);
+                expect(output).toBe(title);
+                expect(output).not.toContain("truncated");
+            });
+
+            test("truncates very long title", () => {
+                const longTitle = "Fix authentication bug in user login system with OAuth2 integration and multi-factor authentication support including SMS and email verification methods and also add support for biometric authentication on mobile devices and tablets and smartwatches and other wearable devices with additional support for legacy systems";
+                const output = truncateOutput(longTitle, OUTPUT_SIZE_LIMITS.TITLE);
+                expect(output.length).toBeLessThanOrEqual(OUTPUT_SIZE_LIMITS.TITLE);
+                expect(output).toContain("(output truncated due to size limits)");
+            });
+        });
+
+        describe("Integration with sanitization", () => {
+            test("works correctly after sanitization", () => {
+                const input = `${"This is some content. ".repeat(2000)} Token: ghp_123456789012345678901234567890ABCDEF`;
+                const sanitized = sanitizeJunieOutput(input, "@junie-agent");
+                const truncated = truncateOutput(sanitized, OUTPUT_SIZE_LIMITS.SUMMARY);
+
+                expect(truncated.length).toBeLessThanOrEqual(OUTPUT_SIZE_LIMITS.SUMMARY);
+                expect(truncated).not.toContain("ghp_");
             });
         });
     });

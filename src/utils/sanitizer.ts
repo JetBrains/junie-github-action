@@ -12,6 +12,13 @@
 
 import {escapeRegExp} from "../github/validation/trigger";
 
+// Size limits for outputs to prevent ARG_MAX issues (2MB Linux limit)
+export const OUTPUT_SIZE_LIMITS = {
+    TITLE: 250,        // Title should be short
+    SUMMARY: 15000,    // ~15KB for detailed summary
+    PR_BODY: 40000,    // ~40KB for PR description
+} as const;
+
 /**
  * Remove HTML comments that could contain hidden instructions
  * Pattern: <!-- anything -->
@@ -166,6 +173,33 @@ export function sanitizeContent(content: string | null | undefined): string {
     sanitized = redactGitHubTokens(sanitized);
 
     return sanitized;
+}
+
+/**
+ * Truncates content to specified max length to prevent exceeding ARG_MAX limits
+ * Tries to cut at word boundary for better readability
+ *
+ * @param content - Content to truncate
+ * @param maxLength - Maximum allowed length in characters
+ * @returns Truncated content with indicator if truncated
+ */
+export function truncateOutput(content: string | undefined, maxLength: number): string {
+    if (!content) {
+        return "";
+    }
+
+    if (content.length <= maxLength) {
+        return content;
+    }
+
+    const truncationMarker = "\n\n... (output truncated due to size limits)";
+    const targetLength = maxLength - truncationMarker.length;
+
+    // Try to cut at last word boundary (space, newline, punctuation)
+    const cutPoint = content.lastIndexOf(" ", targetLength);
+    const actualCutPoint = cutPoint > targetLength * 0.9 ? cutPoint : targetLength;
+
+    return content.substring(0, actualCutPoint).trimEnd() + truncationMarker;
 }
 
 /**

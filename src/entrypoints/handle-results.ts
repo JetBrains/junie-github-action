@@ -5,7 +5,7 @@ import * as core from "@actions/core";
 import {ENV_VARS, OUTPUT_VARS} from "../constants/environment";
 import {handleStepError} from "../utils/error-handler";
 import {isReviewOrCommentHasResolveConflictsTrigger} from "../github/validation/trigger";
-import {sanitizeJunieOutput} from "../utils/sanitizer";
+import {sanitizeJunieOutput, truncateOutput, OUTPUT_SIZE_LIMITS} from "../utils/sanitizer";
 import * as fs from "node:fs";
 
 export enum ActionType {
@@ -80,8 +80,10 @@ export async function handleResults() {
         const rawTitle = junieJsonOutput.taskName || (isResolveConflict ? `Resolve conflicts for ${context.entityNumber} PR` : 'Junie finished task successfully')
         const rawBody = junieJsonOutput.result
         const triggerPhrase = context.inputs.triggerPhrase
-        const title = sanitizeJunieOutput(rawTitle, triggerPhrase)
-        const body = sanitizeJunieOutput(rawBody, triggerPhrase)
+
+        // Sanitize and truncate to prevent ARG_MAX issues
+        const title = truncateOutput(sanitizeJunieOutput(rawTitle, triggerPhrase), OUTPUT_SIZE_LIMITS.TITLE)
+        const body = truncateOutput(sanitizeJunieOutput(rawBody, triggerPhrase), OUTPUT_SIZE_LIMITS.SUMMARY)
         let issueId
         if (isTriggeredByUserInteraction(context)) {
             issueId = context.entityNumber
@@ -100,13 +102,15 @@ export async function handleResults() {
         // Export outputs based on action type
         switch (actionToDo) {
             case ActionType.CREATE_PR:
+                const prTitle = PR_TITLE_TEMPLATE(title);
+                const prBody = truncateOutput(PR_BODY_TEMPLATE(body, issueId), OUTPUT_SIZE_LIMITS.PR_BODY);
                 exportResultsOutputs(
                     title,
                     body,
                     durationMs,
                     commitMessage,
-                    PR_TITLE_TEMPLATE(title),
-                    PR_BODY_TEMPLATE(body, issueId));
+                    prTitle,
+                    prBody);
                 break;
             case ActionType.COMMIT_CHANGES:
             case ActionType.PUSH:
