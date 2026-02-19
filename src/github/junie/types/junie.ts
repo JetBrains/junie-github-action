@@ -21,5 +21,5 @@ export interface CodeReview {
 export interface CliInput {
     task?: string;
     mergeTask?: MergeTask;
-    codeReview?: CodeReview;
+    codeReviewTask?: CodeReview;
 }

@@ -53,7 +53,7 @@ export async function prepareJunieTask(
     } else if (isCodeReviewEvent(context)) {
         const diffPoint = context.isPR ? String(context.entityNumber) : branchInfo.prBaseBranch || branchInfo.baseBranch;
         const diffCommand = `gh pr diff ${diffPoint}`;
-        junieCLITask.codeReview = {diffCommand}
+        junieCLITask.codeReviewTask = {diffCommand}
     } else {
         const formatter = new NewGitHubPromptFormatter();
         let fetchedData: FetchedData = {};
@@ -85,7 +85,7 @@ export async function prepareJunieTask(
         junieCLITask.task = promptText;
     }
 
-    if (!junieCLITask.task && !junieCLITask.mergeTask && !junieCLITask.codeReview) {
+    if (!junieCLITask.task && !junieCLITask.mergeTask && !junieCLITask.codeReviewTask) {
         throw new Error("No task was created. Please check your inputs.");
     }
 
