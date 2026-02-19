@@ -143,7 +143,7 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 | Input | Description | Default |
 |-------|-------------|---------|
 | `prompt` | Custom instructions for Junie. Special values: `code-review` for structured PR reviews, `fix-ci` for CI failure analysis, `minor-fix` for quick PR adjustments. See [Cookbook](COOKBOOK.md) for examples. | - |
-| `junie_version` | Junie CLI version to install | `744.2` |
+| `junie_version` | Junie CLI version to install | `802.5.0` |
 | `model` | Model to use for the primary agent. Available: `gpt-5-2025-08-07`, `gpt-5.2-codex`, `gpt-5.2-2025-12-11`, `claude-sonnet-4-5-20250929`, `claude-opus-4-5-20251101`, `gemini-3-pro-preview`, `gemini-3-flash-preview`, `grok-4-1-fast-reasoning` | - |
 | `junie_work_dir` | Working directory for Junie files | `/tmp/junie-work` |
 | `junie_guidelines_filename` | Filename of the guidelines file (should be in `<project-root>/.junie` dir) | `guidelines.md` |
