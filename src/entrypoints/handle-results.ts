@@ -148,7 +148,7 @@ async function getActionToDo(context: JunieExecutionContext): Promise<ActionType
         action = ActionType.NOTHING;
     } else if (isCodeReviewEvent(context)) {
         console.log('Code review event detected - will only write comment');
-        action = ActionType.CREATE_PR;
+        action = ActionType.WRITE_COMMENT;
     } else if ((hasChangedFiles || hasUnpushedCommits) && isNewBranch) {
         console.log('Changes or unpushed commits found in new branch - will create PR');
         action = ActionType.CREATE_PR;
