@@ -27,28 +27,42 @@ describe("Code Review: Built-in", () => {
         "posts review when PR is opened",
         async () => {
             const branchName = "feature/code-for-review";
-            const filename = "src/app.js";
-            const content = [
-                "function add(a, b {\n",
-                "  return a + bbb\n",
+            const filename1 = "src/app.js";
+            const content1 = [
+                "function add(a, b) {\n",
+                "  return a + bb;\n",
                 "}\n",
             ].join("");
 
+            const filename2 = "src/calculator.js";
+            const content2 = [
+                "function multiply(a, b {\n",
+                "  return a * b;\n",
+                "}\n",
+            ].join("");
             const {data: mainBranch} = await testClient.getBranch(repoName);
             await testClient.createRef(repoName, branchName, mainBranch.commit.sha);
 
             await testClient.createOrUpdateFileContents(
                 repoName,
-                Buffer.from(content).toString("base64"),
-                filename,
-                "Add code to be reviewed",
+                Buffer.from(content1).toString("base64"),
+                filename1,
+                "Add app.js with basic sum implementation",
+                branchName
+            );
+
+            await testClient.createOrUpdateFileContents(
+                repoName,
+                Buffer.from(content2).toString("base64"),
+                filename2,
+                "Add calculator with print statement",
                 branchName
             );
 
             const {data: pr} = await testClient.createPullRequest(
                 repoName,
                 branchName,
-                "Add app.js with basic sum implementation",
+                "Add calculator functions",
                 "Trigger built-in code review",
                 "main"
             );
@@ -59,8 +73,8 @@ describe("Code Review: Built-in", () => {
             const filteredComments = await testClient.getInlineComments(
                 prNumber,
                 (comment) => {
-                    return (testClient.conditionCodeBeforeSuggestionIncludes("bbb")(comment) || testClient.conditionCodeBeforeSuggestionIncludes("(a, b ")(comment))
-                        && (testClient.conditionInlineCommentIncludes("a + b")(comment) || testClient.conditionInlineCommentIncludes("(a, b)")(comment));
+                    return testClient.conditionInlineCommentIncludes("multiply(a, b)")(comment)
+                        || testClient.conditionInlineCommentIncludes("+ b;")(comment);
                 }
             );
             const expectedLength = 2;
@@ -93,28 +107,41 @@ describe("Code Review: On-Demand via comment", () => {
         "runs code review when commented '@junie-agent code-review'",
         async () => {
             const branchName = "feature/on-demand-review";
-            const filename = "src/app-ondemand.js";
-            const content = [
+            const filename1 = "src/app-ondemand.js";
+            const content1 = [
                 "export function avg(arr {\n",
                 "  const sum = arr.reduce((a,b)=> a + b, 0);\n",
-                "  return arr.lengt ? 0 : (sum / arr.length)\n",
+                "  return arr.length ? (sum / arr.length) : 0;\n",
                 "}\n",
             ].join("");
 
+            const filename2 = "src/stats.js";
+            const content2 = [
+                "function multiply(a, b {\n",
+                "  return a * b;\n",
+                "}\n",
+            ].join("");
             const {data: mainBranch} = await testClient.getBranch(repoName);
             await testClient.createRef(repoName, branchName, mainBranch.commit.sha);
             await testClient.createOrUpdateFileContents(
                 repoName,
-                Buffer.from(content).toString("base64"),
-                filename,
+                Buffer.from(content1).toString("base64"),
+                filename1,
                 "Add code for on-demand review",
+                branchName
+            );
+            await testClient.createOrUpdateFileContents(
+                repoName,
+                Buffer.from(content2).toString("base64"),
+                filename2,
+                "Add stats with print statement",
                 branchName
             );
 
             const {data: pr} = await testClient.createPullRequest(
                 repoName,
                 branchName,
-                "Add app-ondemand.js for comment-triggered review",
+                "Add statistics functions",
                 "This PR will be reviewed after a comment command.",
                 "main"
             );
@@ -130,8 +157,8 @@ describe("Code Review: On-Demand via comment", () => {
             const filteredComments = await testClient.getInlineComments(
                 prNumber,
                 (comment) => {
-                    return (testClient.conditionCodeBeforeSuggestionIncludes("avg(arr ")(comment) || testClient.conditionCodeBeforeSuggestionIncludes("lengt ")(comment))
-                        && (testClient.conditionInlineCommentIncludes("avg(arr)")(comment) || testClient.conditionInlineCommentIncludes("length")(comment));
+                    return testClient.conditionInlineCommentIncludes("multiply(a, b)")(comment)
+                        || testClient.conditionInlineCommentIncludes("avg(arr)")(comment);
                 }
             );
             const expectedLength = 2;

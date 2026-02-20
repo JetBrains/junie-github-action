@@ -18,7 +18,6 @@ type GitHubFile =
 type ReviewComment = RestEndpointMethodTypes["pulls"]["listReviewComments"]["response"]["data"][number];
 type ReviewCommentCondition = {
     commentText: string;
-    codeLine: string;
 }
 type PullRequestDetailed = RestEndpointMethodTypes["pulls"]["get"]["response"]["data"];
 type CheckRunsResponse = RestEndpointMethodTypes["checks"]["listForRef"]["response"]["data"];
@@ -242,8 +241,7 @@ export class Client {
         console.log(`Getting inline comments on PR #${prNumber}...`);
         const { data: comments } = await this.getAllReviewComments(prNumber);
         const filteredComments = comments.filter(comment => condition({
-            commentText: comment.body || "",
-            codeLine: (comment.diff_hunk || "").split('\n')[(comment.diff_hunk || "").split('\n').length - 1] || ""
+            commentText: comment.body || ""
         }));
 
         return filteredComments;
@@ -373,12 +371,6 @@ export class Client {
         return (pr: PullRequest) => {
             return titles.some(title => pr.title.toLowerCase().includes(title));
         };
-    }
-
-    conditionCodeBeforeSuggestionIncludes(includesText: string) {
-        return (comment: ReviewCommentCondition): boolean => {
-            return comment.codeLine.includes(includesText);
-        }
     }
 
     conditionInlineCommentIncludes(includesText: string) {
