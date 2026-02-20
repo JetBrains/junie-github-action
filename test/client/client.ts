@@ -77,11 +77,21 @@ export class Client {
         const workflowPath = path.join(process.cwd(), workflowFilePathInTestDirectory);
         let workflowContent = fs.readFileSync(workflowPath, "utf-8");
         const currentBranch = process.env.CURRENT_BRANCH || "main";
+        const junieVersion = process.env.JUNIE_VERSION || "";
 
         workflowContent = workflowContent.replace(/@main/g, `@${currentBranch}`);
 
         if (modifications) {
             workflowContent = modifications(workflowContent);
+        }
+
+        if (junieVersion != ""){
+            const withSectionRegex = /(uses:\s+JetBrains\/junie-github-action[^\n]*\n\s+with:\n(?:\s+\w+:.*\n)*\s+)(\w+:.*)/g;
+
+            workflowContent = workflowContent.replace(
+                withSectionRegex,
+                `$1$2\n              junie_version: "${junieVersion}"`
+            );
         }
 
         await this.createOrUpdateFileContents(
