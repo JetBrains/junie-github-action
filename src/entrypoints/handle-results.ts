@@ -127,15 +127,6 @@ export async function handleResults() {
 }
 
 async function getActionToDo(context: JunieExecutionContext): Promise<ActionType> {
-    if (context.inputs.silentMode) {
-        console.log('Silent mode enabled - no git operations will be performed');
-        return ActionType.NOTHING;
-    }
-    // Code review tasks should only post comments, not create commits/PRs
-    if (isCodeReviewEvent(context)) {
-        console.log('Code review event detected - will only write comment');
-        return ActionType.WRITE_COMMENT;
-    }
     const isNewBranch = process.env[OUTPUT_VARS.IS_NEW_BRANCH] === 'true';
     const workingBranch = process.env[OUTPUT_VARS.WORKING_BRANCH]!;
     const baseBranch = process.env[OUTPUT_VARS.BASE_BRANCH]!;
@@ -152,7 +143,13 @@ async function getActionToDo(context: JunieExecutionContext): Promise<ActionType
     console.log(`Working branch: ${workingBranch}`);
 
     let action: ActionType
-    if ((hasChangedFiles || hasUnpushedCommits) && isNewBranch) {
+    if (context.inputs.silentMode) {
+        console.log('Silent mode enabled - no git operations will be performed');
+        action = ActionType.NOTHING;
+    } else if (isCodeReviewEvent(context)) {
+        console.log('Code review event detected - will only write comment');
+        action = ActionType.CREATE_PR;
+    } else if ((hasChangedFiles || hasUnpushedCommits) && isNewBranch) {
         console.log('Changes or unpushed commits found in new branch - will create PR');
         action = ActionType.CREATE_PR;
     } else if (hasChangedFiles && !isNewBranch) {
