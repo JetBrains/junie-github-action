@@ -355,7 +355,8 @@ export class Client {
         content: string,
         path: string,
         message: string,
-        branch: string = "main"
+        branch: string = "main",
+        sha?: string
     ) {
         return this.octokit.repos.createOrUpdateFileContents({
             owner: this.org,
@@ -363,7 +364,8 @@ export class Client {
             path: path,
             message: message,
             content: content,
-            branch: branch
+            branch: branch,
+            sha: sha
         });
     }
 
