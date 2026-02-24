@@ -48,7 +48,7 @@ inputs:
   junie_version:
     description: "Version of Junie to use"
     required: false
-    default: "802.5.0"
+    default: "862.1.0"
   model:
     description: "Model to use for the primary agent"
     required: false

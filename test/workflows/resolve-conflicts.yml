@@ -1,0 +1,35 @@
+name: Resolve Conflicts
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action name'
+        required: true
+        default: "resolve-conflicts"
+      prNumber:
+        description: "PR number"
+        required: true
+
+jobs:
+  check-conflicts:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Junie
+        id: junie
+        uses: JetBrains/junie-github-action@main
+        with:
+          junie_api_key: ${{ secrets.JUNIE_API_KEY }}
+          resolve_conflicts: true
