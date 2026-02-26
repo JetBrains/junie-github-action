@@ -25,7 +25,6 @@ jobs:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
           allowed_mcp_servers: mcp_github_checks_server
           use_single_comment: true
-          model: "claude-sonnet-4-5-20250929"
           prompt: |
             CI workflow "${{ github.event.workflow_run.name }}" failed on branch ${{ github.event.workflow_run.head_branch }}.
 

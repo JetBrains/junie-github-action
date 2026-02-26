@@ -30,7 +30,6 @@ jobs:
           custom_github_token: ${{ steps.app-token.outputs.token }}
           use_single_comment: true
           create_new_branch_for_pr: true
-          model: "claude-sonnet-4-5-20250929"
           prompt: |
             Review pr diff and update documentation to match code changes.
 

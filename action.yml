@@ -48,7 +48,7 @@ inputs:
   junie_version:
     description: "Version of Junie to use"
     required: false
-    default: "744.2"
+    default: "802.5.0"
   model:
     description: "Model to use for the primary agent"
     required: false
@@ -131,6 +131,46 @@ runs:
       run: |
         cd ${GITHUB_ACTION_PATH}
         bun install
+
+    - name: Update GitHub CLI
+      shell: bash
+      run: |
+        set +e  # Don't fail on errors
+
+        echo "Current gh version: $(gh --version 2>/dev/null || echo 'not found')"
+
+        # Detect OS
+        OS="${RUNNER_OS}"
+        echo "Detected OS: $OS"
+
+        # Set download URL based on OS
+        if [ "$OS" = "Linux" ]; then
+          echo "Updating gh CLI for Linux..."
+          # Get latest release URL from GitHub API
+          LATEST_URL=$(curl -s https://api.github.com/repos/cli/cli/releases/latest | grep "browser_download_url.*linux_amd64.tar.gz" | grep -v "\.deb\|\.rpm" | cut -d '"' -f 4 | head -n1)
+          if [ -n "$LATEST_URL" ]; then
+            wget -q "$LATEST_URL" -O gh.tar.gz 2>/dev/null
+            if [ $? -eq 0 ]; then
+              tar -xzf gh.tar.gz 2>/dev/null
+              sudo mv gh_*/bin/gh /usr/local/bin/ 2>/dev/null || mv gh_*/bin/gh /usr/local/bin/ 2>/dev/null
+              rm -rf gh.tar.gz gh_* 2>/dev/null
+            else
+              echo "⚠️ Failed to download gh CLI, continuing with existing version"
+            fi
+          else
+            echo "⚠️ Failed to get latest gh CLI URL, continuing with existing version"
+          fi
+        elif [ "$OS" = "macOS" ]; then
+          echo "Updating gh CLI for macOS..."
+          brew upgrade gh 2>/dev/null || brew install gh 2>/dev/null || echo "⚠️ Failed to upgrade gh via brew"
+        elif [ "$OS" = "Windows" ]; then
+          echo "Updating gh CLI for Windows..."
+          choco upgrade gh -y 2>/dev/null || choco install gh -y 2>/dev/null || echo "⚠️ Failed to upgrade gh via choco"
+        fi
+
+        echo "Final gh version: $(gh --version 2>/dev/null || echo 'not found')"
+
+        set -e  # Re-enable exit on error
 
     - name: Prepare action
       id: prepare
