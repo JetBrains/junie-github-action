@@ -21,8 +21,7 @@ describe("Fix Failing CI: built-in", () => {
     });
 
     test("Built-in Fix CI analysis", async () => {
-        await testFixCi(repoName, async () => {
-        })
+        await testFixCi(repoName)
         testPassed = true;
     }, 900000);
 });
@@ -57,7 +56,7 @@ describe("Fix Failing CI: via comment", () => {
     }, 900000);
 });
 
-async function testFixCi(repoName: string, fixCiInComment: (prNumber: number) => Promise<void>) {
+async function testFixCi(repoName: string, fixCiInComment: (prNumber: number) => Promise<void> = async () => {}) {
     const branchName = "feature/failing-ci";
     const {data: mainBranch} = await testClient.getBranch(repoName);
     await testClient.createRef(repoName, branchName, mainBranch.commit.sha);
