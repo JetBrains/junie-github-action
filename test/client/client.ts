@@ -84,12 +84,14 @@ export class Client {
             workflowContent = modifications(workflowContent);
         }
 
-        if (junieVersion != ""){
-            const withSectionRegex = /(uses:\s+JetBrains\/junie-github-action[^\n]*\n\s+with:\n(?:\s+\w+:.*\n)*\s+)(\w+:.*)/g;
+        if (junieVersion != "") {
+            const withSectionRegex = /(uses:\s+JetBrains\/junie-github-action[^\n]*\n)(\s+)(with:\n(?:\2\s+\w+:.*\n)*)/;
 
             workflowContent = workflowContent.replace(
                 withSectionRegex,
-                `$1$2\n              junie_version: "${junieVersion}"`
+                (match, uses, indent, withSection) => {
+                    return `${uses}${indent}${withSection}${indent}  junie_version: "${junieVersion}"\n`;
+                }
             );
         }
 
