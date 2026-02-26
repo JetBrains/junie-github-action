@@ -134,14 +134,14 @@ async function testMergeConflictResolve(repoName: string, setupWorkflows: (repoN
 
     const titleKeywords = ["resolve", "conflict", "merge"];
     const foundPR = await testClient.waitForPR(testClient.conditionIncludes(titleKeywords));
-
+    console.log(`PR resolved: #${foundPR.number}`);
     await testClient.checkPRFiles(foundPR, testClient.conditionPRFilesInclude({
-        [filename]: ["2 * (a + b)", "a + b;"]
+        [filename]: ["2 * (a + b)", "a + b;", "2 * c"]
     }, "OR"));
 
     const foundPR2 = await testClient.waitForPR(testClient.conditionIncludes(titleKeywords) && testClient.conditionPRNumberNotEquals(foundPR.number));
-
+    console.log(`Another PR resolved: #${foundPR2.number}`);
     await testClient.checkPRFiles(foundPR2, testClient.conditionPRFilesInclude({
-        [filename]: ["2 * (a + b)", "a + b;"]
+        [filename]: ["2 * (a + b)", "a + b;", "2 * c"]
     }, "OR"));
 };
