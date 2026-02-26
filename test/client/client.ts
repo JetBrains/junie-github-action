@@ -111,7 +111,7 @@ export class Client {
     }
 
     async getAllReposForOrg(){
-        return this.octokit.repos.listForOrg({
+        return this.octokit.paginate(this.octokit.repos.listForOrg, {
             org: this.org,
             per_page: 100,
             sort: "updated",
