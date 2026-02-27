@@ -76,11 +76,23 @@ export class Client {
         const workflowPath = path.join(process.cwd(), workflowFilePathInTestDirectory);
         let workflowContent = fs.readFileSync(workflowPath, "utf-8");
         const currentBranch = process.env.CURRENT_BRANCH || "main";
+        const junieVersion = process.env.JUNIE_VERSION || "";
 
         workflowContent = workflowContent.replace(/@main/g, `@${currentBranch}`);
 
         if (modifications) {
             workflowContent = modifications(workflowContent);
+        }
+
+        if (junieVersion != "") {
+            const withSectionRegex = /(uses:\s+JetBrains\/junie-github-action[^\n]*\n)(\s+)(with:\n(?:\2\s+\w+:.*\n)*)/;
+
+            workflowContent = workflowContent.replace(
+                withSectionRegex,
+                (match, uses, indent, withSection) => {
+                    return `${uses}${indent}${withSection}${indent}  junie_version: "${junieVersion}"\n`;
+                }
+            );
         }
 
         await this.createOrUpdateFileContents(
@@ -99,7 +111,7 @@ export class Client {
     }
 
     async getAllReposForOrg(){
-        return this.octokit.repos.listForOrg({
+        return this.octokit.paginate(this.octokit.repos.listForOrg, {
             org: this.org,
             per_page: 100,
             sort: "updated",
