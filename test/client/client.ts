@@ -323,13 +323,6 @@ export class Client {
         }
     }
 
-    conditionPRNumberNotEquals(prNumber: number) {
-        console.log(`Checking PR number is ${prNumber}`);
-        return async (pr: PullRequest): Promise<boolean> => {
-            return pr.number != prNumber;
-        }
-    }
-
     conditionPRFilesCountIncrease(filesCount: number) {
         return async (files: GitHubFile[]): Promise<boolean> => {
             return files.length > filesCount;
@@ -367,6 +360,49 @@ export class Client {
             repo: this.currentRepo,
             issue_number: issueOrPRNumber,
         });
+    }
+
+    async checkPRHasNoConflicts(prNumber: number): Promise<boolean> {
+        const pr = await this.getPullRequest(prNumber);
+
+        if (pr.mergeable === null) {
+            console.log(`⚠️ GitHub hasn't calculated mergeable status yet for PR #${prNumber}`);
+            return true;
+        }
+
+        const hasNoConflicts = pr.mergeable === true && pr.mergeable_state !== 'dirty';
+        console.log(`PR #${prNumber} conflicts check: mergeable=${pr.mergeable}, state=${pr.mergeable_state}, hasNoConflicts=${hasNoConflicts}`);
+
+        return hasNoConflicts;
+    }
+
+    async waitForConflict(prNumber: number): Promise<void> {
+        console.log(`Waiting for PR #${prNumber} to have merge conflicts...`);
+        await startPoll(
+            `PR #${prNumber} didn't get merge conflicts`,
+            {},
+            async () => {
+                const pr = await this.getPullRequest(prNumber);
+
+                if (pr.mergeable === null) {
+                    console.log(`GitHub still calculating mergeable status for PR #${prNumber}...`);
+                    return false;
+                }
+
+                if (pr.mergeable === false) {
+                    console.log(`✓ PR #${prNumber} has merge conflicts (mergeable: false)`);
+                    return true;
+                }
+
+                if (pr.mergeable_state === 'dirty') {
+                    console.log(`✓ PR #${prNumber} has conflicts (mergeable_state: dirty)`);
+                    return true;
+                }
+
+                console.log(`PR #${prNumber} still has no conflicts (mergeable: ${pr.mergeable}, state: ${pr.mergeable_state}), waiting...`);
+                return false;
+            }
+        );
     }
 
     async createOrUpdateFileContents(

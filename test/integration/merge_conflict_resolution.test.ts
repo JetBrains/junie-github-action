@@ -1,4 +1,4 @@
-import {describe, test, beforeAll, afterAll} from "bun:test";
+import {describe, test, beforeAll, afterAll, expect} from "bun:test";
 import {INIT_COMMENT_BODY, SUCCESS_FEEDBACK_COMMENT} from "../../src/constants/github";
 import {testClient} from "../client/client";
 
@@ -122,7 +122,10 @@ async function testMergeConflictResolve(repoName: string, setupWorkflows: (repoN
         filename,
         "Update version in main", "main", initialFile.data.content!.sha
     );
-    await new Promise(resolve => setTimeout(resolve, 6000));
+
+    console.log(`Waiting for GitHub to detect conflict in PR #${prNumber}`);
+    await testClient.waitForConflict(prNumber);
+    console.log(`Conflict detected in PR #${prNumber}`);
 
     await resolveConflictInComment(prNumber)
 
@@ -138,10 +141,6 @@ async function testMergeConflictResolve(repoName: string, setupWorkflows: (repoN
     await testClient.checkPRFiles(foundPR, testClient.conditionPRFilesInclude({
         [filename]: ["2 * (a + b)", "a + b;", "2 * c"]
     }, "OR"));
-
-    const foundPR2 = await testClient.waitForPR(testClient.conditionIncludes(titleKeywords) && testClient.conditionPRNumberNotEquals(foundPR.number));
-    console.log(`Another PR resolved: #${foundPR2.number}`);
-    await testClient.checkPRFiles(foundPR2, testClient.conditionPRFilesInclude({
-        [filename]: ["2 * (a + b)", "a + b;", "2 * c"]
-    }, "OR"));
+    const hasNoConflicts = await testClient.checkPRHasNoConflicts(foundPR.number);
+    expect(hasNoConflicts, "PR should not have conflicts").toBe(true);
 };
