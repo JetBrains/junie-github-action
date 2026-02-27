@@ -207,9 +207,9 @@ runs:
       shell: bash
       run: |
         if [ "${{ inputs.junie_version }}" == "latest" ]; then
-          curl -fsSL https://junie.jetbrains.com/install.sh | bash
+          curl -fsSL https://junie.jetbrains.com/install-nightly.sh | bash
         else
-          curl -fsSL https://junie.jetbrains.com/install.sh | JUNIE_VERSION=${{ inputs.junie_version }} bash
+          curl -fsSL https://junie.jetbrains.com/install-eap.sh | JUNIE_VERSION=${{ inputs.junie_version }} bash
         fi
 
     - name: Run Junie
