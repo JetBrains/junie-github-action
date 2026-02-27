@@ -205,12 +205,7 @@ runs:
     - name: Install Junie
       if: steps.prepare.outputs.SHOULD_SKIP != 'true'
       shell: bash
-      run: |
-        if [ "${{ inputs.junie_version }}" == "latest" ]; then
-          curl -fsSL https://junie.jetbrains.com/install-nightly.sh | bash
-        else
-          curl -fsSL https://junie.jetbrains.com/install.sh | JUNIE_VERSION=${{ inputs.junie_version }} bash
-        fi
+      run: npm install -g @jetbrains/junie-cli@${{ inputs.junie_version }}
 
     - name: Run Junie
       if: steps.prepare.outputs.SHOULD_SKIP != 'true'
