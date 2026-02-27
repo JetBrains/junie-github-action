@@ -22,15 +22,14 @@ type ReviewCommentCondition = {
 type PullRequestDetailed = RestEndpointMethodTypes["pulls"]["get"]["response"]["data"];
 type CheckRunsResponse = RestEndpointMethodTypes["checks"]["listForRef"]["response"]["data"];
 
-export const TEST_WORKFLOW_FILE_PATHS = {
-    workflowFilePathInTestDirectory: "test/workflows/junie.yml",
-    workflowFilePathInRepo: ".github/workflows/junie.yml"
-};
-
 export class Client {
     private octokit: Octokit;
     public readonly org: string;
     public currentRepo: string = "";
+    public TEST_WORKFLOW_FILE_PATHS = {
+        workflowFilePathInTestDirectory: "test/workflows/junie.yml",
+        workflowFilePathInRepo: ".github/workflows/junie.yml"
+    };
 
     constructor() {
         this.octokit = new Octokit({ auth: e2eConfig.githubToken });
@@ -69,9 +68,10 @@ export class Client {
 
     async setupWorkflow(
         repoName: string,
-        workflowFilePathInRepo: string = TEST_WORKFLOW_FILE_PATHS.workflowFilePathInRepo,
-        workflowFilePathInTestDirectory: string = TEST_WORKFLOW_FILE_PATHS.workflowFilePathInTestDirectory,
-        modifications?: (content: string) => string
+        workflowFilePathInRepo: string = this.TEST_WORKFLOW_FILE_PATHS.workflowFilePathInRepo,
+        workflowFilePathInTestDirectory: string = this.TEST_WORKFLOW_FILE_PATHS.workflowFilePathInTestDirectory,
+        modifications?: (content: string) => string,
+        branch: string = "main"
     ): Promise<void> {
         const workflowPath = path.join(process.cwd(), workflowFilePathInTestDirectory);
         let workflowContent = fs.readFileSync(workflowPath, "utf-8");
@@ -87,7 +87,8 @@ export class Client {
             repoName,
             Buffer.from(workflowContent).toString("base64"),
             workflowFilePathInRepo,
-            "Add Junie workflow"
+            "Add Junie workflow",
+            branch
         );
 
         await new Promise(resolve => setTimeout(resolve, 6000));
@@ -281,7 +282,7 @@ export class Client {
         return condition(files, pr);
     }
 
-    conditionPRFilesInclude(fileContentChecks: { [filename: string]: string }) {
+    conditionPRFilesInclude(fileContentChecks: { [filename: string]: string | string[] }, matchMode: 'AND' | 'OR' = 'AND') {
         return async (files: GitHubFile[], pr: PullRequest) => {
             for (const [filename, expectedSnippet] of Object.entries(fileContentChecks)) {
                 const file = files.find(f => f.filename.includes(filename));
@@ -294,9 +295,20 @@ export class Client {
 
                 if ("content" in contentData && typeof contentData.content === "string") {
                     const decodedContent = Buffer.from(contentData.content, "base64").toString("utf-8");
-                    if (!decodedContent.includes(expectedSnippet)) {
-                        console.log(`Content of ${file.filename} doesn't match expected snippet.`);
-                        return false;
+                    const snippets = Array.isArray(expectedSnippet) ? expectedSnippet : [expectedSnippet];
+
+                    if (matchMode === 'AND') {
+                        const allMatch = snippets.every(snippet => decodedContent.includes(snippet));
+                        if (!allMatch) {
+                            console.log(`Content of ${file.filename} doesn't match all expected snippets (AND mode).`);
+                            return false;
+                        }
+                    } else {
+                        const anyMatch = snippets.some(snippet => decodedContent.includes(snippet));
+                        if (!anyMatch) {
+                            console.log(`Content of ${file.filename} doesn't match any expected snippet (OR mode).`);
+                            return false;
+                        }
                     }
                 }
             }
@@ -307,7 +319,7 @@ export class Client {
     conditionPRNumberEquals(prNumber: number) {
         console.log(`Checking PR number is ${prNumber}`);
         return async (pr: PullRequest): Promise<boolean> => {
-            return pr.number === prNumber;
+            return pr.number == prNumber;
         }
     }
 
@@ -350,12 +362,56 @@ export class Client {
         });
     }
 
+    async checkPRHasNoConflicts(prNumber: number): Promise<boolean> {
+        const pr = await this.getPullRequest(prNumber);
+
+        if (pr.mergeable === null) {
+            console.log(`⚠️ GitHub hasn't calculated mergeable status yet for PR #${prNumber}`);
+            return true;
+        }
+
+        const hasNoConflicts = pr.mergeable === true && pr.mergeable_state !== 'dirty';
+        console.log(`PR #${prNumber} conflicts check: mergeable=${pr.mergeable}, state=${pr.mergeable_state}, hasNoConflicts=${hasNoConflicts}`);
+
+        return hasNoConflicts;
+    }
+
+    async waitForConflict(prNumber: number): Promise<void> {
+        console.log(`Waiting for PR #${prNumber} to have merge conflicts...`);
+        await startPoll(
+            `PR #${prNumber} didn't get merge conflicts`,
+            {},
+            async () => {
+                const pr = await this.getPullRequest(prNumber);
+
+                if (pr.mergeable === null) {
+                    console.log(`GitHub still calculating mergeable status for PR #${prNumber}...`);
+                    return false;
+                }
+
+                if (pr.mergeable === false) {
+                    console.log(`✓ PR #${prNumber} has merge conflicts (mergeable: false)`);
+                    return true;
+                }
+
+                if (pr.mergeable_state === 'dirty') {
+                    console.log(`✓ PR #${prNumber} has conflicts (mergeable_state: dirty)`);
+                    return true;
+                }
+
+                console.log(`PR #${prNumber} still has no conflicts (mergeable: ${pr.mergeable}, state: ${pr.mergeable_state}), waiting...`);
+                return false;
+            }
+        );
+    }
+
     async createOrUpdateFileContents(
         repoName: string,
         content: string,
         path: string,
         message: string,
-        branch: string = "main"
+        branch: string = "main",
+        sha?: string
     ) {
         return this.octokit.repos.createOrUpdateFileContents({
             owner: this.org,
@@ -363,7 +419,8 @@ export class Client {
             path: path,
             message: message,
             content: content,
-            branch: branch
+            branch: branch,
+            sha: sha
         });
     }
 
