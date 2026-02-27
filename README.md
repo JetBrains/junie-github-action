@@ -148,13 +148,13 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 | `model` | Model to use for the primary agent. Available: `claude-sonnet-4-6`, `claude-opus-4-6`, `gpt-5-2025-08-07`, `gpt-5.2-codex`, `gpt-5.2-2025-12-11`, `gemini-3-pro-preview`, `gemini-3-flash-preview`, `grok-4-1-fast-reasoning`, `claude-opus-4-5-20251101` | - |
 | `junie_work_dir` | Working directory for Junie files | `/tmp/junie-work` |
 | `junie_guidelines_filename` | Filename of the guidelines file (should be in `<project-root>/.junie` dir) | `guidelines.md` |
-| `allowed_mcp_servers` | Comma-separated list of MCP servers to use (e.g., `mcp_github_checks_server`). Note: inline comment server is automatically enabled for PRs. | - |
+| `allowed_mcp_servers` | Comma-separated list of MCP servers to use (e.g., `mcp_github_checks_server`). Note: inline comment server is automatically enabled for PRs, and checks server for `fix-ci`. | - |
 
 **Inline Arguments**: You can pass custom Junie CLI arguments directly in comments, issues, or custom prompts using `junie-args:` syntax. These arguments take priority over workflow inputs.
 
 ```markdown
 @junie-agent fix the bug
-junie-args: --model=claude-opus-4-5
+junie-args: --model=claude-opus-4-5-20251101
 ```
 
 **Available MCP Servers**:
@@ -170,7 +170,7 @@ junie-args: --model=claude-opus-4-5
     model: "claude-opus-4-5-20251101"  # Optional: specify which model to use
 ```
 
-**Note**: The `mcp_github_inline_comment_server` is automatically enabled for `pull_request` events - no manual configuration needed.
+**Note**: The `mcp_github_inline_comment_server` is automatically enabled for pull requests, and the `mcp_github_checks_server` is automatically enabled for the `fix-ci` action - no manual configuration needed.
 
 #### Advanced Features
 

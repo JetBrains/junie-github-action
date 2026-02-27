@@ -62,7 +62,7 @@ inputs:
     required: false
     default: "guidelines.md"
   allowed_mcp_servers:
-    description: "Comma-separated list of github MCP servers to use. Allowed server names: mcp_github_checks_server, mcp_github_inline_comment_server. Note: inline comment server is automatically enabled for pull requests."
+    description: "Comma-separated list of github MCP servers to use. Allowed server names: mcp_github_checks_server, mcp_github_inline_comment_server. Note: inline comment server is automatically enabled for pull requests, and checks server for fix-ci."
     required: false
 
   # Jira integration configuration (for workflow_dispatch events)
