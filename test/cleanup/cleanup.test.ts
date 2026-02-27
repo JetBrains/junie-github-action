@@ -7,8 +7,7 @@ describe("Cleanup Test Repositories", () => {
 
         console.log(`Fetching repositories from organization: ${org}`);
 
-        const { data: repos } = await testClient.getAllReposForOrg()
-
+        const repos = await testClient.getAllReposForOrg()
         const oneWeekAgo = new Date();
         oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
 
@@ -27,7 +26,7 @@ describe("Cleanup Test Repositories", () => {
         for (const repo of oldTestRepos) {
             try {
                 console.log(`Deleting repository: ${repo.name} (updated: ${repo.updated_at})`);
-                testClient.deleteRepository(repo.name);
+                await testClient.deleteRepository(repo.name);
                 console.log(`Deleted: ${repo.name}`);
             } catch (error) {
                 console.error(`Failed to delete ${repo.name}:`, error);

@@ -1,0 +1,57 @@
+name: Daily Integration Tests (Latest Junie)
+
+on:
+  schedule:
+    - cron: '0 1 * * *'
+  workflow_dispatch:
+
+jobs:
+  integration-tests-latest:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Run Integration Tests with Latest Junie
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          TEST_ORG: melotria
+          CURRENT_BRANCH: ${{ github.head_ref || github.ref_name }}
+          JUNIE_VERSION: latest
+        run: |
+          mkdir -p test-results
+          
+          exit_code=0
+          for test_file in test/integration/*.test.ts; do
+            echo "Starting $test_file with latest Junie version"
+            bun test "$test_file" &
+          done
+          
+          for job in $(jobs -p); do
+            wait $job || exit_code=$?
+          done
+          
+          echo "All tests completed"
+          exit $exit_code
+
+      - name: Upload Test Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-report-latest-junie
+          if-no-files-found: ignore
+          path: ./test-results/
+          retention-days: 7
