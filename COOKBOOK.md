@@ -161,7 +161,7 @@ jobs:
           use_single_comment: "true"
           prompt: |
             Your task is to:
-            1. Get the Pull Request diff using `gh pr diff ${{ github.event.pull_request.head.ref }}`
+            1. Get the Pull Request diff using `git diff origin/${{ github.event.pull_request.base.ref }}...`
             2. Review this diff according to the criteria below
             3. Output summary following the template below using `submit` action
 
@@ -205,7 +205,7 @@ jobs:
             ## Additional instructions
             - Strictly follow the plan above (`Your task is to:` section)
             - You are not expected to explore the repo. Do review solely based on the downloaded diff
-            - You are not expected to run any code or any commands except `gh pr diff`
+            - You are not expected to run any code or any commands except `git diff`
 ```
 
 </details>
@@ -284,7 +284,7 @@ jobs:
             - If nothing to update, don't make changes
 
             Procedure:
-            Use gh pr diff ${{ github.event.pull_request.head.ref }} to get a diff of the PR.
+            Use git diff origin/${{ github.event.pull_request.base.ref }}... to get a diff of the PR.
 ```
 
 </details>
@@ -523,7 +523,7 @@ jobs:
             No secrets detected in this commit.
 
             Procedure:
-            Use gh pr diff ${{ github.event.pull_request.head.ref }} to get a diff of the PR. 
+            Use git diff origin/${{ github.event.pull_request.base.ref }}... to get a diff of the PR.
 
             Only provide feedback without modifying files.
 

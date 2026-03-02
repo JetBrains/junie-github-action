@@ -47,7 +47,7 @@ export const DEFAULT_TRIGGER_PHRASE = "@junie-agent";
 // ============================================================================
 
 export function createCodeReviewPrompt(diffPoint: string): string {
-    const diffCommand = `gh pr diff ${diffPoint}`
+    const diffCommand = `git diff origin/${diffPoint}...`
     return `
 Your task is to:
 1. Read the Pull Request diff by using \`${diffCommand} | grep \"^diff --git\" \`. Do not write the diff to file.
@@ -96,7 +96,7 @@ Additional instructions:
 }
 
 export function createFixCIFailuresPrompt(diffPoint: string): string {
-    const diffCommand = `gh pr diff ${diffPoint}`
+    const diffCommand = `git diff origin/${diffPoint}...`
     return `
 Your task is to analyze CI failures and fix them. Follow these steps:
 
@@ -178,7 +178,7 @@ IMPORTANT: Do NOT commit or push changes. The system will handle all git operati
 }
 
 export function createMinorFixPrompt(diffPoint: string, userRequest?: string): string {
-    const diffCommand = `gh pr diff ${diffPoint}`
+    const diffCommand = `git diff origin/${diffPoint}...`
     const userRequestSection = userRequest 
         ? `\n### User Request\nThe user has specifically requested: "${userRequest}"\nFocus on addressing this request while following all the guidelines below.\n`
         : '';

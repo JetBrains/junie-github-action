@@ -134,18 +134,15 @@ ${actorInfo ? actorInfo : ""}
         const isMinorFix = isMinorFixEvent(context)
 
         if (issue && isCodeReview) {
-            const branchName = branchInfo.prBaseBranch || branchInfo.baseBranch;
-            const diffPoint = context.isPR ? String(context.entityNumber) : branchName;
+            const diffPoint = branchInfo.prBaseBranch || branchInfo.baseBranch;
             console.log(`Using CODE REVIEW prompt for diffPoint: ${diffPoint}`);
             return createCodeReviewPrompt(diffPoint);
         } else if (isFixCI) {
-            const branchName = branchInfo.prBaseBranch || branchInfo.baseBranch;
-            const diffPoint = context.isPR && context.entityNumber ? String(context.entityNumber) : branchName;
+            const diffPoint = branchInfo.prBaseBranch || branchInfo.baseBranch;
             console.log(`Using FIX-CI prompt for diffPoint: ${diffPoint}`);
             return createFixCIFailuresPrompt(diffPoint);
         } else if (isMinorFix) {
-            const branchName = branchInfo.prBaseBranch || branchInfo.baseBranch;
-            const diffPoint = context.isPR && context.entityNumber ? String(context.entityNumber) : branchName;
+            const diffPoint = branchInfo.prBaseBranch || branchInfo.baseBranch;
             // Extract user request from comment (text after "minor-fix")
             const userRequest = this.extractMinorFixRequest(context);
             console.log(`Using MINOR-FIX prompt for diffPoint: ${diffPoint}, userRequest: ${userRequest || '(none)'}`);
