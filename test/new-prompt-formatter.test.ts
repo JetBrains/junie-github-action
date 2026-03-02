@@ -237,6 +237,7 @@ describe("NewGitHubPromptFormatter", () => {
                             id: "1",
                             databaseId: 1,
                             body: "Test comment",
+                            bodyHTML: "<p>Test comment</p>",
                             author: {login: "commenter"},
                             createdAt: "2024-01-03T00:00:00Z",
                             lastEditedAt: null,
@@ -267,6 +268,7 @@ describe("NewGitHubPromptFormatter", () => {
                             databaseId: 1,
                             author: {login: "reviewer"},
                             body: "Looks good!",
+                            bodyHTML: "<p>Looks good!</p>",
                             state: "APPROVED",
                             submittedAt: "2024-01-03T00:00:00Z",
                             lastEditedAt: null,
@@ -384,6 +386,7 @@ describe("NewGitHubPromptFormatter", () => {
                             databaseId: 1,
                             author: {login: "reviewer"},
                             body: "Some review comments",
+                            bodyHTML: "<p>Some review comments</p>",
                             state: "COMMENTED",
                             submittedAt: "2024-01-03T00:00:00Z",
                             lastEditedAt: null,
@@ -394,6 +397,7 @@ describe("NewGitHubPromptFormatter", () => {
                                         id: "comment1",
                                         databaseId: 1,
                                         body: "This needs improvement",
+                                        bodyHTML: "<p>This needs improvement</p>",
                                         path: "src/file.ts",
                                         position: 10,
                                         diffHunk: "@@ -1,3 +1,5 @@\n function test() {\n-  return 1;\n+  return 2;\n }",
@@ -407,6 +411,7 @@ describe("NewGitHubPromptFormatter", () => {
                                         id: "comment2",
                                         databaseId: 2,
                                         body: "I agree, let me explain why",
+                                        bodyHTML: "<p>I agree, let me explain why</p>",
                                         path: "src/file.ts",
                                         position: 10,
                                         diffHunk: "@@ -1,3 +1,5 @@\n function test() {\n-  return 1;\n+  return 2;\n }",
@@ -420,6 +425,7 @@ describe("NewGitHubPromptFormatter", () => {
                                         id: "comment3",
                                         databaseId: 3,
                                         body: "@junie-agent why did you decide this approach?",
+                                        bodyHTML: "<p>@junie-agent why did you decide this approach?</p>",
                                         path: "src/file.ts",
                                         position: 10,
                                         diffHunk: "@@ -1,3 +1,5 @@\n function test() {\n-  return 1;\n+  return 2;\n }",
@@ -473,6 +479,7 @@ describe("NewGitHubPromptFormatter", () => {
                             databaseId: 1,
                             author: {login: "reviewer"},
                             body: "Review with multiple threads",
+                            bodyHTML: "<p>Review with multiple threads</p>",
                             state: "COMMENTED",
                             submittedAt: "2024-01-03T00:00:00Z",
                             lastEditedAt: null,
@@ -484,6 +491,7 @@ describe("NewGitHubPromptFormatter", () => {
                                         id: "thread1-comment1",
                                         databaseId: 1,
                                         body: "First thread root comment",
+                                        bodyHTML: "<p>First thread root comment</p>",
                                         path: "src/file1.ts",
                                         position: 5,
                                         diffHunk: "@@ -1,1 +1,1 @@",
@@ -497,6 +505,7 @@ describe("NewGitHubPromptFormatter", () => {
                                         id: "thread1-comment2",
                                         databaseId: 2,
                                         body: "Reply to first thread",
+                                        bodyHTML: "<p>Reply to first thread</p>",
                                         path: "src/file1.ts",
                                         position: 5,
                                         diffHunk: "@@ -1,1 +1,1 @@",
@@ -511,6 +520,7 @@ describe("NewGitHubPromptFormatter", () => {
                                         id: "thread2-comment1",
                                         databaseId: 3,
                                         body: "Second thread root comment",
+                                        bodyHTML: "<p>Second thread root comment</p>",
                                         path: "src/file2.ts",
                                         position: 10,
                                         diffHunk: "@@ -2,2 +2,2 @@",
@@ -656,7 +666,7 @@ junie-args: --other="value"` }
             const result = await formatter.generatePrompt(context, fetchedData, createMockBranchInfo(), false);
 
             expect(result.customJunieArgs).toContain('--model="gpt-5.2-codex"');
-            expect(result.prompt).toContain("Read the Pull Request diff");
+            expect(result.prompt).toContain("code-review");
         });
 
         test("preserves junie-args when fix-ci is detected", async () => {
@@ -675,7 +685,7 @@ junie-args: --other="value"` }
             const context = createMockContext({
                 isPR: false,
                 entityNumber: 1,
-                inputs: { ...createMockContext().inputs, prompt: "code-review" }
+                inputs: { ...createMockContext().inputs, prompt: "fix-ci" }
             });
             const branchInfo = createMockBranchInfo();
             branchInfo.prBaseBranch = undefined;
@@ -739,19 +749,29 @@ junie-args: --model="gpt-4" --timeout=30 --model="claude-opus-4-5"`,
                         nodes: [
                             {
                                 __typename: "IssueComment",
+                                id: "comment1",
+                                databaseId: 1,
                                 author: { login: "someuser" },
                                 body: "Some comment with junie-args: --model=\"should-not-extract\"",
-                                createdAt: "2024-01-01T00:00:00Z"
+                                bodyHTML: "<p>Some comment</p>",
+                                createdAt: "2024-01-01T00:00:00Z",
+                                lastEditedAt: null,
+                                url: "https://github.com/test/test/pull/1#issuecomment-1"
                             }
                         ]
                     },
                     reviews: {
                         nodes: [
                             {
+                                id: "review1",
+                                databaseId: 1,
                                 author: { login: "reviewer" },
                                 state: "COMMENTED",
                                 submittedAt: "2024-01-01T00:00:00Z",
                                 body: "Review with junie-args: --timeout=999",
+                                bodyHTML: "<p>Review with junie-args: --timeout=999</p>",
+                                lastEditedAt: null,
+                                url: "https://github.com/test/test/pull/1#pullrequestreview-1",
                                 comments: { nodes: [] }
                             }
                         ]
