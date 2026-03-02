@@ -51,8 +51,8 @@ export async function prepareJunieTask(
     if (context.inputs.resolveConflicts || isReviewOrCommentHasResolveConflictsTrigger(context)) {
         junieCLITask.mergeTask = {branch: branchInfo.prBaseBranch || branchInfo.baseBranch}
     } else if (isCodeReviewEvent(context)) {
-        const diffPoint = context.isPR ? String(context.entityNumber) : branchInfo.prBaseBranch || branchInfo.baseBranch;
-        const diffCommand = `gh pr diff ${diffPoint}`;
+        const diffPoint = branchInfo.prBaseBranch || branchInfo.baseBranch;
+        const diffCommand = `git diff origin/${diffPoint}...`;
         junieCLITask.codeReviewTask = {diffCommand}
     } else {
         const formatter = new NewGitHubPromptFormatter();

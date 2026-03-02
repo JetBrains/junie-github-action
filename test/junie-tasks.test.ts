@@ -422,7 +422,7 @@ describe("prepareJunieTask", () => {
 
             expect(result).toBeDefined();
             expect(result.codeReviewTask).toBeDefined();
-            expect(result.codeReviewTask?.diffCommand).toContain("gh pr diff 123");
+            expect(result.codeReviewTask?.diffCommand).toContain("git diff origin/main...");
         });
 
         test("should trigger code review prompt from comment when inputs.prompt is empty", async () => {
@@ -460,7 +460,7 @@ describe("prepareJunieTask", () => {
             expect(result).toBeDefined();
             expect(result.codeReviewTask).toBeDefined();
             // Should detect code-review trigger from comment and create codeReview task
-            expect(result.codeReviewTask?.diffCommand).toContain("gh pr diff 123");
+            expect(result.codeReviewTask?.diffCommand).toContain("git diff origin/main...");
         });
 
         test("should not trigger fix CI prompt when workflow_run event has success conclusion", async () => {
