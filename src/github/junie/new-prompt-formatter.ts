@@ -7,7 +7,6 @@ import {
     GraphQLTimelineItemNode
 } from "../api/queries";
 import {
-    isCodeReviewEvent,
     isFixCIEvent,
     isIssueCommentEvent,
     isIssuesEvent,
@@ -24,7 +23,6 @@ import {
 import {downloadJiraAttachmentsAndRewriteText} from "./attachment-downloader";
 import {sanitizeContent} from "../../utils/sanitizer";
 import {
-    createCodeReviewPrompt,
     createFixCIFailuresPrompt,
     createMinorFixPrompt,
     GIT_OPERATIONS_NOTE,
@@ -127,18 +125,10 @@ ${actorInfo ? actorInfo : ""}
     }
 
     private extractKeyWords(context: JunieExecutionContext, fetchedData: FetchedData, branchInfo: BranchInfo) {
-        const issue = fetchedData.pullRequest || fetchedData.issue;
-
-        const isCodeReview = isCodeReviewEvent(context)
         const isFixCI = isFixCIEvent(context)
         const isMinorFix = isMinorFixEvent(context)
 
-        if (issue && isCodeReview) {
-            const branchName = branchInfo.prBaseBranch || branchInfo.baseBranch;
-            const diffPoint = context.isPR ? String(context.entityNumber) : branchName;
-            console.log(`Using CODE REVIEW prompt for diffPoint: ${diffPoint}`);
-            return createCodeReviewPrompt(diffPoint);
-        } else if (isFixCI) {
+        if (isFixCI) {
             const branchName = branchInfo.prBaseBranch || branchInfo.baseBranch;
             const diffPoint = context.isPR && context.entityNumber ? String(context.entityNumber) : branchName;
             console.log(`Using FIX-CI prompt for diffPoint: ${diffPoint}`);

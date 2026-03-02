@@ -46,55 +46,6 @@ export const DEFAULT_TRIGGER_PHRASE = "@junie-agent";
 // Templates and Messages
 // ============================================================================
 
-export function createCodeReviewPrompt(diffPoint: string): string {
-    const diffCommand = `gh pr diff ${diffPoint}`
-    return `
-Your task is to:
-1. Read the Pull Request diff by using \`${diffCommand} | grep \"^diff --git\" \`. Do not write the diff to file.
-2. Review the downloaded diff according to the criteria below
-3. For each specific finding, use the 'post_inline_review_comment' tool (if available) to provide feedback directly on the code.
-4. Once all findings are posted (or if the tool is unavailable), submit with your review as a bullet point list.
-
-Additional instructions:
-1. Review ONLY the changed lines against the Core Review Areas below, prioritizing repository style/guidelines adherence and avoiding overcomplication.
-2. You may open files or search the project to understand context. Do NOT run tests, build, or make any modifications.
-3. Do NOT create any new files. Do NOT commit or push any changes. This is a read-only code review and you don't have write access to the repository.
-
-### Core Review Areas
-
-1. **Adherence with this repository style and guidelines**
-   - Naming, formatting, and package structure consistency with existing code and modules.
-   - Reuse of existing utilities/patterns; avoiding introduction of new dependencies.
-
-2. **Avoiding overcomplications**
-   - Avoid new abstractions, frameworks, premature generalization, or unnecessarily complicated solutions.
-   - Avoid touching of unrelated files.
-   - Avoid unnecessary indirection (wrappers, flags, configuration) and ensure straightforward control flow.
-   - Do not allow duplicate logic.
-
-### If obviously applicable to the CHANGED lines only
-- Security: newly introduced unsafe input handling, command execution, or data exposure.
-- Performance: unnecessary allocations/loops/heavy work on UI thread introduced by the change.
-- Error handling: swallowing exceptions or deviating from existing error-handling patterns.
-
-### Output Format
-- If the 'post_inline_review_comment' tool is available, use it for each specific finding.
-- **Use the tool parameters correctly**:
-    - \`filePath\`: The relative path to the file.
-    - \`lineNumber\`: The line (or end of range) where the comment applies.
-    - \`startLineNumber\`: Use this for multi-line comments to cover a range.
-    - \`commentBody\`: Your explanation. Use the \`\`\`suggestion syntax here for code changes.
-- Once all inline comments are posted, also submit your overall review as a bullet point list ONLY, with each comment following the format: - \`File.ts:Line: Comment\`. Do NOT include any summary, introduction, conclusion, notes, or any other text—ONLY the bullet points.
-- Comment ONLY on the actual modifications in this diff. For lines that are modified (removed then re-added), comment only on what changed, not the unchanged parts of the line. Never comment on pre-existing code.
-- Ensure that your suggestions are not already implemented, or equivalent to existing code.
-- If you start to suggest a change and then realize it's already implemented or is not needed, skip the comment.
-- Keep it concise (15–25 words per comment). No praise, questions, or speculation; omit low-impact nits.
-- If unsure whether a comment applies, omit it. If no feedback is warranted, submit \`LGTM\` only .
-- Only make comments of medium or high impact and only if you have high confidence in your findings.
-- For small changes, max 3 comments; medium 6–8; large 8–12.
-`;
-}
-
 export function createFixCIFailuresPrompt(diffPoint: string): string {
     const diffCommand = `gh pr diff ${diffPoint}`
     return `
@@ -140,39 +91,8 @@ Your task is to analyze CI failures and fix them. Follow these steps:
 
 ### Output
 - DO NOT post inline comments.
-- When you have fixed CI failures, submit your response using EXACTLY this format:
-    ---
-    ## ✅ CI Fix Applied
-    
-    **Fixed Check:** [name of the CI check that was failing]
-    **Error Type:** [test failure / build error / lint error / timeout / other]
-    
-    ### Root Cause
-    [1-3 sentences explaining why this failed]
-    
-    ### Changes Made
-    - \`path/to/file.ts\`: [brief description of what was changed]
-    - [additional files if applicable]
-    
-    ### Verification
-    [Confirm that build passes and tests succeed, or describe what was verified]
-    ---
-- If you did NOT make changes due to uncertainty or errors, submit your response using this format instead:
-    ---
-    ## ⚠️ CI Analysis (No Changes Made)
-    
-    **Failed Check:** [name of the CI check that was failing]
-    **Error Type:** [test failure / build error / lint error / timeout / other]
-    
-    ### Root Cause
-    [1-3 sentences explaining why this failed]
-    
-    ### Why No Fix Was Applied
-    [Explain your uncertainty and why you chose not to make changes]
-    
-    ### Suggested Investigation
-    [What the developer should look into to resolve this]
-    ---
+- When you have fixed CI failures, submit your response specifying fixed checks, error types, root cause, and changes made.
+- If you did NOT make changes due to uncertainty or errors, submit your response specifying failed checks, error types, root causes, why no fix was applied, and suggested next steps.
 IMPORTANT: Do NOT commit or push changes. The system will handle all git operations (staging, committing, and pushing) automatically.
 `;
 }
@@ -213,34 +133,8 @@ ${userRequestSection}
 
 ### Output
 - DO NOT post inline comments.
-- If you have made the requested changes, submit your response using EXACTLY this format:
----
-## ✅ Minor Fix Applied
-
-**Request:** [brief description of what the user requested]
-
-### Changes Made
-- \`path/to/file.ts\`: [brief description of what was changed]
-- [additional files if applicable]
-
-### How This Addresses the Request
-[1-2 sentences explaining how your changes fulfill the user's request]
-
-### Verification
-[Confirm that build passes and tests succeed, or describe what was verified]
----
-- If you could NOT make changes (e.g., request is unclear, unsafe, or beyond scope), submit your response using this format instead:
----
-## ⚠️ Minor Fix Not Applied
-
-**Request:** [brief description of what the user requested]
-
-### Why No Changes Were Made
-[Explain why you could not or chose not to make the changes]
-
-### Suggested Next Steps
-[What the user should clarify or do differently]
----
+- If you have made the requested changes, submit your response specifying the original request, changes made, and how the changes address the request.
+- If you could NOT make changes (e.g., request is unclear, unsafe, or beyond scope), submit your response specifying the original request, why no changes were made, and suggested next steps.
 IMPORTANT: Do NOT commit or push changes. The system will handle all git operations (staging, committing, and pushing) automatically.
 `;
 }
