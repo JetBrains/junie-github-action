@@ -6,7 +6,7 @@ Real-world recipes for automating development workflows with Junie. Each recipe 
 
 Before using any recipe, add your Junie API key to repository secrets:
 1. Go to **Settings → Secrets and variables → Actions**
-2. Create `JUNIE_API_KEY` with your key from [junie.labs.jb.gg](https://junie.labs.jb.gg/)
+2. Create `JUNIE_API_KEY` with your key from [junie.jetbrains.com](https://junie.jetbrains.com/)
 
 ---
 

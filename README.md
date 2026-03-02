@@ -43,7 +43,7 @@ A powerful GitHub Action that integrates [Junie](https://www.jetbrains.com/junie
 
 ### Prerequisites
 
-1. **Junie API Key**: Obtain from [JetBrains Junie](https://junie.labs.jb.gg/)
+1. **Junie API Key**: Obtain from [JetBrains Junie](https://junie.jetbrains.com/)
 2. **Repository Permissions**: Admin access to configure secrets and workflows
 
 ### Basic Setup
