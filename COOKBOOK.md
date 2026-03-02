@@ -88,7 +88,7 @@ jobs:
 
 ### Option A: Use Built-in Code Review (Recommended)
 
-Use the built-in `code-review` prompt for a structured, opinionated review focused on repository style, avoiding overcomplications, and catching obvious issues:
+Use the built-in `code-review` prompt for a structured PR review:
 
 <details>
 <summary>View complete workflow</summary>
@@ -123,10 +123,7 @@ jobs:
 
 </details>
 
-The built-in review focuses on:
-- **Repository style adherence** - naming, formatting, package structure
-- **Avoiding overcomplications** - premature abstractions, unnecessary indirection
-- **Security, performance, error handling** - only for obviously applicable cases
+The built-in review provides structured feedback directly on the PR.
 
 ### Option B: Custom Review Prompt
 
