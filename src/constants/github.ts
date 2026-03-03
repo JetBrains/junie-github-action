@@ -60,7 +60,7 @@ Your task is to analyze CI failures and fix them. Follow these steps:
      - Description
      - Previous comments and conversations
 
-2. If NO failed checks were found, briefly report that there are no failures for this PR. Do not run additional tests to find errors not reported in the failed checks.
+2. If NO failed checks were found, submit immediately, reporting that there are no failures for this PR. Do not run additional tests to find errors not reported in the failed checks. Do not double-check the branch, recent commits or anything else.
 
 3. If failed checks WERE found, analyze each failure:
    - Open and explore relevant source files to understand the context
