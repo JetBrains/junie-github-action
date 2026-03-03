@@ -550,9 +550,11 @@ jobs:
 
 ---
 
-## 5. Automatic Merge Conflict Resolution
+## 5. Merge Conflict Resolution
 
 **Problem:** Merge conflicts block PRs and require manual resolution. When you merge changes to main/master, all open PRs need to be updated and conflicts resolved.
+
+### Option A: Automatic Resolution on Push (Recommended)
 
 **Solution:** Automatically detects PRs with conflicts when you push to base branch and resolves them.
 
@@ -606,6 +608,19 @@ jobs:
 3. Checks each PR for merge conflicts (mergeable_state === 'dirty')
 4. For each conflicted PR, triggers the workflow again via dispatch API with specific PR number
 5. In the dispatched run, Junie merges base branch into PR branch and resolves conflicts
+
+### Option B: On-Demand Resolution via Comments
+
+You can also trigger merge conflict resolution on-demand by commenting on a PR with the `resolve conflicts` phrase:
+
+```
+@junie-agent resolve conflicts
+```
+
+This works with the [Basic Interactive Setup](#basic-interactive-setup). Junie will:
+1. Merge the base branch (e.g., `main`) into your PR branch
+2. Resolve any conflicts that occur during the merge
+3. Create a new branch and a new PR with the resolved conflicts (via `create_new_branch_for_pr`)
 
 **Use cases:**
 - **Auto-resolution after merge:** Merge to main → all conflicted PRs automatically updated
