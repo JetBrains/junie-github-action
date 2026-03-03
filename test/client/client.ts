@@ -294,7 +294,20 @@ export class Client {
         return condition(files, pr);
     }
 
-    conditionPRFilesInclude(fileContentChecks: { [filename: string]: string | string[] }, matchMode: 'AND' | 'OR' = 'AND') {
+    conditionPRFilesInclude(fileContentChecks: { [filename: string]: string | string[] }) {
+        return this.buildFilesCondition(fileContentChecks,
+            (snippets, content) => snippets.every(s => content.includes(s)));
+    }
+
+    conditionPRFilesIncludeAny(fileContentChecks: { [filename: string]: string | string[] }) {
+        return this.buildFilesCondition(fileContentChecks,
+            (snippets, content) => snippets.some(s => content.includes(s)));
+    }
+
+    private buildFilesCondition(
+        fileContentChecks: { [filename: string]: string | string[] },
+        matcher: (snippets: string[], content: string) => boolean
+    ) {
         return async (files: GitHubFile[], pr: PullRequest) => {
             for (const [filename, expectedSnippet] of Object.entries(fileContentChecks)) {
                 const file = files.find(f => f.filename.includes(filename));
@@ -309,18 +322,8 @@ export class Client {
                     const decodedContent = Buffer.from(contentData.content, "base64").toString("utf-8");
                     const snippets = Array.isArray(expectedSnippet) ? expectedSnippet : [expectedSnippet];
 
-                    if (matchMode === 'AND') {
-                        const allMatch = snippets.every(snippet => decodedContent.includes(snippet));
-                        if (!allMatch) {
-                            console.log(`Content of ${file.filename} doesn't match all expected snippets (AND mode).`);
-                            return false;
-                        }
-                    } else {
-                        const anyMatch = snippets.some(snippet => decodedContent.includes(snippet));
-                        if (!anyMatch) {
-                            console.log(`Content of ${file.filename} doesn't match any expected snippet (OR mode).`);
-                            return false;
-                        }
+                    if (!matcher(snippets, decodedContent)) {
+                        return false;
                     }
                 }
             }
