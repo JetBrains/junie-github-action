@@ -111,10 +111,10 @@ ${userRequestSection}
 ### Steps to follow
 1. Gather Information
    - Read the Pull Request diff by using \`${diffCommand} | grep "^diff --git"\`. Do not write the diff to file.
-   - Understand the context of the changes and what the PR is trying to accomplish.${gatherInfoUserRequestNote}
    - Review the full PR context before proceeding. Specifically, examine:
      - Title and Description.
      - Previous comments and conversations that explain the reasoning or provide specific feedback.
+   - Understand the context of the changes and what the PR is trying to accomplish.${gatherInfoUserRequestNote}     
      
 2. Implement the Fix
    - Make the requested changes to the codebase.
