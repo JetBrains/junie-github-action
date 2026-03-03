@@ -39,7 +39,7 @@ jobs:
           for test_file in test/integration/*.test.ts; do
             test_name=$(basename "$test_file" .test.ts)
             echo "Starting $test_file with latest Junie version"
-            bun test "$test_file" > "test-results/$test_name.log" 2>&1 &
+            bun test "$test_file" 2>&1 | tee "test-results/$test_name.log" &
           done
           
           for job in $(jobs -p); do
