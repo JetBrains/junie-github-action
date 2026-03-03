@@ -1,0 +1,382 @@
+bun test v1.3.0 (b0a6feca)
+
+::group::test/junie-tasks.test.ts:
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Junie task written to file: /tmp/junie-test/junie_input.json
+(pass) prepareJunieTask > with user prompt > should set task from inputs.prompt with GitHub context by default [5.00ms]
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Junie task written to file: /tmp/junie-test/junie_input.json
+(pass) prepareJunieTask > with user prompt > should set task from inputs.prompt without GitHub context when disabled
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Junie task written to file: /tmp/junie-test/junie_input.json
+(pass) prepareJunieTask > issue comment event (not on PR) > should format issue comment prompt [1.00ms]
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Junie task written to file: /tmp/junie-test/junie_input.json
+(pass) prepareJunieTask > issues event > should format issue prompt
+Processing attachments for PR #123
+Using GraphQL bodyHTML for PR #123 (14 chars)
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Junie task written to file: /tmp/junie-test/junie_input.json
+(pass) prepareJunieTask > PR comment event > should format PR comment prompt with all details [2.00ms]
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Junie task written to file: /tmp/junie-test/junie_input.json
+(pass) prepareJunieTask > PR review event > should format PR review prompt
+Processing attachments for PR #123
+Using GraphQL bodyHTML for PR #123 (14 chars)
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=true, inComment=false
+Using CODE-REVIEW keyword detection
+Code review detection: inPrompt=true, inComment=false
+Code review detection: inPrompt=true, inComment=false
+Junie task written to file: /tmp/junie-test/junie_input.json
+
+::error file=test/junie-tasks.test.ts,line=425,col=56,title=error: expect(received).toContain(expected)::Expected to contain: "gh pr diff 123"%0AReceived: "git diff origin/123..."%0A%0A      at <anonymous> (/home/runner/work/junie-github-action/junie-github-action/test/junie-tasks.test.ts:425:56)
+420 | 
+421 |             const result = await prepareJunieTask(context, branchInfo, octokit);
+422 | 
+423 |             expect(result).toBeDefined();
+424 |             expect(result.codeReviewTask).toBeDefined();
+425 |             expect(result.codeReviewTask?.diffCommand).toContain("gh pr diff 123");
+                                                             ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "gh pr diff 123"
+Received: "git diff origin/123..."
+
+      at <anonymous> (/home/runner/work/junie-github-action/junie-github-action/test/junie-tasks.test.ts:425:56)
+(fail) prepareJunieTask > PR review event > should create codeReviewTask when code-review prompt is provided [1.00ms]
+Processing attachments for PR #123
+Using GraphQL bodyHTML for PR #123 (14 chars)
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Pull request review contains exact trigger phrase '/code-review/i'
+Code review detection: inPrompt=false, inComment=true
+Using CODE-REVIEW keyword detection
+Pull request review contains exact trigger phrase '/code-review/i'
+Code review detection: inPrompt=false, inComment=true
+Pull request review contains exact trigger phrase '/code-review/i'
+Code review detection: inPrompt=false, inComment=true
+Junie task written to file: /tmp/junie-test/junie_input.json
+
+::error file=test/junie-tasks.test.ts,line=470,col=56,title=error: expect(received).toContain(expected)::Expected to contain: "gh pr diff 123"%0AReceived: "git diff origin/123..."%0A%0A      at <anonymous> (/home/runner/work/junie-github-action/junie-github-action/test/junie-tasks.test.ts:470:56)
+465 |             const result = await prepareJunieTask(context, branchInfo, octokit);
+466 | 
+467 |             expect(result).toBeDefined();
+468 |             expect(result.codeReviewTask).toBeDefined();
+469 |             // Should detect code-review trigger from comment and create codeReviewTask
+470 |             expect(result.codeReviewTask?.diffCommand).toContain("gh pr diff 123");
+                                                             ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "gh pr diff 123"
+Received: "git diff origin/123..."
+
+      at <anonymous> (/home/runner/work/junie-github-action/junie-github-action/test/junie-tasks.test.ts:470:56)
+(fail) prepareJunieTask > PR review event > should trigger codeReviewTask from comment when inputs.prompt is empty and code-review keyword is used [1.00ms]
+Processing attachments for PR #123
+Using GraphQL bodyHTML for PR #123 (14 chars)
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Junie task written to file: /tmp/junie-test/junie_input.json
+(pass) prepareJunieTask > PR review event > should not trigger fix CI prompt when workflow_run event has success conclusion
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Junie task written to file: /tmp/junie-test/junie_input.json
+(pass) prepareJunieTask > PR review comment event > should format PR review comment prompt
+Processing attachments for PR #123
+Using GraphQL bodyHTML for PR #123 (14 chars)
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Junie task written to file: /tmp/junie-test/junie_input.json
+(pass) prepareJunieTask > PR event > should format PR prompt for opened/edited PR [1.00ms]
+Junie task written to file: /tmp/junie-test/junie_input.json
+(pass) prepareJunieTask > merge task > should set merge task when resolveConflicts input is true
+Comment contains exact trigger phrase '/resolve conflicts/i'
+Junie task written to file: /tmp/junie-test/junie_input.json
+(pass) prepareJunieTask > merge task > should set merge task when comment has resolve trigger phrase
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Junie task written to file: /tmp/junie-test/junie_input.json
+(pass) prepareJunieTask > output > should call core.setOutput with JSON stringified task
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Junie task written to file: /tmp/junie-test/junie_input.json
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Junie task written to file: /tmp/junie-test/junie_input.json
+(pass) prepareJunieTask > integration > should handle multiple event types in sequence [1.00ms]
+
+::endgroup::
+
+::group::test/new-prompt-formatter.test.ts:
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+(pass) NewGitHubPromptFormatter > generatePrompt includes repository info [1.00ms]
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+(pass) NewGitHubPromptFormatter > generatePrompt includes actor info
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+(pass) NewGitHubPromptFormatter > generatePrompt includes PR info when available
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+(pass) NewGitHubPromptFormatter > generatePrompt includes commits info
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+(pass) NewGitHubPromptFormatter > generatePrompt includes changed files info
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+(pass) NewGitHubPromptFormatter > generatePrompt includes issue info when not a PR [1.00ms]
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+(pass) NewGitHubPromptFormatter > generatePrompt includes custom prompt
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+(pass) NewGitHubPromptFormatter > generatePrompt handles timeline comments
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+(pass) NewGitHubPromptFormatter > generatePrompt handles reviews
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+(pass) NewGitHubPromptFormatter > generatePrompt omits empty sections
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+(pass) NewGitHubPromptFormatter > generatePrompt returns only custom prompt when attachGithubContext is false [1.00ms]
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+(pass) NewGitHubPromptFormatter > generatePrompt includes GitHub context when attachGithubContext is true with custom prompt
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+(pass) NewGitHubPromptFormatter > generatePrompt includes GitHub context when attachGithubContext is true without custom prompt
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+(pass) NewGitHubPromptFormatter > generatePrompt formats review comments with thread structure
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+(pass) NewGitHubPromptFormatter > generatePrompt formats multiple comment threads correctly [1.00ms]
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+(pass) NewGitHubPromptFormatter > junie-args extraction > should extract junie-args from custom prompt
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+(pass) NewGitHubPromptFormatter > junie-args extraction > should extract junie-args from PR body
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+(pass) NewGitHubPromptFormatter > junie-args extraction > should extract junie-args from issue comment
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+(pass) NewGitHubPromptFormatter > junie-args extraction > should handle multiple junie-args blocks [1.00ms]
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+(pass) NewGitHubPromptFormatter > junie-args extraction > should return empty array when no junie-args present
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=true, inComment=false
+Using CODE-REVIEW keyword detection
+Code review detection: inPrompt=true, inComment=false
+(pass) NewGitHubPromptFormatter > code-review and fix-ci keywords (refactoring validation) > preserves junie-args when code-review is detected
+Fix-CI detection: inPrompt=true, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Using FIX-CI prompt for diffPoint: 1
+Code review detection: inPrompt=false, inComment=false
+(pass) NewGitHubPromptFormatter > code-review and fix-ci keywords (refactoring validation) > preserves junie-args when fix-ci is detected [1.00ms]
+Fix-CI detection: inPrompt=true, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Using FIX-CI prompt for diffPoint: develop
+Code review detection: inPrompt=false, inComment=false
+(pass) NewGitHubPromptFormatter > code-review and fix-ci keywords (refactoring validation) > uses branch name for diffPoint when not a PR
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+(pass) NewGitHubPromptFormatter > code-review and fix-ci keywords (refactoring validation) > deduplicates junie-args keeping the last occurrence
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+(pass) NewGitHubPromptFormatter > code-review and fix-ci keywords (refactoring validation) > does not extract junie-args from timeline or reviews [1.00ms]
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+(pass) NewGitHubPromptFormatter > Issue/PR body inclusion > should include PR body when triggered by comment
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+(pass) NewGitHubPromptFormatter > Issue/PR body inclusion > should NOT include PR body when triggered by PR event itself
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+(pass) NewGitHubPromptFormatter > Issue/PR body inclusion > should include issue body when triggered by comment
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+(pass) NewGitHubPromptFormatter > Issue/PR body inclusion > should NOT include issue body when triggered by issue event itself
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+(pass) NewGitHubPromptFormatter > Workflow modification note > should include WORKFLOW_MODIFICATION_NOTE when isDefaultToken is true [1.00ms]
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+(pass) NewGitHubPromptFormatter > Workflow modification note > should NOT include WORKFLOW_MODIFICATION_NOTE when isDefaultToken is false
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+(pass) NewGitHubPromptFormatter > Workflow modification note > should always include GIT_OPERATIONS_NOTE regardless of token type
+Fix-CI detection: inPrompt=true, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Using FIX-CI prompt for diffPoint: 1
+Code review detection: inPrompt=false, inComment=false
+(pass) NewGitHubPromptFormatter > Keyword Context Handling > should include GitHub context for fix-ci even if attachGithubContextToCustomPrompt is false
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=true, inComment=false
+Using CODE-REVIEW keyword detection
+Code review detection: inPrompt=true, inComment=false
+(pass) NewGitHubPromptFormatter > Keyword Context Handling > should include GitHub context for code-review even if attachGithubContextToCustomPrompt is false
+Fix-CI detection: inPrompt=false, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+
+::error file=test/new-prompt-formatter.test.ts,line=1051,col=39,title=error: expect(received).not.toContain(expected)::Expected to not contain: "<pull_request_info>"%0AReceived: "You were triggered as a GitHub AI Assistant by pull_request action. Your task is to:\n\n<user_instruction>\n        Please refactor this file\n</user_instruction>\n<repository>\nRepository: test-owner/test-repo\nOwner: test-owner\n</repository>\n<pull_request_info>\nPR Number: #1\nTitle: Test PR\nAuthor: @test-author\nState: OPEN\nBranch: feature -> main\nBase Commit: def456abc123\nHead Commit: abc123def456\nStats: +10/-5 (3 files, 2 commits)\nDescription:\nTest PR body\n</pull_request_info>\n<commits>\n[2024-01-01T00:00:00Z] abc123 - First commit\n[2024-01-02T00:00:00Z] def456 - Second commit\n</commits>\n\n\n<changed_files>file1.ts (modified) +5/-2\nfile2.ts (added) +5/-3</changed_files>\n<actor>\nTriggered by: @test-user\nEvent: pull_request (opened)\n</actor>\n\n\nIMPORTANT: Do NOT commit or push changes. The system will handle all git operations (staging, committing, and pushing) automatically."%0A%0A      at <anonymous> (/home/runner/work/junie-github-action/junie-github-action/test/new-prompt-formatter.test.ts:1051:39)
+1046 |             };
+1047 | 
+1048 |             const result = await formatter.generatePrompt(context, fetchedData, createMockBranchInfo());
+1049 | 
+1050 |             // Context should NOT be present
+1051 |             expect(result.prompt).not.toContain("<pull_request_info>");
+                                             ^
+error: expect(received).not.toContain(expected)
+
+Expected to not contain: "<pull_request_info>"
+Received: "You were triggered as a GitHub AI Assistant by pull_request action. Your task is to:\n\n<user_instruction>\n        Please refactor this file\n</user_instruction>\n<repository>\nRepository: test-owner/test-repo\nOwner: test-owner\n</repository>\n<pull_request_info>\nPR Number: #1\nTitle: Test PR\nAuthor: @test-author\nState: OPEN\nBranch: feature -> main\nBase Commit: def456abc123\nHead Commit: abc123def456\nStats: +10/-5 (3 files, 2 commits)\nDescription:\nTest PR body\n</pull_request_info>\n<commits>\n[2024-01-01T00:00:00Z] abc123 - First commit\n[2024-01-02T00:00:00Z] def456 - Second commit\n</commits>\n\n\n<changed_files>file1.ts (modified) +5/-2\nfile2.ts (added) +5/-3</changed_files>\n<actor>\nTriggered by: @test-user\nEvent: pull_request (opened)\n</actor>\n\n\nIMPORTANT: Do NOT commit or push changes. The system will handle all git operations (staging, committing, and pushing) automatically."
+
+      at <anonymous> (/home/runner/work/junie-github-action/junie-github-action/test/new-prompt-formatter.test.ts:1051:39)
+(fail) NewGitHubPromptFormatter > Keyword Context Handling > should NOT include GitHub context for generic custom prompt if attachGithubContextToCustomPrompt is false [1.00ms]
+Fix-CI detection: inPrompt=true, inComment=false
+Minor fix detection: inPrompt=false, inComment=false
+Code review detection: inPrompt=false, inComment=false
+Using FIX-CI prompt for diffPoint: 1
+Code review detection: inPrompt=false, inComment=false
+
+::error file=test/new-prompt-formatter.test.ts,line=1072,col=44,title=error: expect(received).toContain(expected)::Expected to contain: "--model=gpt-4"%0AReceived: []%0A%0A      at <anonymous> (/home/runner/work/junie-github-action/junie-github-action/test/new-prompt-formatter.test.ts:1072:44)
+1067 |                 pullRequest: createMockPR()
+1068 |             };
+1069 | 
+1070 |             const result = await formatter.generatePrompt(context, fetchedData, createMockBranchInfo());
+1071 | 
+1072 |             expect(result.customJunieArgs).toContain("--model=gpt-4");
+                                                  ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "--model=gpt-4"
+Received: []
+
+      at <anonymous> (/home/runner/work/junie-github-action/junie-github-action/test/new-prompt-formatter.test.ts:1072:44)
+(fail) NewGitHubPromptFormatter > Keyword Context Handling > should extract args from input prompt even when keyword is used
+
+::endgroup::
+
+4 tests failed:
+(fail) prepareJunieTask > PR review event > should create codeReviewTask when code-review prompt is provided [1.00ms]
+(fail) prepareJunieTask > PR review event > should trigger codeReviewTask from comment when inputs.prompt is empty and code-review keyword is used [1.00ms]
+(fail) NewGitHubPromptFormatter > Keyword Context Handling > should NOT include GitHub context for generic custom prompt if attachGithubContextToCustomPrompt is false [1.00ms]
+(fail) NewGitHubPromptFormatter > Keyword Context Handling > should extract args from input prompt even when keyword is used
+
+ 47 pass
+ 4 fail
+ 211 expect() calls
+Ran 51 tests across 2 files. [192.00ms]

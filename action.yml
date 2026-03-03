@@ -36,7 +36,7 @@ inputs:
     required: false
     default: "false"
   attach_github_context_to_custom_prompt:
-    description: "Whether to attach GitHub context (PR/issue info, commits, reviews, etc.) when using custom prompt. Only applies when 'prompt' input is provided."
+    description: "Whether to attach GitHub context (PR/issue info, commits, reviews, etc.) when using custom prompt. Only applies when 'prompt' input is provided. Note: Always enabled when using built-in keywords like 'code-review' or 'fix-ci'."
     required: false
     default: "false"
 

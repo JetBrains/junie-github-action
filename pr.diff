@@ -1,0 +1,335 @@
+From 33d33c4161d3932bba75a7e165c252e8495ac46b Mon Sep 17 00:00:00 2001
+From: Marco Damonte <marcodamonte@jetbrains.com>
+Date: Tue, 3 Mar 2026 15:20:49 +0000
+Subject: [PATCH] add pr details to prompts
+
+---
+ src/github/junie/junie-tasks.ts          | 15 ++--
+ src/github/junie/new-prompt-formatter.ts | 53 +++++++++++---
+ test/junie-tasks.test.ts                 | 24 +++++--
+ test/new-prompt-formatter.test.ts        | 91 ++++++++++++++++++++++++
+ 4 files changed, 163 insertions(+), 20 deletions(-)
+
+diff --git a/src/github/junie/junie-tasks.ts b/src/github/junie/junie-tasks.ts
+index 3483548..1519feb 100644
+--- a/src/github/junie/junie-tasks.ts
++++ b/src/github/junie/junie-tasks.ts
+@@ -50,10 +50,6 @@ export async function prepareJunieTask(
+ 
+     if (context.inputs.resolveConflicts || isReviewOrCommentHasResolveConflictsTrigger(context)) {
+         junieCLITask.mergeTask = {branch: branchInfo.prBaseBranch || branchInfo.baseBranch}
+-    } else if (isCodeReviewEvent(context)) {
+-        const diffPoint = branchInfo.prBaseBranch || branchInfo.baseBranch;
+-        const diffCommand = `git diff origin/${diffPoint}...`;
+-        junieCLITask.codeReviewTask = {diffCommand}
+     } else {
+         const formatter = new NewGitHubPromptFormatter();
+         let fetchedData: FetchedData = {};
+@@ -82,7 +78,16 @@ export async function prepareJunieTask(
+         }
+ 
+         // Note: Attachments are already processed in fetchIssueData/fetchPullRequestData
+-        junieCLITask.task = promptText;
++        if (isCodeReviewEvent(context)) {
++            const diffPoint = context.isPR ? String(context.entityNumber) : branchInfo.prBaseBranch || branchInfo.baseBranch;
++            const diffCommand = `git diff origin/${diffPoint}...`;
++            junieCLITask.codeReviewTask = {
++                description: promptText,
++                diffCommand
++            }
++        } else {
++            junieCLITask.task = promptText;
++        }
+     }
+ 
+     if (!junieCLITask.task && !junieCLITask.mergeTask && !junieCLITask.codeReviewTask) {
+diff --git a/src/github/junie/new-prompt-formatter.ts b/src/github/junie/new-prompt-formatter.ts
+index 533472d..654d0c0 100644
+--- a/src/github/junie/new-prompt-formatter.ts
++++ b/src/github/junie/new-prompt-formatter.ts
+@@ -7,6 +7,7 @@ import {
+     GraphQLTimelineItemNode
+ } from "../api/queries";
+ import {
++    isCodeReviewEvent,
+     isFixCIEvent,
+     isIssueCommentEvent,
+     isIssuesEvent,
+@@ -27,6 +28,7 @@ import {
+     createMinorFixPrompt,
+     GIT_OPERATIONS_NOTE,
+     MINOR_FIX_ACTION,
++    CODE_REVIEW_ACTION,
+     WORKFLOW_MODIFICATION_NOTE
+ } from "../../constants/github";
+ import {extractJunieArgs} from "../../utils/junie-args-parser";
+@@ -59,24 +61,40 @@ export class NewGitHubPromptFormatter {
+         let customJunieArgs: string[] = [];
+ 
+         let prompt = context.inputs.prompt || undefined;
++
+         // 1. Extract junie-args from user prompt if provided
+         if (prompt) {
+             const parsed = extractJunieArgs(prompt);
+             prompt = parsed.cleanedText;
+             customJunieArgs.push(...parsed.args);
+         }
+-        prompt = this.extractKeyWords(context, fetchedData, branchInfo) || prompt
+ 
+-        // If user provided custom prompt and doesn't want GitHub context, sanitize and return it
+-        if (prompt && !attachGithubContextToCustomPrompt) {
++        // 2. Extract a command-specific prompt if a keyword is detected
++        const commandPrompt = this.extractKeyWords(context, fetchedData, branchInfo);
++        const hasCommand = commandPrompt !== undefined;
++
++        // The command prompt takes precedence over the generic input prompt
++        if (hasCommand) {
++            prompt = commandPrompt;
++            // Also extract args from the command prompt (relevant for minor-fix)
++            if (prompt) {
++                const parsed = extractJunieArgs(prompt);
++                prompt = parsed.cleanedText;
++                customJunieArgs.push(...parsed.args);
++            }
++        }
++
++        // 3. Early return check: Only skip context if it's a generic custom prompt AND context is disabled
++        // If it's a built-in command (hasCommand is true), we proceed to attach context.
++        if (prompt && !attachGithubContextToCustomPrompt && !hasCommand) {
+             const finalPrompt = sanitizeContent(prompt);
+             return {
+                 prompt: finalPrompt,
+-                customJunieArgs
++                customJunieArgs: this.deduplicateArgs(customJunieArgs)
+             };
+         }
+ 
+-        // 2. Handle Jira issue integration
++        // 4. Handle Jira issue integration
+         if (isJiraWorkflowDispatchEvent(context)) {
+             const jiraPrompt = await this.generateJiraPrompt(context);
+             const parsed = extractJunieArgs(jiraPrompt);
+@@ -86,11 +104,12 @@ export class NewGitHubPromptFormatter {
+             };
+         }
+ 
++        const isCodeReview = isCodeReviewEvent(context);
+         const repositoryInfo = this.getRepositoryInfo(context);
+         const actorInfo = this.getActorInfo(context);
+ 
+         // Extract junie-args ONLY from user instruction, not from GitHub context (timeline, reviews, etc.)
+-        let userInstruction = this.getUserInstruction(context, fetchedData, prompt);
++        let userInstruction = this.getUserInstruction(context, fetchedData, prompt, isCodeReview);
+         if (userInstruction) {
+             const parsed = extractJunieArgs(userInstruction);
+             userInstruction = parsed.cleanedText;
+@@ -104,7 +123,11 @@ export class NewGitHubPromptFormatter {
+         const changedFilesInfo = this.getChangedFilesInfo(fetchedData);
+ 
+         // Build the final prompt
+-        const finalPrompt = `You were triggered as a GitHub AI Assistant by ${context.eventName} action. Your task is to:
++        const header = isCodeReview
++            ? `You were triggered as a GitHub AI Assistant by ${context.eventName} action.`
++            : `You were triggered as a GitHub AI Assistant by ${context.eventName} action. Your task is to:`;
++
++        const finalPrompt = `${header}
+ 
+ ${userInstruction ? userInstruction : ""}
+ ${repositoryInfo ? repositoryInfo : ""}
+@@ -127,6 +150,7 @@ ${actorInfo ? actorInfo : ""}
+     private extractKeyWords(context: JunieExecutionContext, fetchedData: FetchedData, branchInfo: BranchInfo) {
+         const isFixCI = isFixCIEvent(context)
+         const isMinorFix = isMinorFixEvent(context)
++        const isCodeReview = isCodeReviewEvent(context)
+ 
+         if (isFixCI) {
+             const branchName = branchInfo.prBaseBranch || branchInfo.baseBranch;
+@@ -139,6 +163,9 @@ ${actorInfo ? actorInfo : ""}
+             const userRequest = this.extractMinorFixRequest(context);
+             console.log(`Using MINOR-FIX prompt for diffPoint: ${diffPoint}, userRequest: ${userRequest || '(none)'}`);
+             return createMinorFixPrompt(diffPoint, userRequest);
++        } else if (isCodeReview) {
++            console.log(`Using CODE-REVIEW keyword detection`);
++            return CODE_REVIEW_ACTION;
+         }
+     }
+ 
+@@ -202,7 +229,7 @@ Description: ${jira.issueDescription}${commentsInfo}
+         return await downloadJiraAttachmentsAndRewriteText(promptText, jira.attachments);
+     }
+ 
+-    private getUserInstruction(context: JunieExecutionContext, fetchedData: FetchedData, customPrompt?: string): string | undefined {
++    private getUserInstruction(context: JunieExecutionContext, fetchedData: FetchedData, customPrompt?: string, isCodeReview: boolean = false): string | undefined {
+         let githubUserInstruction
+         if (isPullRequestEvent(context)) {
+             githubUserInstruction = context.payload.pull_request.body
+@@ -225,10 +252,16 @@ Description: ${jira.issueDescription}${commentsInfo}
+         }
+ 
+         const instruction = customPrompt || githubUserInstruction;
+-        return instruction ? `
++        if (!instruction) return undefined;
++
++        if (isCodeReview) {
++            return `\n${instruction}\n`;
++        }
++
++        return `
+         <user_instruction>
+         ${instruction}
+-</user_instruction>` : undefined
++</user_instruction>`
+     }
+ 
+     /**
+diff --git a/test/junie-tasks.test.ts b/test/junie-tasks.test.ts
+index 422a870..3a8f0f4 100644
+--- a/test/junie-tasks.test.ts
++++ b/test/junie-tasks.test.ts
+@@ -396,7 +396,7 @@ describe("prepareJunieTask", () => {
+             expect(result.task).toContain("<repository>");
+         });
+ 
+-        test("should create codeReview task when code-review prompt is provided", async () => {
++        test("should create codeReviewTask when code-review prompt is provided", async () => {
+             const context = createMockContext({
+                 eventName: "pull_request",
+                 isPR: true,
+@@ -422,10 +422,17 @@ describe("prepareJunieTask", () => {
+ 
+             expect(result).toBeDefined();
+             expect(result.codeReviewTask).toBeDefined();
+-            expect(result.codeReviewTask?.diffCommand).toContain("git diff origin/main...");
++            expect(result.codeReviewTask?.diffCommand).toContain("gh pr diff 123");
++            expect(result.codeReviewTask?.description).toContain("<pull_request_info>");
++            // Header should NOT contain "Your task is to:"
++            expect(result.codeReviewTask?.description).toContain("You were triggered as a GitHub AI Assistant by pull_request action.");
++            expect(result.codeReviewTask?.description).not.toContain("Your task is to:");
++            // Keyword should be present but NOT wrapped in user_instruction tags
++            expect(result.codeReviewTask?.description).toContain("code-review");
++            expect(result.codeReviewTask?.description).not.toContain("<user_instruction>");
+         });
+ 
+-        test("should trigger code review prompt from comment when inputs.prompt is empty", async () => {
++        test("should trigger codeReviewTask from comment when inputs.prompt is empty and code-review keyword is used", async () => {
+             const context = createMockContext({
+                 eventName: "pull_request_review",
+                 eventAction: "submitted",  // Important: eventAction must be "submitted" or "edited"
+@@ -459,8 +466,15 @@ describe("prepareJunieTask", () => {
+ 
+             expect(result).toBeDefined();
+             expect(result.codeReviewTask).toBeDefined();
+-            // Should detect code-review trigger from comment and create codeReview task
+-            expect(result.codeReviewTask?.diffCommand).toContain("git diff origin/main...");
++            // Should detect code-review trigger from comment and create codeReviewTask
++            expect(result.codeReviewTask?.diffCommand).toContain("gh pr diff 123");
++            expect(result.codeReviewTask?.description).toContain("<pull_request_info>");
++            // Header should NOT contain "Your task is to:"
++            expect(result.codeReviewTask?.description).toContain("You were triggered as a GitHub AI Assistant by pull_request_review action.");
++            expect(result.codeReviewTask?.description).not.toContain("Your task is to:");
++            // Keyword should be present but NOT wrapped in user_instruction tags
++            expect(result.codeReviewTask?.description).toContain("Please do code-review for this PR");
++            expect(result.codeReviewTask?.description).not.toContain("<user_instruction>");
+         });
+ 
+         test("should not trigger fix CI prompt when workflow_run event has success conclusion", async () => {
+diff --git a/test/new-prompt-formatter.test.ts b/test/new-prompt-formatter.test.ts
+index 1f9e611..5f8ed40 100644
+--- a/test/new-prompt-formatter.test.ts
++++ b/test/new-prompt-formatter.test.ts
+@@ -982,4 +982,95 @@ junie-args: --model="gpt-4" --timeout=30 --model="claude-opus-4-5"`,
+             expect(resultWithCustom.prompt).toContain("Do NOT commit or push changes");
+         });
+     });
++    describe("Keyword Context Handling", () => {
++        test("should include GitHub context for fix-ci even if attachGithubContextToCustomPrompt is false", async () => {
++            const context = createMockContext({
++                inputs: {
++                    ...createMockContext().inputs,
++                    prompt: "fix-ci",
++                    attachGithubContextToCustomPrompt: false
++                }
++            });
++            const fetchedData: FetchedData = {
++                pullRequest: createMockPR()
++            };
++
++            const result = await formatter.generatePrompt(context, fetchedData, createMockBranchInfo());
++
++            // Context should be present
++            expect(result.prompt).toContain("<pull_request_info>");
++            expect(result.prompt).toContain("Title: Test PR");
++            expect(result.prompt).toContain("<repository>");
++            
++            // Command prompt should be present
++            expect(result.prompt).toContain("Your task is to analyze CI failures and fix them");
++        });
++
++        test("should include GitHub context for code-review even if attachGithubContextToCustomPrompt is false", async () => {
++            const context = createMockContext({
++                inputs: {
++                    ...createMockContext().inputs,
++                    prompt: "code-review",
++                    attachGithubContextToCustomPrompt: false
++                }
++            });
++            const fetchedData: FetchedData = {
++                pullRequest: createMockPR()
++            };
++
++            const result = await formatter.generatePrompt(context, fetchedData, createMockBranchInfo());
++
++            // Context should be present
++            expect(result.prompt).toContain("<pull_request_info>");
++            expect(result.prompt).toContain("Title: Test PR");
++            
++            // Code review prompt should be present (standard header + keyword for now)
++            // Header should NOT contain "Your task is to:"
++            expect(result.prompt).toContain("You were triggered as a GitHub AI Assistant by pull_request action.");
++            expect(result.prompt).not.toContain("Your task is to:");
++            // Keyword should be present but NOT wrapped in user_instruction tags
++            expect(result.prompt).toContain("code-review");
++            expect(result.prompt).not.toContain("<user_instruction>");
++        });
++
++        test("should NOT include GitHub context for generic custom prompt if attachGithubContextToCustomPrompt is false", async () => {
++            const context = createMockContext({
++                inputs: {
++                    ...createMockContext().inputs,
++                    prompt: "Please refactor this file",
++                    attachGithubContextToCustomPrompt: false
++                }
++            });
++            const fetchedData: FetchedData = {
++                pullRequest: createMockPR()
++            };
++
++            const result = await formatter.generatePrompt(context, fetchedData, createMockBranchInfo());
++
++            // Context should NOT be present
++            expect(result.prompt).not.toContain("<pull_request_info>");
++            expect(result.prompt).not.toContain("<repository>");
++            
++            // Custom prompt should be present
++            expect(result.prompt).toContain("Please refactor this file");
++        });
++
++        test("should extract args from input prompt even when keyword is used", async () => {
++            const context = createMockContext({
++                inputs: {
++                    ...createMockContext().inputs,
++                    prompt: "fix-ci --model=gpt-4",
++                    attachGithubContextToCustomPrompt: true
++                }
++            });
++            const fetchedData: FetchedData = {
++                pullRequest: createMockPR()
++            };
++
++            const result = await formatter.generatePrompt(context, fetchedData, createMockBranchInfo());
++
++            expect(result.customJunieArgs).toContain("--model=gpt-4");
++            expect(result.prompt).toContain("Your task is to analyze CI failures and fix them");
++        });
++    });
+ });
