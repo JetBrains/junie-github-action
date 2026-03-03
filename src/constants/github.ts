@@ -54,9 +54,9 @@ Your task is to analyze CI failures and fix them. Follow these steps:
 ### Steps to follow
 1. Gather Information
    - Use the 'get_pr_failed_checks_info' tool to retrieve information about failed CI/CD checks.
-   - If NO failed checks were found, stop and submit IMMEDIATELY, reporting that there are no failures for this PR. Do not check anything else. 
+   - If NO failed checks were found, stop and submit IMMEDIATELY, reporting that there are no failures for this PR. Do not check anything else.
+   - If failed checks WERE found, read the PR title, description, comments, and conversations. This is important to ensure we align with the PR intent and decisions being made.    
    - If failed checks WERE found, read the Pull Request diff by using \`${diffCommand} | grep "^diff --git"\`. Do not write the diff to file.
-   - If failed checks WERE found, read the PR title, description, comments, and conversations. This is important to ensure we align with the PR intent and decisions being made.
 
 
 3. If failed checks WERE found, analyze each failure:
@@ -109,8 +109,8 @@ Your task is to make a minor fix to this Pull Request based on the user's reques
 ${userRequestSection}
 ### Steps to follow
 1. Gather Information
-   - Read the Pull Request diff by using \`${diffCommand} | grep "^diff --git"\`. Do not write the diff to file.
    - Read the PR title, description, comments, and conversations. This is important to ensure we align with the PR intent and decisions being made.
+   - Read the Pull Request diff by using \`${diffCommand} | grep "^diff --git"\`. Do not write the diff to file.
    - Understand the context of the changes and what the PR is trying to accomplish.${gatherInfoUserRequestNote}     
      
 2. Implement the Fix
