@@ -26,6 +26,7 @@ jobs:
         run: bun install
 
       - name: Run Integration Tests with Latest Junie
+        id: run-tests
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
           TEST_ORG: melotria
@@ -46,6 +47,34 @@ jobs:
           
           echo "All tests completed"
           exit $exit_code
+
+      - name: Send Slack Notification
+        if: always()
+        uses: slackapi/slack-github-action@v2.0.0
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "text": "Daily Integration Tests (Latest Junie) completed with status: ${{ steps.run-tests.outcome }}",
+              "attachments": [
+                {
+                  "color": "${{ steps.run-tests.outcome == 'success' && 'good' || 'danger' }}",
+                  "fields": [
+                    {
+                      "title": "Workflow",
+                      "value": "<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|${{ github.workflow }}>",
+                      "short": true
+                    },
+                    {
+                      "title": "Status",
+                      "value": "${{ steps.run-tests.outcome }}",
+                      "short": true
+                    }
+                  ]
+                }
+              ]
+            }
 
       - name: Upload Test Report
         if: always()
