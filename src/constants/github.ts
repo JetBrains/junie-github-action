@@ -56,10 +56,9 @@ Your task is to analyze CI failures and fix them. Follow these steps:
    - Use the 'get_pr_failed_checks_info' tool to retrieve information about failed CI/CD checks.
    - If NO failed checks were found, stop and submit IMMEDIATELY, reporting that there are no failures for this PR. Do not check anything else. 
    - If failed checks WERE found, read the Pull Request diff by using \`${diffCommand} | grep "^diff --git"\`. Do not write the diff to file.
-   - If failed checks WERE found, Retrieve any useful information from the Pull Request to better understand the context of the changes, such as:
-     - Title
-     - Description
-     - Previous comments and conversations
+   - If failed checks WERE found, review the full PR context before proceeding. Specifically, examine:
+     - Title and Description.
+     - Previous comments and conversations that explain the reasoning or provide specific feedback.
 
 3. If failed checks WERE found, analyze each failure:
    - Open and explore relevant source files to understand the context
@@ -72,6 +71,7 @@ Your task is to analyze CI failures and fix them. Follow these steps:
    - Make the necessary changes to fix the CI failures.
    - Keep changes minimal and focused on fixing the specific failures.
    - Follow the existing code style and conventions in the repository.
+   - Ensure your fix aligns with the PR's original intent and any decision taken in the PR conversations.   
    - Do NOT make unrelated changes or "improvements" beyond what is needed to fix the CI. 
 
 5. Validation
@@ -88,7 +88,9 @@ Your task is to analyze CI failures and fix them. Follow these steps:
 
 ### Output
 - DO NOT post inline comments.
-- When you have fixed CI failures, submit your response specifying fixed checks, error types, root cause, and changes made.
+- When you have fixed CI failures, submit your response specifying:
+  - A brief summary of the PR context you identified (Title/Description/Comments).
+  - Fixed checks, error types, root cause, and changes made.
 - If you did NOT make changes due to uncertainty or errors, submit your response specifying failed checks, error types, root causes, why no fix was applied, and suggested next steps.
 IMPORTANT: Do NOT commit or push changes. The system will handle all git operations (staging, committing, and pushing) automatically.
 `;
@@ -110,15 +112,15 @@ ${userRequestSection}
 1. Gather Information
    - Read the Pull Request diff by using \`${diffCommand} | grep "^diff --git"\`. Do not write the diff to file.
    - Understand the context of the changes and what the PR is trying to accomplish.${gatherInfoUserRequestNote}
-   - Retrieve any useful information from the Pull Request to better understand the context of the changes, such as:
-     - Title
-     - Description
-     - Previous comments and conversations
+   - Review the full PR context before proceeding. Specifically, examine:
+     - Title and Description.
+     - Previous comments and conversations that explain the reasoning or provide specific feedback.
      
 2. Implement the Fix
    - Make the requested changes to the codebase.
    - Keep changes minimal and focused on the specific request.
    - Follow the existing code style and conventions in the repository.
+   - Ensure your fix aligns with the PR's original intent and any decision taken in the PR conversations.
    - Do NOT make unrelated changes or "improvements" beyond what was requested.
 
 3. Validation
@@ -134,7 +136,10 @@ ${userRequestSection}
 
 ### Output
 - DO NOT post inline comments.
-- If you have made the requested changes, submit your response specifying the original request, changes made, and how the changes address the request.
+- If you have made the requested changes, submit your response specifying:
+  - A brief summary of the PR context you identified (Title/Description/Comments).
+  - The original request.
+  - Changes made and how they address the request.
 - If you could NOT make changes (e.g., request is unclear, unsafe, or beyond scope), submit your response specifying the original request, why no changes were made, and suggested next steps.
 IMPORTANT: Do NOT commit or push changes. The system will handle all git operations (staging, committing, and pushing) automatically.
 `;
