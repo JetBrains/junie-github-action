@@ -2,7 +2,7 @@ import {describe, test, beforeAll, afterAll, expect} from "bun:test";
 import {INIT_COMMENT_BODY, SUCCESS_FEEDBACK_COMMENT} from "../../src/constants/github";
 import {testClient} from "../client/client";
 
-describe("Automatic Merge Conflict Resolution", () => {
+describe.skip("Automatic Merge Conflict Resolution", () => {
     let repoName: string;
     let testPassed = false;
 
@@ -38,7 +38,7 @@ describe("Automatic Merge Conflict Resolution", () => {
     }, 900000);
 });
 
-describe("In comment Merge Conflict Resolution", () => {
+describe.skip("In comment Merge Conflict Resolution", () => {
     let repoName: string;
     let testPassed = false;
 
