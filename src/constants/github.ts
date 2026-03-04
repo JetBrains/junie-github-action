@@ -106,8 +106,9 @@ Your task is to make a minor fix to this Pull Request based on the user's reques
 ${userRequestSection}
 ### Steps to follow
 1. Gather Information
+   - Read the PR title, description, comments, and conversations. This is important to ensure we align with the PR intent and decisions being made.
    - Read the Pull Request diff by using \`${diffCommand} | grep "^diff --git"\`. Do not write the diff to file.
-   - Understand the context of the changes and what the PR is trying to accomplish.${gatherInfoUserRequestNote}
+   - Understand the context of the changes and what the PR is trying to accomplish.${gatherInfoUserRequestNote}   
 
 2. Implement the Fix
    - Make the requested changes to the codebase.
