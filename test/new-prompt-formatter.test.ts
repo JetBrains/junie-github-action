@@ -1031,7 +1031,8 @@ junie-args: --model="gpt-4" --timeout=30 --model="claude-opus-4-5"`,
             expect(result.prompt).not.toContain("Your task is to:");
             // GitHub context is attached even when attachGithubContextToCustomPrompt is false for keyword commands
             expect(result.prompt).toContain("<pull_request_info>");
-            expect(result.prompt).not.toContain("<user_instruction>");
+            expect(result.prompt).toContain("<user_instruction>");
+            expect(result.prompt).toContain("code-review");
         });
 
         test("should NOT include GitHub context for generic custom prompt if attachGithubContextToCustomPrompt is false", async () => {
