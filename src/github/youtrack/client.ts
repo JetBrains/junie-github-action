@@ -40,6 +40,8 @@ class YouTrackClient {
             console.log(`Adding comment to YouTrack issue ${issueId}`);
 
             const url = `${this.baseUrl}/api/issues/${issueId}/comments`;
+            console.log(`Sending POST request to ${url}`);
+
             const response = await fetch(url, {
                 method: 'POST',
                 headers: this.authHeaders,
