@@ -485,6 +485,7 @@ async function postYouTrackFeedback(data: FinishFeedbackData): Promise<void> {
     const client = getYouTrackClient(ytPayload.youtrackBaseUrl);
     const {owner, name} = data.parsedContext.payload.repository;
     const ownerLogin = owner.login;
+    const youtrackInitCommentId = process.env[OUTPUT_VARS.YOUTRACK_INIT_COMMENT_ID];
 
     console.log(`Updating YouTrack issue ${ytPayload.issueId}...`);
 
@@ -500,8 +501,8 @@ async function postYouTrackFeedback(data: FinishFeedbackData): Promise<void> {
     }
 
     if (comment) {
-        if (data.youtrackInitCommentId) {
-            await client.updateComment(ytPayload.issueId, data.youtrackInitCommentId, comment);
+        if (youtrackInitCommentId) {
+            await client.updateComment(ytPayload.issueId, youtrackInitCommentId, comment);
         } else {
             await client.addComment(ytPayload.issueId, comment);
         }

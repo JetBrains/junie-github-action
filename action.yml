@@ -360,6 +360,7 @@ runs:
         JIRA_TRANSITION_IN_PROGRESS: ${{ inputs.jira_transition_in_progress }}
         JIRA_TRANSITION_IN_REVIEW: ${{ inputs.jira_transition_in_review }}
         YOUTRACK_TOKEN: ${{ inputs.youtrack_token }}
+        YOUTRACK_INIT_COMMENT_ID: ${{ steps.prepare.outputs.YOUTRACK_INIT_COMMENT_ID }}
 
     - name: Give feedback and update summary (failure)
       if: failure() && steps.prepare.outputs.SHOULD_SKIP != 'true'
@@ -385,4 +386,5 @@ runs:
         JIRA_TRANSITION_IN_PROGRESS: ${{ inputs.jira_transition_in_progress }}
         JIRA_TRANSITION_IN_REVIEW: ${{ inputs.jira_transition_in_review }}
         YOUTRACK_TOKEN: ${{ inputs.youtrack_token }}
+        YOUTRACK_INIT_COMMENT_ID: ${{ steps.prepare.outputs.YOUTRACK_INIT_COMMENT_ID }}
         ERROR: ${{ steps.prepare.outputs.EXCEPTION || steps.junie-run-results.outputs.EXCEPTION }}
