@@ -11,6 +11,7 @@ The integration uses the [YouTrack Junie App](https://plugins.jetbrains.com/plug
 3. **Implements the changes** based on the issue description
 4. **Creates a pull request** with the changes
 5. **Adds a comment** to the YouTrack issue with the result (PR link or error details)
+6. **Enables the YouTrack MCP server** automatically so Junie can use its tools to read more data or update the issue as needed
 
 ## Setup
 

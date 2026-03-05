@@ -12,6 +12,7 @@ When a Jira issue is created or updated with a specific trigger (e.g., adding a 
 4. **Creates a pull request** with the changes
 5. **Transitions the issue to "In Review"**
 6. **Adds a comment** to the Jira issue with the PR link
+7. **Enables the Jira MCP server** automatically so Junie can use its tools to read more data or update the issue as needed
 
 ## Setup
 

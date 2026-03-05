@@ -107,11 +107,11 @@ jobs:
 
 ## Jira Integration
 
-🔗 **Want to trigger Junie from Jira?** Check out the [Jira Integration Guide](docs/JIRA_INTEGRATION.md) to automatically implement features and fixes based on Jira issues.
+🔗 **Want to trigger Junie from Jira?** Check out the [Jira Integration Guide](docs/JIRA_INTEGRATION.md) to automatically implement features and fixes based on Jira issues. When triggered from Jira, the Jira MCP server is automatically enabled to allow Junie to interact with your Jira project.
 
 ## YouTrack Integration
 
-🔗 **Want to trigger Junie from YouTrack?** Check out the [YouTrack Integration Guide](docs/YOUTRACK_INTEGRATION.md) to automatically implement features and fixes based on YouTrack issues using the **Junie YouTrack App** from JetBrains Marketplace.
+🔗 **Want to trigger Junie from YouTrack?** Check out the [YouTrack Integration Guide](docs/YOUTRACK_INTEGRATION.md) to automatically implement features and fixes based on YouTrack issues using the **Junie YouTrack App** from JetBrains Marketplace. When triggered from YouTrack, the YouTrack MCP server is automatically enabled to allow Junie to interact with your YouTrack project.
 
 ## Cookbook
 
@@ -153,7 +153,7 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 | `model` | Model to use for the primary agent. Available: `sonnet`, `opus`, `gpt`, `gpt-codex`, `gemini-pro`, `gemini-flash`, `grok` | - |
 | `junie_work_dir` | Working directory for Junie files | `/tmp/junie-work` |
 | `junie_guidelines_filename` | Filename of the guidelines file (should be in `<project-root>/.junie` dir) | `guidelines.md` |
-| `allowed_mcp_servers` | Comma-separated list of MCP servers to use (e.g., `mcp_github_checks_server`). Note: inline comment server is automatically enabled for PRs. | - |
+| `allowed_mcp_servers` | Comma-separated list of MCP servers to use (e.g., `mcp_github_checks_server`). Note: inline comment server, Jira, and YouTrack servers are automatically enabled when applicable. | - |
 
 **Inline Arguments**: You can pass custom Junie CLI arguments directly in comments, issues, or custom prompts using `junie-args:` syntax. These arguments take priority over workflow inputs.
 
@@ -165,6 +165,8 @@ junie-args: --model=opus
 **Available MCP Servers**:
 - `mcp_github_checks_server`: Analyze failed GitHub Actions checks and provide detailed error information
 - `mcp_github_inline_comment_server`: Create inline code review comments with GitHub suggestions on PRs (automatically enabled for pull requests)
+- `jira`: Access Jira issues and project data (automatically enabled for Jira-triggered workflows)
+- `youtrack`: Access YouTrack issues and project data (automatically enabled for YouTrack-triggered workflows)
 
 **Example configuration**:
 ```yaml
@@ -175,7 +177,7 @@ junie-args: --model=opus
     model: "opus"  # Optional: specify which model to use
 ```
 
-**Note**: The `mcp_github_inline_comment_server` is automatically enabled for `pull_request` events - no manual configuration needed.
+**Note**: The `mcp_github_inline_comment_server` is automatically enabled for `pull_request` events, and `jira`/`youtrack` servers are automatically enabled when triggered via their respective integrations - no manual configuration needed.
 
 #### Advanced Features
 
