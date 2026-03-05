@@ -150,9 +150,9 @@ ${actorInfo ? actorInfo : ""}
 
         const userInstructionSection = yt.triggerComment
             ? `\n<user_instruction>\n${yt.triggerComment}\n</user_instruction>\n`
-            : '';
+            : 'Your task is to implement the requested feature or fix based on the YouTrack issue details below.';
 
-        return `You were triggered as a GitHub AI Assistant by a YouTrack issue. Your task is to implement the requested feature or fix based on the YouTrack issue details below.
+        return `You were triggered as a GitHub AI Assistant by a YouTrack issue. 
 ${userInstructionSection}
 <youtrack_issue>
 Issue ID: ${yt.issueId}
