@@ -94,8 +94,8 @@ jobs:
 ```
 
 **Version Tags:**
-- Use `@v0` for the latest v0.x.x version (pre-release)
-- Use `@v0.1.0` for a specific version (pinned - no automatic updates)
+- Use `@v1` for the latest v1.x.x version
+- Use `@v1.0.0` for a specific version (pinned - no automatic updates)
 - Use `@main` for the latest development version (not recommended for production)
 
 3. Start using Junie:
@@ -136,6 +136,7 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 |-------|-------------|---------|
 | `base_branch` | Base branch for creating new branches | `github.base_ref` |
 | `create_new_branch_for_pr` | Create new branch for PR contributors | `false` |
+| `resolve_conflicts` | Enable automatic conflict detection (not needed for manual `@junie-agent` resolution) | `false` |
 
 #### Junie Configuration
 
@@ -146,7 +147,7 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 | `model` | Model to use for the primary agent. Available: `sonnet`, `opus`, `gpt`, `gpt-codex`, `gemini-pro`, `gemini-flash`, `grok` | - |
 | `junie_work_dir` | Working directory for Junie files | `/tmp/junie-work` |
 | `junie_guidelines_filename` | Filename of the guidelines file (should be in `<project-root>/.junie` dir) | `guidelines.md` |
-| `allowed_mcp_servers` | Comma-separated list of MCP servers to use (e.g., `mcp_github_checks_server`). Note: inline comment server is automatically enabled for PRs. | - |
+| `allowed_mcp_servers` | Comma-separated list of MCP servers to use (e.g., `mcp_github_checks_server`). Note: inline comment server is automatically enabled for PRs and checks server is automatically enabled for `fix-ci` tasks. | - |
 
 **Inline Arguments**: You can pass custom Junie CLI arguments directly in comments, issues, or custom prompts using `junie-args:` syntax. These arguments take priority over workflow inputs.
 
@@ -156,7 +157,7 @@ junie-args: --model=opus
 ```
 
 **Available MCP Servers**:
-- `mcp_github_checks_server`: Analyze failed GitHub Actions checks and provide detailed error information
+- `mcp_github_checks_server`: Analyze failed GitHub Actions checks and provide detailed error information (automatically enabled for `fix-ci` tasks)
 - `mcp_github_inline_comment_server`: Create inline code review comments with GitHub suggestions on PRs (automatically enabled for pull requests)
 
 **Example configuration**:
@@ -168,7 +169,7 @@ junie-args: --model=opus
     model: "opus"  # Optional: specify which model to use
 ```
 
-**Note**: The `mcp_github_inline_comment_server` is automatically enabled for `pull_request` events - no manual configuration needed.
+**Note**: The `mcp_github_inline_comment_server` is automatically enabled for `pull_request` events, and `mcp_github_checks_server` is automatically enabled for `fix-ci` tasks - no manual configuration needed.
 
 #### Advanced Features
 
