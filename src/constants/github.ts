@@ -55,8 +55,8 @@ Your task is to analyze CI failures and fix them. Follow these steps:
 1. Gather Information
    - Use the 'get_pr_failed_checks_info' tool to retrieve information about failed CI/CD checks.
    - If NO failed checks were found, stop and submit IMMEDIATELY, reporting that there are no failures for this PR. Do not check anything else.
-   - If failed checks WERE found, read the PR title, description, comments, and conversations. This is important to ensure we align with the PR intent and decisions being made.    
-   - If failed checks WERE found, read the Pull Request diff by using \`${diffCommand} | grep "^diff --git"\`. Do not write the diff to file.   
+   - If failed checks WERE found, review the PR title, description, comments, and conversations. This is important to ensure we align with the PR intent and decisions being made.
+   - If failed checks WERE found, review the Pull Request diff by using \`${diffCommand} | grep "^diff --git"\`. Do not write the diff to file.
 
 2. If failed checks WERE found, analyze each failure:
    - Open and explore relevant source files to understand the context
@@ -69,7 +69,7 @@ Your task is to analyze CI failures and fix them. Follow these steps:
    - Make the necessary changes to fix the CI failures.
    - Keep changes minimal and focused on fixing the specific failures.
    - Follow the existing code style and conventions in the repository.
-   - Ensure your fix aligns with the PR's original intent and any decision taken in the PR conversations.   
+   - Ensure your fix aligns with the PR's original intent and you take into consideration any decision taken in the PR conversations.
    - Do NOT make unrelated changes or "improvements" beyond what is needed to fix the CI. 
 
 4. Validation
@@ -106,15 +106,15 @@ Your task is to make a minor fix to this Pull Request based on the user's reques
 ${userRequestSection}
 ### Steps to follow
 1. Gather Information
-   - Read the PR title, description, comments, and conversations. This is important to ensure we align with the PR intent and decisions being made.
-   - Read the Pull Request diff by using \`${diffCommand} | grep "^diff --git"\`. Do not write the diff to file.
-   - Understand the context of the changes and what the PR is trying to accomplish.${gatherInfoUserRequestNote}   
+   - Review the PR title, description, comments, and conversations. This is important to ensure we align with the PR intent and decisions being made.
+   - Review the Pull Request diff by using \`${diffCommand} | grep "^diff --git"\`. Do not write the diff to file.
+   - Understand the context of the changes and what the PR is trying to accomplish.${gatherInfoUserRequestNote}
 
 2. Implement the Fix
    - Make the requested changes to the codebase.
    - Keep changes minimal and focused on the specific request.
    - Follow the existing code style and conventions in the repository.
-   - Ensure your fix aligns with the PR's original intent and any decision taken in the PR conversations.   
+   - Ensure your fix aligns with the PR's original intent and you take into consideration any decision taken in the PR conversations.
    - Do NOT make unrelated changes or "improvements" beyond what was requested.
 
 3. Validation
