@@ -21,7 +21,7 @@ import {
     JiraIssuePayload,
     JunieExecutionContext, YouTrackIssuePayload
 } from "../context";
-import {downloadJiraAttachmentsAndRewriteText, downloadYouTrackAttachments} from "./attachment-downloader";
+import {downloadJiraAttachmentsAndRewriteText} from "./attachment-downloader";
 import {sanitizeContent} from "../../utils/sanitizer";
 import {
     createFixCIFailuresPrompt,
@@ -148,30 +148,20 @@ ${actorInfo ? actorInfo : ""}
     private async generateYouTrackPrompt(context: JunieExecutionContext): Promise<string> {
         const yt = context.payload as YouTrackIssuePayload;
 
-        const commentsSection = yt.issueComments
-            ? `\n\nComments:\n${yt.issueComments}`
+        const userInstructionSection = yt.triggerComment
+            ? `\n<user_instruction>\n${yt.triggerComment}\n</user_instruction>\n`
             : '';
 
-        let promptText = `You were triggered as a GitHub AI Assistant by a YouTrack issue. Your task is to implement the requested feature or fix based on the YouTrack issue details below.
-
+        return `You were triggered as a GitHub AI Assistant by a YouTrack issue. Your task is to implement the requested feature or fix based on the YouTrack issue details below.
+${userInstructionSection}
 <youtrack_issue>
 Issue ID: ${yt.issueId}
 URL: ${yt.issueUrl}
 Summary: ${yt.issueTitle}
 
-Description: ${yt.issueDescription}${commentsSection}
+Description: ${yt.issueDescription}
 </youtrack_issue>
 `;
-
-        // Download attachments and list their local paths in the prompt
-        if (yt.attachments.length > 0) {
-            const localPaths = await downloadYouTrackAttachments(yt.attachments, yt.youtrackBaseUrl);
-            if (localPaths.length > 0) {
-                promptText += `\nAttachments:\n${localPaths.join('\n')}\n`;
-            }
-        }
-
-        return promptText;
     }
 
     private extractKeyWords(context: JunieExecutionContext, branchInfo: BranchInfo) {

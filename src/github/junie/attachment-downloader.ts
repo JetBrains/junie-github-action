@@ -1,13 +1,11 @@
 import {writeFile, mkdir} from "fs/promises";
 import {join} from "path";
-import {JiraAttachment, YouTrackAttachment} from "../context";
+import {JiraAttachment} from "../context";
 import {getJiraClient} from "../jira/client";
-import {getYouTrackClient} from "../youtrack/client";
 import mime from "mime-types";
 
 const DOWNLOAD_DIR = "/tmp/github-attachments";
 const JIRA_DOWNLOAD_DIR = "/tmp/jira-attachments";
-const YOUTRACK_DOWNLOAD_DIR = "/tmp/youtrack-attachments";
 
 /**
  * Download file from URL (signed or regular)
@@ -216,42 +214,6 @@ async function downloadJiraAttachment(url: string, filename: string): Promise<st
     console.log(`✓ Downloaded Jira attachment: ${filename} -> ${localPath}`);
 
     return localPath;
-}
-
-/**
- * Downloads YouTrack attachments and returns their local file paths.
- *
- * @param attachments - Array of YouTrack attachments with URL and optional metadata
- * @param youtrackBaseUrl - YouTrack instance base URL (used for client authentication)
- * @returns Array of local file paths for the downloaded attachments
- */
-export async function downloadYouTrackAttachments(
-    attachments: Array<YouTrackAttachment>,
-    youtrackBaseUrl: string,
-): Promise<string[]> {
-    if (attachments.length === 0) {
-        return [];
-    }
-
-    const client = getYouTrackClient(youtrackBaseUrl);
-    const localPaths: string[] = [];
-
-    await mkdir(YOUTRACK_DOWNLOAD_DIR, { recursive: true });
-
-    for (const attachment of attachments) {
-        try {
-            const buffer = await client.downloadAttachment(attachment.url);
-            const filename = attachment.filename || attachment.url.split('/').pop() || `attachment-${Date.now()}`;
-            const localPath = join(YOUTRACK_DOWNLOAD_DIR, filename);
-            await writeFile(localPath, buffer);
-            localPaths.push(localPath);
-            console.log(`✓ Downloaded YouTrack attachment: ${filename} -> ${localPath}`);
-        } catch (error) {
-            console.warn(`Could not download YouTrack attachment ${attachment.url}: ${error instanceof Error ? error.message : error}`);
-        }
-    }
-
-    return localPaths;
 }
 
 /**
