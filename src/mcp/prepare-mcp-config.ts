@@ -5,7 +5,7 @@ import {mkdir, writeFile} from "fs/promises";
 import {join} from "path";
 import {homedir} from 'os';
 import {BranchInfo} from "../github/operations/branch";
-import {isFixCIEvent, isYouTrackWorkflowDispatchEvent, JunieExecutionContext} from "../github/context";
+import {isFixCIEvent, isJiraWorkflowDispatchEvent, isYouTrackWorkflowDispatchEvent, JunieExecutionContext} from "../github/context";
 
 type PrepareConfigParams = {
     context: JunieExecutionContext;
@@ -84,6 +84,28 @@ export async function prepareMcpConfig(
             },
         };
         enabledServers.push('mcp_github_checks_server');
+    }
+
+    // Add Jira MCP server when triggered by a Jira event
+    if (isJiraWorkflowDispatchEvent(context)) {
+        const jiraUrl = process.env.JIRA_BASE_URL;
+        const jiraUsername = process.env.JIRA_EMAIL;
+        const jiraApiToken = process.env.JIRA_API_TOKEN;
+        if (jiraUrl && jiraUsername && jiraApiToken) {
+            console.log(`Enabling Jira MCP Server for ${jiraUrl}`);
+            baseMcpConfig.mcpServers.jira = {
+                command: "uvx",
+                args: ["mcp-atlassian"],
+                env: {
+                    JIRA_URL: jiraUrl,
+                    JIRA_USERNAME: jiraUsername,
+                    JIRA_API_TOKEN: jiraApiToken,
+                },
+            };
+            enabledServers.push('jira');
+        } else {
+            console.warn('Jira MCP Server not enabled: missing JIRA_BASE_URL, JIRA_EMAIL, or JIRA_API_TOKEN');
+        }
     }
 
     // Add YouTrack MCP server when triggered by a YouTrack event
