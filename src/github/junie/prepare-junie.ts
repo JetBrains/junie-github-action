@@ -4,7 +4,7 @@ import {
     isTriggeredByUserInteraction,
     isPushEvent,
     isJiraWorkflowDispatchEvent,
-    isResolveConflictsWorkflowDispatchEvent, isWorkflowRunFailureEvent, isFixCIEvent,
+    isResolveConflictsWorkflowDispatchEvent, isWorkflowRunFailureEvent,
     isYouTrackWorkflowDispatchEvent,
 } from "../context";
 import {checkHumanActor} from "../validation/actor";
@@ -91,15 +91,12 @@ export async function initializeJunieExecution({
     // - Inline comment server: enabled for PRs (requires commitSha)
     // - Checks server: enabled for fix-ci action or when explicitly requested
     const mcpConfig = await prepareMcpConfig({
-        junieWorkingDir: context.inputs.junieWorkingDir,
+        context: context,
         allowedMcpServers: mcpServers,
         githubToken: tokenConfig.workingToken,
-        owner: context.payload.repository.owner.login,
-        repo: context.payload.repository.name,
         branchInfo: branchInfo,
         prNumber: prNumber,
         commitSha: commitSha,
-        isFixCI: isFixCIEvent(context)
     })
 
     await prepareJunieTask(context, branchInfo, octokit, mcpConfig.enabledServers, tokenConfig.isDefaultToken())

@@ -5,17 +5,15 @@ import {mkdir, writeFile} from "fs/promises";
 import {join} from "path";
 import {homedir} from 'os';
 import {BranchInfo} from "../github/operations/branch";
+import {isFixCIEvent, isYouTrackWorkflowDispatchEvent, JunieExecutionContext} from "../github/context";
 
 type PrepareConfigParams = {
-    junieWorkingDir: string;
+    context: JunieExecutionContext;
     githubToken: string;
-    owner: string;
-    repo: string;
     branchInfo: BranchInfo;
     allowedMcpServers: string[];
     prNumber?: number;
     commitSha?: string;
-    isFixCI?: boolean;
 };
 
 
@@ -23,16 +21,15 @@ export async function prepareMcpConfig(
     params: PrepareConfigParams,
 ): Promise<{ configPath: string; enabledServers: string[] }> {
     const {
+        context,
         githubToken,
-        owner,
-        repo,
         branchInfo,
         allowedMcpServers,
         prNumber,
         commitSha,
-        isFixCI,
     } = params;
-
+    const owner = context.payload.repository.owner.login
+    const repo = context.payload.repository.name
     const hasGHCheksServer = allowedMcpServers.some((name) =>
         name == "mcp_github_checks_server"
     );
@@ -64,6 +61,7 @@ export async function prepareMcpConfig(
         };
         enabledServers.push('mcp_github_inline_comment_server');
     }
+    const isFixCI = isFixCIEvent(context);
 
     // Auto-enable checks server for fix-ci action or when explicitly requested
     if (hasGHCheksServer || isFixCI) {
@@ -86,6 +84,24 @@ export async function prepareMcpConfig(
             },
         };
         enabledServers.push('mcp_github_checks_server');
+    }
+
+    // Add YouTrack MCP server when triggered by a YouTrack event
+    if (isYouTrackWorkflowDispatchEvent(context)) {
+        console.log(`Enabling YouTrack MCP Server for ${context.payload.youtrackBaseUrl}`);
+        baseMcpConfig.mcpServers.youtrack = {
+            command: "npx",
+            args: [
+                "mcp-remote",
+                `${context.payload.youtrackBaseUrl}/mcp`,
+                "--header",
+                "Authorization:${AUTH_HEADER}",
+            ],
+            env: {
+                AUTH_HEADER: `Bearer ${context.payload.youtrackToken}`,
+            },
+        };
+        enabledServers.push('youtrack');
     }
 
     const configJsonString = JSON.stringify(baseMcpConfig, null, 2);

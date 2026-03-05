@@ -65,6 +65,7 @@ export type YouTrackIssuePayload = WorkflowDispatchEvent & {
     issueComments: string;
     attachments: YouTrackAttachment[];
     youtrackBaseUrl: string;
+    youtrackToken: string;
     action: typeof YOUTRACK_EVENT_ACTION;
 };
 
@@ -455,6 +456,7 @@ function extractYouTrackEventData(workflowPayload: WorkflowDispatchEvent, contex
     const issueDescription = (workflowPayload.inputs?.issue_description as string) || '';
     const issueComments = (workflowPayload.inputs?.issue_comments as string) || '';
     const youtrackBaseUrl = workflowPayload.inputs?.youtrack_base_url as string;
+    const youtrackToken = process.env.YOUTRACK_TOKEN || '';
 
     if (!issueId || !issueTitle || !youtrackBaseUrl) {
         throw new Error(`Missing YouTrack issue data in workflow payload: ${JSON.stringify(workflowPayload)}`);
@@ -490,6 +492,7 @@ function extractYouTrackEventData(workflowPayload: WorkflowDispatchEvent, contex
             issueComments,
             attachments,
             youtrackBaseUrl,
+            youtrackToken,
             action: YOUTRACK_EVENT_ACTION,
         },
     };
