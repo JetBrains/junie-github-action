@@ -58,12 +58,15 @@ export async function initializeJunieExecution({
         }
     }
 
-    // Post "started working" comment for YouTrack-triggered workflows
+    // Post "started working" comment for YouTrack-triggered workflows and save the comment ID
     if (isYouTrackWorkflowDispatchEvent(context)) {
         try {
             console.log('Youtrack Payload: ', JSON.stringify(context.payload, null, 2));
             const client = getYouTrackClient(context.payload.youtrackBaseUrl);
-            await client.addComment(context.payload.issueId, INIT_COMMENT_BODY);
+            const commentId = await client.addComment(context.payload.issueId, INIT_COMMENT_BODY);
+            if (commentId) {
+                core.setOutput(OUTPUT_VARS.YOUTRACK_INIT_COMMENT_ID, commentId);
+            }
         } catch (ytError) {
             console.warn('Failed to post starting comment to YouTrack:', ytError);
             // Don't fail the workflow if YouTrack update fails

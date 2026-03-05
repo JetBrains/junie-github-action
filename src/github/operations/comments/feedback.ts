@@ -500,7 +500,11 @@ async function postYouTrackFeedback(data: FinishFeedbackData): Promise<void> {
     }
 
     if (comment) {
-        await client.addComment(ytPayload.issueId, comment);
+        if (data.youtrackInitCommentId) {
+            await client.updateComment(ytPayload.issueId, data.youtrackInitCommentId, comment);
+        } else {
+            await client.addComment(ytPayload.issueId, comment);
+        }
         console.log(`✓ Successfully updated YouTrack issue ${ytPayload.issueId}`);
     }
 }

@@ -33,15 +33,13 @@ class YouTrackClient {
      *
      * @param issueId - YouTrack issue ID (e.g., PROJ-123)
      * @param text - Comment text in Markdown
-     * @returns true if successful, false otherwise
+     * @returns comment ID if successful, null otherwise
      */
-    async addComment(issueId: string, text: string): Promise<boolean> {
+    async addComment(issueId: string, text: string): Promise<string | null> {
         try {
             console.log(`Adding comment to YouTrack issue ${issueId}`);
 
-            const url = `${this.baseUrl}/api/issues/${issueId}/comments`;
-            console.log(`Sending POST request to ${url}`);
-
+            const url = `${this.baseUrl}/api/issues/${issueId}/comments?fields=id`;
             const response = await fetch(url, {
                 method: 'POST',
                 headers: this.authHeaders,
@@ -52,10 +50,42 @@ class YouTrackClient {
                 throw new Error(`${response.status} ${response.statusText}`);
             }
 
-            console.log(`✓ Successfully added comment to YouTrack issue ${issueId}`);
-            return true;
+            const data = await response.json() as { id: string };
+            console.log(`✓ Successfully added comment to YouTrack issue ${issueId}, comment ID: ${data.id}`);
+            return data.id;
         } catch (error) {
             console.error(`Error adding comment to YouTrack issue ${issueId}:`, error);
+            return null;
+        }
+    }
+
+    /**
+     * Updates an existing comment on a YouTrack issue
+     *
+     * @param issueId - YouTrack issue ID (e.g., PROJ-123)
+     * @param commentId - ID of the comment to update
+     * @param text - New comment text in Markdown
+     * @returns true if successful, false otherwise
+     */
+    async updateComment(issueId: string, commentId: string, text: string): Promise<boolean> {
+        try {
+            console.log(`Updating comment ${commentId} on YouTrack issue ${issueId}`);
+
+            const url = `${this.baseUrl}/api/issues/${issueId}/comments/${commentId}`;
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: this.authHeaders,
+                body: JSON.stringify({ text }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`${response.status} ${response.statusText}`);
+            }
+
+            console.log(`✓ Successfully updated comment ${commentId} on YouTrack issue ${issueId}`);
+            return true;
+        } catch (error) {
+            console.error(`Error updating comment ${commentId} on YouTrack issue ${issueId}:`, error);
             return false;
         }
     }
