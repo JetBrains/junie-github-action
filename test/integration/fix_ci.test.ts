@@ -1,4 +1,4 @@
-import {describe, test, beforeAll, afterAll} from "bun:test";
+import {describe, test, beforeAll, afterAll, expect} from "bun:test";
 import {INIT_COMMENT_BODY, SUCCESS_FEEDBACK_COMMENT} from "../../src/constants/github";
 import {testClient} from "../client/client";
 
@@ -74,7 +74,8 @@ async function testFixCi(repoName: string, fixCiInComment: (prNumber: number) =>
     const titleKeywords = ["ci", "fail", "fix", "workflow"]
 
     const foundPR = await testClient.waitForPR(testClient.conditionIncludes(titleKeywords));
-    await testClient.checkPRFiles(foundPR, testClient.conditionPRFilesInclude({[fileName]: "console.log('fail');"}));
+    const result = await testClient.checkPRFiles(foundPR, testClient.conditionPRFilesInclude({[fileName]: "console.log('fail');"}));
+    expect(result, "PR files check failed - required content not found in files").toBe(true);
     console.log(`Waiting for CI to pass on PR #${foundPR.number}...`);
     await testClient.waitForSuccessfulCI(foundPR.number);
     await testClient.waitForJunieComment(pr.number, SUCCESS_FEEDBACK_COMMENT);

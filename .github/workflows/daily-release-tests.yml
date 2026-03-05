@@ -33,6 +33,7 @@ jobs:
           CURRENT_BRANCH: ${{ github.head_ref || github.ref_name }}
           JUNIE_VERSION: latest
         run: |
+          set -o pipefail
           mkdir -p test-results
           
           exit_code=0
@@ -43,7 +44,7 @@ jobs:
           done
           
           for job in $(jobs -p); do
-            wait $job || exit_code=$?
+            wait $job || exit_code=1
           done
           
           # Prepare a short failure summary for Slack
@@ -62,6 +63,10 @@ jobs:
           
           echo "All tests completed"
           exit $exit_code
+
+      - name: Generate Test Summary
+        if: always()
+        run: bun run test/summary/generate-test-summary.ts
 
       - name: Send Slack Notification
         if: always()

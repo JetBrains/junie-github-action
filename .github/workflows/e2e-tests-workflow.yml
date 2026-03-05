@@ -29,25 +29,32 @@ jobs:
         run: bun install
 
       - name: Run Integration Tests in Parallel
+        id: run-tests
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
           TEST_ORG: melotria
           CURRENT_BRANCH: ${{ github.head_ref || github.ref_name }}
         run: |
+          set -o pipefail
           mkdir -p test-results
           
           exit_code=0
           for test_file in test/integration/*.test.ts; do
+            test_name=$(basename "$test_file" .test.ts)
             echo "Starting $test_file"
-            bun test "$test_file" &
+            bun test "$test_file" 2>&1 | tee "test-results/$test_name.log" &
           done
           
           for job in $(jobs -p); do
-            wait $job || exit_code=$?
+            wait $job || exit_code=1
           done
           
           echo "All tests completed"
           exit $exit_code
+
+      - name: Generate Test Summary
+        if: always()
+        run: bun run test/summary/generate-test-summary.ts
 
       - name: Upload Test Report
         if: always()
