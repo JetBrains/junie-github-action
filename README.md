@@ -26,8 +26,8 @@ A powerful GitHub Action that integrates [Junie](https://www.jetbrains.com/junie
 - **PR Management**: Reviews code changes and implements requested modifications
 - **Inline Code Reviews**: Create code review comments with GitHub suggestions directly on PR diffs
 - **Conflict Resolution**: Resolve merge conflicts via `@junie-agent` comment or automatic detection
-- **Minor PR Fixes**: Quickly implement small changes in PRs using `@junie-agent minor-fix [instruction]`
-- **CI Failure Analysis**: Investigates failed checks and suggests fixes using MCP integration
+- **Minor PR Fixes**: Quickly implement small changes in PRs using `@junie-agent minor-fix [instruction]`, considering PR context and previous discussions
+- **CI Failure Analysis**: Investigates failed checks and suggests fixes using MCP integration, taking into account PR description and comments for context
 - **Flexible Triggers**: Activate via mentions, assignees, labels, or custom prompts
 - **Smart Branch Management**: Context-aware branch creation and management
 - **Silent Mode**: Run analysis-only workflows without comments or git operations
@@ -143,7 +143,7 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 
 | Input | Description | Default |
 |-------|-------------|---------|
-| `prompt` | Custom instructions for Junie. Special values: `code-review` for PR reviews, `fix-ci` for CI failure analysis, `minor-fix` for quick PR adjustments. See [Cookbook](COOKBOOK.md) for examples. | - |
+| `prompt` | Custom instructions for Junie. Special values: `code-review` for PR reviews, `fix-ci` for CI failure analysis (considers PR context and comments), `minor-fix` for quick PR adjustments (taking PR context into account). See [Cookbook](COOKBOOK.md) for examples. | - |
 | `junie_version` | Junie CLI version to install | `888.57` |
 | `model` | Model to use for the primary agent. Available: `sonnet`, `opus`, `gpt`, `gpt-codex`, `gemini-pro`, `gemini-flash`, `grok` | - |
 | `junie_work_dir` | Working directory for Junie files | `/tmp/junie-work` |
@@ -366,7 +366,7 @@ jobs:
 1. **Trigger Detection**: The action detects triggers (mentions, labels, assignments, or prompts)
 2. **Validation**: Verifies permissions and checks if the actor is human (when applicable - see Security Considerations)
 3. **Branch Management**: Creates or checks out the appropriate working branch
-4. **Task Preparation**: Converts GitHub context into a Junie-compatible task, applying security sanitization to user-submitted content to prevent prompt injection
+4. **Task Preparation**: Converts GitHub context (including PR title, description, comments, and commits) into a Junie-compatible task, applying security sanitization to user-submitted content to prevent prompt injection
 5. **Attachment Processing**: Automatically downloads attachments from issues, PRs, and comments
    - Downloaded files are made available to Junie for analysis and context
 6. **MCP Setup**: Configures enabled MCP servers for enhanced capabilities

@@ -68,7 +68,7 @@ jobs:
 - Comment `@junie-agent minor-fix rename variable x to y` in a PR → Junie makes the requested adjustment
 
 **Features enabled:**
-- ✅ Minor Fixes - quickly implement small PR adjustments with `minor-fix`
+- ✅ Minor Fixes - quickly implement small PR adjustments with `minor-fix`, considering PR context and previous discussions
 - ✅ Single comment mode - updates one comment instead of creating multiple
 - ✅ Works on issues, PRs, comments, and reviews
 - ✅ Only triggers on explicit `@junie-agent` mentions
@@ -355,6 +355,8 @@ The built-in fix-ci prompt:
 - **Retrieves failed check information** using MCP GitHub Checks Server
 - **Analyzes root causes** - test failures, build errors, linting issues, timeouts, flaky tests
 - **Correlates with PR changes** - determines if failure is related to the PR or pre-existing
+- **Context Awareness** - reviews PR title, description, and comments for additional guidance and context
+- **Smart Exit** - exits immediately if no failed checks are found, preventing redundant analysis
 - **Implements fixes automatically** - analyzes the issue and creates a PR with the fix (when `create_new_branch_for_pr` is enabled)
 
 ### Option B: Custom Fix CI Prompt
