@@ -1,4 +1,4 @@
-import {describe, test, beforeAll, afterAll} from "bun:test";
+import {describe, test, beforeAll, afterAll, expect} from "bun:test";
 import {INIT_COMMENT_BODY, SUCCESS_FEEDBACK_COMMENT} from "../../src/constants/github";
 import {testClient} from "../client/client";
 
@@ -56,7 +56,8 @@ describe("Trigger Junie in PR comment", () => {
                 await testClient.checkPRFiles(pr, testClient.conditionPRFilesCountIncrease(filesCount));
         });
 
-        await testClient.checkPRFiles(foundPR, testClient.conditionPRFilesInclude({[filename]: "zero", ["README.md"]: ""}));
+        const result = await testClient.checkPRFiles(foundPR, testClient.conditionPRFilesInclude({[filename]: "zero", ["README.md"]: ""}));
+        expect(result, "PR files check failed - required content not found in files").toBe(true);
 
         await testClient.waitForJunieComment(prNumber, SUCCESS_FEEDBACK_COMMENT);
         testPassed = true;
