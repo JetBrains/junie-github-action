@@ -61,6 +61,7 @@ export async function initializeJunieExecution({
     // Post "started working" comment for YouTrack-triggered workflows
     if (isYouTrackWorkflowDispatchEvent(context)) {
         try {
+            console.log('Youtrack Payload: ', JSON.stringify(context.payload, null, 2));
             const client = getYouTrackClient(context.payload.youtrackBaseUrl);
             await client.addComment(context.payload.issueId, INIT_COMMENT_BODY);
         } catch (ytError) {
