@@ -4,6 +4,12 @@ on:
   schedule:
     - cron: '0 1 * * *'
   workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to test'
+        required: false
+        default: 'main'
+        type: string
 
 jobs:
   integration-tests-latest:
@@ -16,6 +22,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch || github.ref }}
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -90,8 +98,12 @@ jobs:
                       "title": "Status",
                       "value": "${{ steps.run-tests.outcome }}",
                       "short": true
-                    }
-                    ${{ env.FAILED_TESTS_SUMMARY != '' && format(', { "title": "Failed Tests", "value": "{0}", "short": false }', env.FAILED_TESTS_SUMMARY) || '' }}
+                    }${{ env.FAILED_TESTS_SUMMARY != '' && format(',
+                    {{
+                      "title": "Failed Tests",
+                      "value": "{0}",
+                      "short": false
+                    }}', env.FAILED_TESTS_SUMMARY) || '' }}
                   ]
                 }
               ]
