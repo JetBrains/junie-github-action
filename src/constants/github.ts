@@ -38,6 +38,8 @@ export const MINOR_FIX_TRIGGER_PHRASE_REGEXP = new RegExp(MINOR_FIX_ACTION, 'i')
 
 export const JIRA_EVENT_ACTION = "jira_event";
 
+export const YOUTRACK_EVENT_ACTION = "youtrack_event";
+
 export const WORKING_BRANCH_PREFIX = "junie/";
 
 export const DEFAULT_TRIGGER_PHRASE = "@junie-agent";

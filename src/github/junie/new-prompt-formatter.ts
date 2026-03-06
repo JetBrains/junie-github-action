@@ -17,11 +17,12 @@ import {
     isPullRequestReviewCommentEvent,
     isPullRequestReviewEvent,
     isPushEvent,
-    isTriggeredByUserInteraction,
+    isTriggeredByUserInteraction, isYouTrackWorkflowDispatchEvent,
     JiraIssuePayload,
-    JunieExecutionContext
+    JunieExecutionContext, YouTrackIssuePayload
 } from "../context";
-import {downloadJiraAttachmentsAndRewriteText} from "./attachment-downloader";
+import {downloadJiraAttachmentsAndRewriteText, downloadYouTrackAttachments} from "./attachment-downloader";
+import {getYouTrackClient} from "../youtrack/client";
 import {sanitizeContent} from "../../utils/sanitizer";
 import {
     createFixCIFailuresPrompt,
@@ -93,6 +94,17 @@ export class NewGitHubPromptFormatter {
                 customJunieArgs: parsed.args
             };
         }
+
+        // 5. Handle YouTrack issue integration
+        if (isYouTrackWorkflowDispatchEvent(context)) {
+            const youtrackPrompt = await this.generateYouTrackPrompt(context);
+            const parsed = extractJunieArgs(youtrackPrompt);
+            return {
+                prompt: sanitizeContent(parsed.cleanedText),
+                customJunieArgs: parsed.args,
+            };
+        }
+
         const repositoryInfo = this.getRepositoryInfo(context);
         const actorInfo = this.getActorInfo(context);
 
@@ -132,6 +144,47 @@ ${actorInfo ? actorInfo : ""}
             prompt: sanitizeContent(finalPrompt),
             customJunieArgs: this.deduplicateArgs(customJunieArgs)
         };
+    }
+
+    private async generateYouTrackPrompt(context: JunieExecutionContext): Promise<string> {
+        const yt = context.payload as YouTrackIssuePayload;
+
+        const userInstructionSection = yt.triggerComment
+            ? `Your task is to follow the instruction below: 
+<user_instruction>
+${yt.triggerComment}
+</user_instruction>
+
+Use the information inside <youtrack_issue> only as context. 
+Do not implement or modify anything related to it unless the user_instruction explicitly asks for it.`
+            : 'Your task is to implement the requested feature or fix based on the YouTrack issue details below.';
+
+        const commentsSection = yt.issueComments
+            ? `\n\nComments:\n${yt.issueComments}`
+            : '';
+
+        let promptText = `You were triggered as a GitHub AI Assistant by a YouTrack issue.
+${userInstructionSection}
+<youtrack_issue>
+Issue ID: ${yt.issueId}
+URL: ${yt.issueUrl}
+Summary: ${yt.issueTitle}
+
+Description: ${yt.issueDescription}${commentsSection}
+</youtrack_issue>
+`;
+
+        try {
+            const client = getYouTrackClient(yt.youtrackBaseUrl);
+            const attachments = await client.getAttachments(yt.issueId);
+            if (attachments.length > 0) {
+                promptText = await downloadYouTrackAttachments(promptText, attachments);
+            }
+        } catch (error) {
+            console.warn(`Failed to fetch YouTrack attachments: ${error instanceof Error ? error.message : error}`);
+        }
+
+        return promptText;
     }
 
     private extractKeyWords(context: JunieExecutionContext, branchInfo: BranchInfo) {
@@ -187,23 +240,32 @@ ${actorInfo ? actorInfo : ""}
     private async generateJiraPrompt(context: JunieExecutionContext): Promise<string> {
         const jira = context.payload as JiraIssuePayload;
 
+        const userInstructionSection = jira.triggerComment
+            ? `Your task is to follow the instruction below:
+<user_instruction>
+${jira.triggerComment}
+</user_instruction>
+
+Use the information inside <jira_issue> only as context.
+Do not implement or modify anything related to it unless the user_instruction explicitly asks for it.`
+            : 'Your task is to implement the requested feature or fix based on the Jira issue details below.';
+
         // Format comments
         const commentsInfo = jira.comments.length > 0
             ? '\n\nComments:\n' + jira.comments.map(comment => {
-            const date = new Date(comment.created).toLocaleString('en-US', {
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-            });
-            return `[${date}] ${comment.author}:\n${comment.body}`;
-        }).join('\n\n')
+                const date = new Date(comment.created).toLocaleString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                return `[${date}] ${comment.author}:\n${comment.body}`;
+            }).join('\n\n')
             : '';
 
-        // Form the complete prompt text
-        const promptText = `You were triggered as a GitHub AI Assistant by a Jira issue. Your task is to implement the requested feature or fix based on the Jira issue details below.
-
+        const promptText = `You were triggered as a GitHub AI Assistant by a Jira issue.
+${userInstructionSection}
 <jira_issue>
 Issue Key: ${jira.issueKey}
 Summary: ${jira.issueSummary}
@@ -212,7 +274,6 @@ Description: ${jira.issueDescription}${commentsInfo}
 </jira_issue>
 `;
 
-        // Download all attachments referenced in text (single pass), then return
         return await downloadJiraAttachmentsAndRewriteText(promptText, jira.attachments);
     }
 

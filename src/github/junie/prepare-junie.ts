@@ -4,7 +4,8 @@ import {
     isTriggeredByUserInteraction,
     isPushEvent,
     isJiraWorkflowDispatchEvent,
-    isResolveConflictsWorkflowDispatchEvent, isWorkflowRunFailureEvent, isFixCIEvent
+    isResolveConflictsWorkflowDispatchEvent, isWorkflowRunFailureEvent,
+    isYouTrackWorkflowDispatchEvent,
 } from "../context";
 import {checkHumanActor} from "../validation/actor";
 import {postJunieWorkingStatusComment} from "../operations/comments/feedback";
@@ -17,8 +18,9 @@ import {Octokits} from "../api/client";
 import {prepareJunieTask} from "./junie-tasks";
 import {prepareJunieCLIToken} from "./junie-token";
 import {OUTPUT_VARS} from "../../constants/environment";
-import {RESOLVE_CONFLICTS_ACTION,} from "../../constants/github";
+import {INIT_COMMENT_BODY, RESOLVE_CONFLICTS_ACTION,} from "../../constants/github";
 import {getJiraClient} from "../jira/client";
+import {getYouTrackClient} from "../youtrack/client";
 import {detectJunieTriggerPhrase} from "../validation/trigger";
 
 /**
@@ -56,6 +58,21 @@ export async function initializeJunieExecution({
         }
     }
 
+    // Post "started working" comment for YouTrack-triggered workflows and save the comment ID
+    if (isYouTrackWorkflowDispatchEvent(context)) {
+        try {
+            console.log('Youtrack Payload: ', JSON.stringify(context.payload, null, 2));
+            const client = getYouTrackClient(context.payload.youtrackBaseUrl);
+            const commentId = await client.addComment(context.payload.issueId, INIT_COMMENT_BODY);
+            if (commentId) {
+                core.setOutput(OUTPUT_VARS.YOUTRACK_INIT_COMMENT_ID, commentId);
+            }
+        } catch (ytError) {
+            console.warn('Failed to post starting comment to YouTrack:', ytError);
+            // Don't fail the workflow if YouTrack update fails
+        }
+    }
+
     const branchInfo = await initializeJunieWorkspace(octokit, context);
     const mcpServers = context.inputs.allowedMcpServers ? context.inputs.allowedMcpServers.split(',') : []
     console.log(`MCP Servers enabled by user: ${mcpServers}`)
@@ -78,15 +95,12 @@ export async function initializeJunieExecution({
     // - Inline comment server: enabled for PRs (requires commitSha)
     // - Checks server: enabled for fix-ci action or when explicitly requested
     const mcpConfig = await prepareMcpConfig({
-        junieWorkingDir: context.inputs.junieWorkingDir,
+        context: context,
         allowedMcpServers: mcpServers,
         githubToken: tokenConfig.workingToken,
-        owner: context.payload.repository.owner.login,
-        repo: context.payload.repository.name,
         branchInfo: branchInfo,
         prNumber: prNumber,
         commitSha: commitSha,
-        isFixCI: isFixCIEvent(context)
     })
 
     await prepareJunieTask(context, branchInfo, octokit, mcpConfig.enabledServers, tokenConfig.isDefaultToken())
@@ -113,6 +127,10 @@ async function shouldHandle(context: JunieExecutionContext, octokit: Octokits): 
     }
 
     if (isJiraWorkflowDispatchEvent(context)) {
+        return true;
+    }
+
+    if (isYouTrackWorkflowDispatchEvent(context)) {
         return true;
     }
 

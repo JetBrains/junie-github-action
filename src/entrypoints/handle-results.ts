@@ -1,5 +1,8 @@
 import {COMMIT_MESSAGE_TEMPLATE, PR_BODY_TEMPLATE, PR_TITLE_TEMPLATE} from "../constants/github";
-import {JunieExecutionContext, isTriggeredByUserInteraction, isJiraWorkflowDispatchEvent, isCodeReviewEvent} from "../github/context";
+import {
+    JunieExecutionContext, isTriggeredByUserInteraction, isJiraWorkflowDispatchEvent, isCodeReviewEvent,
+    isYouTrackWorkflowDispatchEvent
+} from "../github/context";
 import {execSync} from 'child_process';
 import * as core from "@actions/core";
 import {ENV_VARS, OUTPUT_VARS} from "../constants/environment";
@@ -132,7 +135,7 @@ async function getActionToDo(context: JunieExecutionContext): Promise<ActionType
     const baseBranch = process.env[OUTPUT_VARS.BASE_BRANCH]!;
     const hasChangedFiles = await checkForChangedFiles();
     const hasUnpushedCommits = await checkForUnpushedCommits(isNewBranch, baseBranch);
-    const isExternalIntegration = isJiraWorkflowDispatchEvent(context)
+    const isExternalIntegration = isJiraWorkflowDispatchEvent(context) || isYouTrackWorkflowDispatchEvent(context);
     const initCommentId = process.env[OUTPUT_VARS.INIT_COMMENT_ID];
 
     console.log(`Has changed files: ${hasChangedFiles}`);

@@ -9,6 +9,7 @@ A powerful GitHub Action that integrates [Junie](https://www.jetbrains.com/junie
   - [Prerequisites](#prerequisites)
   - [Basic Setup](#basic-setup)
 - [Jira Integration](#jira-integration)
+- [YouTrack Integration](#youtrack-integration)
 - [Cookbook](#cookbook)
 - [Configuration](#configuration)
   - [Input Parameters](#input-parameters)
@@ -107,6 +108,10 @@ jobs:
 
 🔗 **Want to trigger Junie from Jira?** Check out the [Jira Integration Guide](docs/JIRA_INTEGRATION.md) to automatically implement features and fixes based on Jira issues.
 
+## YouTrack Integration
+
+🔗 **Want to trigger Junie from YouTrack?** Check out the [YouTrack Integration Guide](docs/YOUTRACK_INTEGRATION.md) to automatically implement features and fixes based on YouTrack issues using the **Junie YouTrack App** from JetBrains Marketplace.
+
 ## Cookbook
 
 📚 **Looking for practical examples?** Check out the [Cookbook](COOKBOOK.md) for real-world recipes including:
@@ -189,6 +194,14 @@ junie-args: --model=opus
 | `jira_transition_in_review` | Jira transition ID for "In Review" status | `31` |
 
 For detailed setup instructions, see the [Jira Integration Guide](docs/JIRA_INTEGRATION.md).
+
+#### YouTrack Integration
+
+| Input | Description | Default |
+|-------|-------------|---------|
+| `youtrack_token` | YouTrack permanent token for posting comments and reading issue data | - |
+
+For detailed setup instructions, see the [YouTrack Integration Guide](docs/YOUTRACK_INTEGRATION.md).
 
 #### Authentication
 

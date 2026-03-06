@@ -1,11 +1,12 @@
 import {writeFile, mkdir} from "fs/promises";
 import {join} from "path";
-import {JiraAttachment} from "../context";
+import {JiraAttachment, YouTrackAttachment} from "../context";
 import {getJiraClient} from "../jira/client";
 import mime from "mime-types";
 
 const DOWNLOAD_DIR = "/tmp/github-attachments";
 const JIRA_DOWNLOAD_DIR = "/tmp/jira-attachments";
+const YOUTRACK_DOWNLOAD_DIR = "/tmp/youtrack-attachments";
 
 /**
  * Download file from URL (signed or regular)
@@ -225,6 +226,91 @@ async function downloadJiraAttachment(url: string, filename: string): Promise<st
  * @param attachments - Array of Jira attachments with filename and content URL
  * @returns Text with wiki markup replaced by local file paths
  */
+/**
+ * Pattern for YouTrack markdown attachment refs:
+ * [display text](filename.ext) or ![alt](filename.png){width=70%}
+ */
+const YOUTRACK_ATTACHMENT_PATTERN = /!?\[([^\]]*)\]\(([^)]+)\)(?:\{[^}]*\})?/g;
+
+async function saveYouTrackAttachment(attachment: YouTrackAttachment): Promise<string> {
+    const filename = attachment.name || attachment.url.split('/').pop() || `attachment-${Date.now()}`;
+    const localPath = join(YOUTRACK_DOWNLOAD_DIR, filename);
+
+    if (attachment.base64Content) {
+        await writeFile(localPath, Buffer.from(attachment.base64Content, 'base64'));
+    } else {
+        // Fallback: fetch by URL (shouldn't normally happen since we request base64Content from API)
+        const response = await fetch(attachment.url);
+        if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+        await writeFile(localPath, Buffer.from(await response.arrayBuffer()));
+    }
+
+    console.log(`✓ Saved YouTrack attachment: ${filename} -> ${localPath}`);
+    return localPath;
+}
+
+/**
+ * Saves YouTrack attachments, replacing inline markdown refs with local paths
+ * and appending unreferenced attachments at the end.
+ *
+ * @param text - Text that may contain markdown attachment references
+ * @param attachments - Array of YouTrack attachments (fetched from API with base64Content)
+ * @returns Text with inline refs replaced and unreferenced attachments appended
+ */
+export async function downloadYouTrackAttachments(
+    text: string,
+    attachments: YouTrackAttachment[],
+): Promise<string> {
+    if (attachments.length === 0) {
+        return text;
+    }
+
+    await mkdir(YOUTRACK_DOWNLOAD_DIR, {recursive: true});
+
+    let updatedText = text;
+    const savedPaths = new Map<string, string>(); // url -> localPath
+
+    // Replace inline markdown attachment refs with local paths
+    const matches = [...text.matchAll(YOUTRACK_ATTACHMENT_PATTERN)];
+    for (const match of matches) {
+        const fullMatch = match[0];
+        const href = match[2];
+
+        const attachment = attachments.find(att => att.name === href);
+        if (!attachment) continue;
+
+        try {
+            let localPath = savedPaths.get(attachment.url);
+            if (!localPath) {
+                localPath = await saveYouTrackAttachment(attachment);
+                savedPaths.set(attachment.url, localPath);
+            }
+            updatedText = updatedText.replace(fullMatch, localPath);
+        } catch (error) {
+            console.warn(`Could not save YouTrack attachment ${attachment.name}: ${error instanceof Error ? error.message : error}`);
+        }
+    }
+
+    // Save unreferenced attachments and append
+    const unreferencedPaths: string[] = [];
+    for (const attachment of attachments) {
+        if (savedPaths.has(attachment.url)) continue;
+        try {
+            const localPath = await saveYouTrackAttachment(attachment);
+            savedPaths.set(attachment.url, localPath);
+            unreferencedPaths.push(localPath);
+        } catch (error) {
+            console.warn(`Could not save YouTrack attachment ${attachment.name}: ${error instanceof Error ? error.message : error}`);
+        }
+    }
+
+    if (unreferencedPaths.length > 0) {
+        updatedText += `\nAttachments:\n${unreferencedPaths.join('\n')}\n`;
+    }
+
+    return updatedText;
+}
+
 export async function downloadJiraAttachmentsAndRewriteText(
     text: string,
     attachments: Array<JiraAttachment>
@@ -234,29 +320,43 @@ export async function downloadJiraAttachmentsAndRewriteText(
     }
 
     let updatedText = text;
+    const referencedFilenames = new Set<string>();
 
     // Find all Jira wiki markup references: !filename.ext! or !filename.ext|params!
     const matches = [...text.matchAll(JIRA_ATTACHMENT_PATTERN)];
 
     for (const match of matches) {
-        const fullMatch = match[0]; // Full match: !filename.jpg|width=100!
-        const filename = match[1];  // Captured filename: filename.jpg
+        const fullMatch = match[0];
+        const filename = match[1];
 
-        // Find the attachment by filename
         const attachment = attachments.find(att => att.filename === filename);
-
         if (attachment) {
             try {
                 const localPath = await downloadJiraAttachment(attachment.content, filename);
-                // Replace the entire wiki markup with just the local path
                 updatedText = updatedText.replace(fullMatch, localPath);
+                referencedFilenames.add(filename);
             } catch (error) {
                 console.error(`Failed to download Jira attachment: ${filename}`, error);
-                // Keep the original markup if download fails
             }
         } else {
             console.warn(`Jira attachment not found: ${filename}`);
         }
+    }
+
+    // Download unreferenced attachments and append
+    const unreferencedPaths: string[] = [];
+    for (const attachment of attachments) {
+        if (referencedFilenames.has(attachment.filename)) continue;
+        try {
+            const localPath = await downloadJiraAttachment(attachment.content, attachment.filename);
+            unreferencedPaths.push(localPath);
+        } catch (error) {
+            console.warn(`Failed to download Jira attachment: ${attachment.filename}`, error);
+        }
+    }
+
+    if (unreferencedPaths.length > 0) {
+        updatedText += `\nAttachments:\n${unreferencedPaths.join('\n')}\n`;
     }
 
     return updatedText;
