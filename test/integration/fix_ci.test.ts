@@ -74,7 +74,7 @@ async function testFixCi(repoName: string, fixCiInComment: (prNumber: number) =>
     const titleKeywords = ["ci", "fail", "fix", "workflow"]
 
     const foundPR = await testClient.waitForPR(testClient.conditionIncludes(titleKeywords));
-    const result = await testClient.checkPRFiles(foundPR, testClient.conditionPRFilesInclude({[fileName]: "console.log('fail');"}));
+    const result = await testClient.checkPRFiles(foundPR, testClient.conditionPRFilesInclude({[fileName]: "console.log('fahjhkhil');"}));
     expect(result, "PR files check failed - required content not found in files").toBe(true);
     console.log(`Waiting for CI to pass on PR #${foundPR.number}...`);
     await testClient.waitForSuccessfulCI(foundPR.number);
