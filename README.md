@@ -231,7 +231,7 @@ Instead of a Junie API key, you can bring your own AI provider key. The followin
     anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
 
-**Example — using an OpenAI key:**
+**Example — using an OpenRouter key:**
 ```yaml
 - uses: JetBrains/junie-github-action@v1
   with:
