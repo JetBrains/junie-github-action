@@ -94,8 +94,8 @@ export async function prepareMcpConfig(
         if (jiraUrl && jiraUsername && jiraApiToken) {
             console.log(`Enabling Jira MCP Server for ${jiraUrl}`);
             baseMcpConfig.mcpServers.jira = {
-                command: "uvx",
-                args: ["mcp-atlassian"],
+                command: "pipx",
+                args: ["run", "mcp-atlassian"],
                 env: {
                     JIRA_URL: jiraUrl,
                     JIRA_USERNAME: jiraUsername,
