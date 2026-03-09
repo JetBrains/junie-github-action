@@ -100,6 +100,11 @@ type JunieWorkflowContext = {
         attachGithubContextToCustomPrompt: boolean;
         junieWorkingDir: string;
         appToken: string;
+        openaiApiKey?: string;
+        anthropicApiKey?: string;
+        grokApiKey?: string;
+        openrouterApiKey?: string;
+        googleApiKey?: string;
         baseBranch?: string;
         targetBranch?: string;
         prompt: string;
@@ -162,6 +167,11 @@ export function extractJunieWorkflowContext(tokenOwner: TokenOwner): JunieExecut
             junieWorkingDir: process.env.WORKING_DIR!,
             headRef: process.env.GITHUB_HEAD_REF,
             appToken: process.env.APP_TOKEN!,
+            openaiApiKey: process.env.OPENAI_API_KEY,
+            anthropicApiKey: process.env.ANTHROPIC_API_KEY,
+            grokApiKey: process.env.GROK_API_KEY,
+            openrouterApiKey: process.env.OPENROUTER_API_KEY,
+            googleApiKey: process.env.GOOGLE_API_KEY,
             prompt: process.env.PROMPT || "",
             triggerPhrase: process.env.TRIGGER_PHRASE ?? DEFAULT_TRIGGER_PHRASE,
             assigneeTrigger: process.env.ASSIGNEE_TRIGGER ?? "",

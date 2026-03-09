@@ -88,6 +88,21 @@ inputs:
   junie_api_key:
     description: "Junie API key"
     required: false
+  openai_api_key:
+    description: "OpenAI API key (BYOK - use instead of junie_api_key)"
+    required: false
+  anthropic_api_key:
+    description: "Anthropic API key (BYOK - use instead of junie_api_key)"
+    required: false
+  grok_api_key:
+    description: "Grok API key (BYOK - use instead of junie_api_key)"
+    required: false
+  openrouter_api_key:
+    description: "OpenRouter API key (BYOK - use instead of junie_api_key)"
+    required: false
+  google_api_key:
+    description: "Google API key (BYOK - use instead of junie_api_key)"
+    required: false
   custom_github_token:
     description: "GitHub token with repo and pull request permissions (optional if using GitHub App)"
     required: false
@@ -200,6 +215,11 @@ runs:
         JIRA_TRANSITION_IN_PROGRESS: ${{ inputs.jira_transition_in_progress }}
         JIRA_TRANSITION_IN_REVIEW: ${{ inputs.jira_transition_in_review }}
         ALL_INPUTS: ${{ toJson(inputs) }}
+        OPENAI_API_KEY: ${{ inputs.openai_api_key }}
+        ANTHROPIC_API_KEY: ${{ inputs.anthropic_api_key }}
+        GROK_API_KEY: ${{ inputs.grok_api_key }}
+        OPENROUTER_API_KEY: ${{ inputs.openrouter_api_key }}
+        GOOGLE_API_KEY: ${{ inputs.google_api_key }}
 
 
     - name: Install Junie
@@ -228,6 +248,11 @@ runs:
         WORKING_DIR: ${{ inputs.junie_work_dir }}
         MODEL: ${{ inputs.model }}
         CUSTOM_JUNIE_ARGS: ${{ steps.prepare.outputs.CUSTOM_JUNIE_ARGS }}
+        OPENAI_API_KEY: ${{ inputs.openai_api_key }}
+        ANTHROPIC_API_KEY: ${{ inputs.anthropic_api_key }}
+        GROK_API_KEY: ${{ inputs.grok_api_key }}
+        OPENROUTER_API_KEY: ${{ inputs.openrouter_api_key }}
+        GOOGLE_API_KEY: ${{ inputs.google_api_key }}
       run: |
         # Start with custom junie args if provided (highest priority)
         JUNIE_FLAGS="${CUSTOM_JUNIE_ARGS}"
@@ -237,18 +262,33 @@ runs:
           JUNIE_FLAGS="${JUNIE_FLAGS} --model=${MODEL}"
         fi
 
+        # Add BYOK API key flags if provided
+        [ -n "${OPENAI_API_KEY}" ] && JUNIE_FLAGS="${JUNIE_FLAGS} --openai-api-key=${OPENAI_API_KEY}"
+        [ -n "${ANTHROPIC_API_KEY}" ] && JUNIE_FLAGS="${JUNIE_FLAGS} --anthropic-api-key=${ANTHROPIC_API_KEY}"
+        [ -n "${GROK_API_KEY}" ] && JUNIE_FLAGS="${JUNIE_FLAGS} --grok-api-key=${GROK_API_KEY}"
+        [ -n "${OPENROUTER_API_KEY}" ] && JUNIE_FLAGS="${JUNIE_FLAGS} --openrouter-api-key=${OPENROUTER_API_KEY}"
+        [ -n "${GOOGLE_API_KEY}" ] && JUNIE_FLAGS="${JUNIE_FLAGS} --google-api-key=${GOOGLE_API_KEY}"
+
         JUNIE_OUTPUT_FILE="${WORKING_DIR}/junie_output.json"
         echo "Using Junie flags: ${JUNIE_FLAGS}"
         echo "Writing Junie output to: ${JUNIE_OUTPUT_FILE}"
         echo "Reading Junie input from: ${JUNIE_INPUT_FILE}"
 
         # Read from file via stdin to avoid ARG_MAX limit for large prompts
-        junie --cache-dir="${WORKING_DIR}" \
-              --output-format="json" \
-              --input-format="json" \
-              --json-output-file="${JUNIE_OUTPUT_FILE}" \
-              --auth="${CLI_TOKEN}" \
-              ${JUNIE_FLAGS} < "${JUNIE_INPUT_FILE}"
+        if [ -n "${CLI_TOKEN}" ]; then
+          junie --cache-dir="${WORKING_DIR}" \
+                --output-format="json" \
+                --input-format="json" \
+                --json-output-file="${JUNIE_OUTPUT_FILE}" \
+                --auth="${CLI_TOKEN}" \
+                ${JUNIE_FLAGS} < "${JUNIE_INPUT_FILE}"
+        else
+          junie --cache-dir="${WORKING_DIR}" \
+                --output-format="json" \
+                --input-format="json" \
+                --json-output-file="${JUNIE_OUTPUT_FILE}" \
+                ${JUNIE_FLAGS} < "${JUNIE_INPUT_FILE}"
+        fi
 
         # Export the file path instead of the content
         echo "json_output_file=${JUNIE_OUTPUT_FILE}" >> $GITHUB_OUTPUT
