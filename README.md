@@ -195,19 +195,23 @@ For detailed setup instructions, see the [Jira Integration Guide](docs/JIRA_INTE
 
 #### Authentication
 
-| Input | Description | Required |
-|-------|-------------|----------|
-| `junie_api_key` | JetBrains Junie API key | One of `junie_api_key` or a BYOK key is required |
-| `openai_api_key` | OpenAI API key (BYOK) | One of `junie_api_key` or a BYOK key is required |
-| `anthropic_api_key` | Anthropic API key (BYOK) | One of `junie_api_key` or a BYOK key is required |
-| `grok_api_key` | Grok API key (BYOK) | One of `junie_api_key` or a BYOK key is required |
-| `openrouter_api_key` | OpenRouter API key (BYOK) | One of `junie_api_key` or a BYOK key is required |
-| `google_api_key` | Google API key (BYOK) | One of `junie_api_key` or a BYOK key is required |
+| Input                 | Description | Required |
+|-----------------------|-------------|----------|
+| `junie_api_key`       | JetBrains Junie API key | One of `junie_api_key` or a BYOK key is required |
+| BYOK key              | BYOK — use your own AI provider key instead of `junie_api_key`. See [BYOK Authentication](#byok-authentication). | One of `junie_api_key` or a BYOK key is required |
 | `custom_github_token` | Custom GitHub token (optional) | No |
 
 ##### BYOK Authentication
 
-Instead of a Junie API key, you can use your own AI provider key. This lets you bring your existing API subscription from OpenAI, Anthropic, Google, Grok, or OpenRouter.
+Instead of a Junie API key, you can bring your own AI provider key. The following inputs are supported:
+
+| Input | Provider |
+|-------|----------|
+| `openai_api_key` | OpenAI |
+| `anthropic_api_key` | Anthropic |
+| `grok_api_key` | Grok |
+| `openrouter_api_key` | OpenRouter |
+| `google_api_key` | Google |
 
 **Example — using an Anthropic key:**
 ```yaml
@@ -220,7 +224,7 @@ Instead of a Junie API key, you can use your own AI provider key. This lets you 
 ```yaml
 - uses: JetBrains/junie-github-action@v1
   with:
-    openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+    openrouter_api_key: ${{ secrets.OPENROUTER_API_KEY }}
 ```
 
 > **Note:** Provide either `junie_api_key` **or** one of the BYOK keys — not both. All API keys are automatically masked in workflow logs.
