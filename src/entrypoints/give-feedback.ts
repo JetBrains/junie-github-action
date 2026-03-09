@@ -11,10 +11,11 @@ import {handleStepError} from "../utils/error-handler";
 /**
  * Writes feedback comment to GitHub issue/PR if initCommentId is available
  */
-async function writeFeedbackComment(isJobFailed: boolean, initCommentId?: string, youtrackInitCommentId?: string): Promise<void> {
+async function writeFeedbackComment(isJobFailed: boolean, initCommentId?: string, youtrackInitCommentId?: string, jiraInitCommentId?: string): Promise<void> {
     const data: FinishFeedbackData = {
         initCommentId: initCommentId,
         youtrackInitCommentId: youtrackInitCommentId,
+        jiraInitCommentId: jiraInitCommentId,
         isJobFailed: isJobFailed,
         parsedContext: JSON.parse(process.env[OUTPUT_VARS.PARSED_CONTEXT]!) as JunieExecutionContext
     }
@@ -85,8 +86,9 @@ export async function giveFeedback() {
         const isJobFailed = process.env[ENV_VARS.IS_JOB_FAILED] === "true";
         const initCommentId = process.env[OUTPUT_VARS.INIT_COMMENT_ID];
         const youtrackInitCommentId = process.env[OUTPUT_VARS.YOUTRACK_INIT_COMMENT_ID];
+        const jiraInitCommentId = process.env[OUTPUT_VARS.JIRA_INIT_COMMENT_ID];
 
-        await writeFeedbackComment(isJobFailed, initCommentId, youtrackInitCommentId);
+        await writeFeedbackComment(isJobFailed, initCommentId, youtrackInitCommentId, jiraInitCommentId);
 
         // Generate GitHub Actions Job Summary (always)
         try {

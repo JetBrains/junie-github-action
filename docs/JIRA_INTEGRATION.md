@@ -7,11 +7,10 @@ This integration allows Junie to automatically implement features and fixes base
 When a Jira issue is created or updated with a specific trigger (e.g., adding a label), Jira automation triggers a GitHub Actions workflow via `workflow_dispatch`. Junie then:
 
 1. **Receives the Jira issue** details (key, summary, description)
-2. **Transitions the issue to "In Progress"** automatically
+2. **Posts a comment** to the Jira issue indicating that work has started
 3. **Implements the changes** based on the issue description
 4. **Creates a pull request** with the changes
-5. **Transitions the issue to "In Review"**
-6. **Adds a comment** to the Jira issue with the PR link
+5. **Updates the initial comment** on the Jira issue with the result (PR link or summary)
 
 ## Setup
 
@@ -47,25 +46,7 @@ Add the following secrets to your GitHub repository:
 - `JIRA_API_TOKEN`: The API token you created
 - `JIRA_BASE_URL`: Your Jira instance URL (e.g., `https://your-company.atlassian.net`)
 
-### 4. Configure Jira Transition IDs (Optional)
-
-By default, the integration uses these transition IDs:
-- **In Progress**: `21`
-- **In Review**: `31`
-
-These IDs may vary depending on your Jira workflow. To find your transition IDs:
-
-```bash
-curl -u EMAIL:API_TOKEN \
-  "https://your-company.atlassian.net/rest/api/3/issue/YOUR-ISSUE-KEY/transitions" \
-  | jq '.transitions[] | {id, name}'
-```
-
-Add custom transition IDs as GitHub secrets if needed:
-- `JIRA_TRANSITION_IN_PROGRESS`
-- `JIRA_TRANSITION_IN_REVIEW`
-
-### 5. Create GitHub Workflow
+### 4. Create GitHub Workflow
 
 Create `.github/workflows/junie-jira.yml`:
 
@@ -126,12 +107,9 @@ jobs:
           jira_base_url: ${{ secrets.JIRA_BASE_URL }}
           jira_email: ${{ secrets.JIRA_EMAIL }}
           jira_api_token: ${{ secrets.JIRA_API_TOKEN }}
-#          optional
-#          jira_transition_in_progress: your value
-#          jira_transition_in_review: your value
 ```
 
-### 6. Configure Jira Automation
+### 5. Configure Jira Automation
 
 Create two automation rules in Jira — one triggered by a label, one triggered by an `@junie` comment.
 

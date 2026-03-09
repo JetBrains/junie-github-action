@@ -4,6 +4,7 @@ import {ActionType} from "../../../entrypoints/handle-results";
 export interface FinishFeedbackData {
     initCommentId?: string;
     youtrackInitCommentId?: string;
+    jiraInitCommentId?: string;
     isJobFailed: boolean;
     parsedContext: JunieExecutionContext;
     successData?: SuccessFeedbackData;

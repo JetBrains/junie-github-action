@@ -75,15 +75,6 @@ inputs:
   jira_api_token:
     description: "Jira API token for authentication (required for Jira integration)"
     required: false
-  jira_transition_in_progress:
-    description: "Jira transition ID for 'In Progress' status (default: 21)"
-    required: false
-    default: "21"
-  jira_transition_in_review:
-    description: "Jira transition ID for 'In Review' status (default: 31)"
-    required: false
-    default: "31"
-
   # YouTrack integration configuration (for workflow_dispatch events)
   youtrack_token:
     description: "YouTrack permanent token for API authentication (required for YouTrack integration)"
@@ -202,8 +193,6 @@ runs:
         JIRA_BASE_URL: ${{ inputs.jira_base_url }}
         JIRA_EMAIL: ${{ inputs.jira_email }}
         JIRA_API_TOKEN: ${{ inputs.jira_api_token }}
-        JIRA_TRANSITION_IN_PROGRESS: ${{ inputs.jira_transition_in_progress }}
-        JIRA_TRANSITION_IN_REVIEW: ${{ inputs.jira_transition_in_review }}
         YOUTRACK_TOKEN: ${{ inputs.youtrack_token }}
         ALL_INPUTS: ${{ toJson(inputs) }}
 
@@ -357,10 +346,9 @@ runs:
         JIRA_BASE_URL: ${{ inputs.jira_base_url }}
         JIRA_EMAIL: ${{ inputs.jira_email }}
         JIRA_API_TOKEN: ${{ inputs.jira_api_token }}
-        JIRA_TRANSITION_IN_PROGRESS: ${{ inputs.jira_transition_in_progress }}
-        JIRA_TRANSITION_IN_REVIEW: ${{ inputs.jira_transition_in_review }}
         YOUTRACK_TOKEN: ${{ inputs.youtrack_token }}
         YOUTRACK_INIT_COMMENT_ID: ${{ steps.prepare.outputs.YOUTRACK_INIT_COMMENT_ID }}
+        JIRA_INIT_COMMENT_ID: ${{ steps.prepare.outputs.JIRA_INIT_COMMENT_ID }}
 
     - name: Give feedback and update summary (failure)
       if: failure() && steps.prepare.outputs.SHOULD_SKIP != 'true'
@@ -383,8 +371,7 @@ runs:
         JIRA_BASE_URL: ${{ inputs.jira_base_url }}
         JIRA_EMAIL: ${{ inputs.jira_email }}
         JIRA_API_TOKEN: ${{ inputs.jira_api_token }}
-        JIRA_TRANSITION_IN_PROGRESS: ${{ inputs.jira_transition_in_progress }}
-        JIRA_TRANSITION_IN_REVIEW: ${{ inputs.jira_transition_in_review }}
         YOUTRACK_TOKEN: ${{ inputs.youtrack_token }}
         YOUTRACK_INIT_COMMENT_ID: ${{ steps.prepare.outputs.YOUTRACK_INIT_COMMENT_ID }}
+        JIRA_INIT_COMMENT_ID: ${{ steps.prepare.outputs.JIRA_INIT_COMMENT_ID }}
         ERROR: ${{ steps.prepare.outputs.EXCEPTION || steps.junie-run-results.outputs.EXCEPTION }}

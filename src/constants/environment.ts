@@ -69,6 +69,7 @@ export const OUTPUT_VARS = {
     // Comments and feedback
     INIT_COMMENT_ID: "INIT_COMMENT_ID",
     YOUTRACK_INIT_COMMENT_ID: "YOUTRACK_INIT_COMMENT_ID",
+    JIRA_INIT_COMMENT_ID: "JIRA_INIT_COMMENT_ID",
 
     // Action metadata
     ACTION_TO_DO: "ACTION_TO_DO",

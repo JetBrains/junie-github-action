@@ -449,6 +449,7 @@ async function postJiraFeedback(data: FinishFeedbackData): Promise<void> {
     const client = getJiraClient();
     const {owner, name} = data.parsedContext.payload.repository;
     const ownerLogin = owner.login;
+    const jiraInitCommentId = data.jiraInitCommentId;
 
     console.log(`Updating Jira issue ${jiraPayload.issueKey}...`);
 
@@ -459,18 +460,16 @@ async function postJiraFeedback(data: FinishFeedbackData): Promise<void> {
         comment = getFailedBody(ownerLogin, name, data.parsedContext.runId, data.failureData!);
     } else {
         console.log(`Add success comment to Jira issue ${jiraPayload.issueKey}`);
-        comment = data.successData?.junieSummary || '';
-        if (data.successData?.actionToDo === 'CREATE_PR' && data.successData.prLink) {
-            comment = getSuccessBody(`${ownerLogin}/${name}`, data.successData);
-            console.log(`Move Jira issue ${jiraPayload.issueKey} to "In Review"`);
-            await client.moveIssueToReview(jiraPayload.issueKey);
-        }
+        comment = data.successData ? getSuccessBody(`${ownerLogin}/${name}`, data.successData) : '';
     }
 
     if (comment) {
-        // Convert Markdown to Atlassian Document Format (ADF)
         const jiraComment = convertMarkdownToADF(comment);
-        await client.addComment(jiraPayload.issueKey, jiraComment);
+        if (jiraInitCommentId) {
+            await client.updateComment(jiraPayload.issueKey, jiraInitCommentId, jiraComment);
+        } else {
+            await client.addComment(jiraPayload.issueKey, jiraComment);
+        }
         console.log(`✓ Successfully updated Jira issue ${jiraPayload.issueKey}`);
     }
 }

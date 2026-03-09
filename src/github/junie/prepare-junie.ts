@@ -20,6 +20,7 @@ import {prepareJunieCLIToken} from "./junie-token";
 import {OUTPUT_VARS} from "../../constants/environment";
 import {INIT_COMMENT_BODY, RESOLVE_CONFLICTS_ACTION,} from "../../constants/github";
 import {getJiraClient} from "../jira/client";
+import {convertMarkdownToADF} from "../jira/markdown-to-jira";
 import {getYouTrackClient} from "../youtrack/client";
 import {detectJunieTriggerPhrase} from "../validation/trigger";
 
@@ -47,13 +48,17 @@ export async function initializeJunieExecution({
 
     await postJunieWorkingStatusComment(octokit.rest, context);
 
-    // Start Jira issue if this is a Jira-triggered workflow
+    // Post "started working" comment for Jira-triggered workflows and save the comment ID
     if (isJiraWorkflowDispatchEvent(context)) {
         try {
             const client = getJiraClient();
-            await client.startIssue(context.payload.issueKey);
+            const adfComment = convertMarkdownToADF(INIT_COMMENT_BODY);
+            const commentId = await client.addComment(context.payload.issueKey, adfComment);
+            if (commentId) {
+                core.setOutput(OUTPUT_VARS.JIRA_INIT_COMMENT_ID, commentId);
+            }
         } catch (jiraError) {
-            console.warn('Failed to start Jira issue:', jiraError);
+            console.warn('Failed to post starting comment to Jira:', jiraError);
             // Don't fail the workflow if Jira update fails
         }
     }

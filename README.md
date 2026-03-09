@@ -190,8 +190,6 @@ junie-args: --model=opus
 | `jira_base_url` | Jira instance base URL (e.g., `https://your-company.atlassian.net`) | - |
 | `jira_email` | Jira account email for API authentication | - |
 | `jira_api_token` | Jira API token for authentication | - |
-| `jira_transition_in_progress` | Jira transition ID for "In Progress" status | `21` |
-| `jira_transition_in_review` | Jira transition ID for "In Review" status | `31` |
 
 For detailed setup instructions, see the [Jira Integration Guide](docs/JIRA_INTEGRATION.md).
 

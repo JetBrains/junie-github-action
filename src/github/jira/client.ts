@@ -3,15 +3,6 @@
 import {Version3Client} from 'jira.js';
 
 /**
- * Jira transition IDs (may vary by Jira instance/project)
- * These should be configurable via environment variables
- */
-export const JIRA_TRANSITIONS = {
-    IN_PROGRESS: process.env.JIRA_TRANSITION_IN_PROGRESS || "21",
-    IN_REVIEW: process.env.JIRA_TRANSITION_IN_REVIEW || "31",
-} as const;
-
-/**
  * Jira API client wrapper
  */
 class JiraClient {
@@ -43,67 +34,53 @@ class JiraClient {
     }
 
     /**
-     * Transitions a Jira issue to a new status
-     *
-     * @param issueKey - Jira issue key (e.g., PROJ-123)
-     * @param transitionId - ID of the transition to perform
-     * @returns true if successful, false otherwise
-     */
-    async transitionIssue(issueKey: string, transitionId: string): Promise<boolean> {
-        try {
-            console.log(`Transitioning Jira issue ${issueKey} with transition ID ${transitionId}`);
-
-            await this.client.issues.doTransition({
-                issueIdOrKey: issueKey,
-                transition: {
-                    id: transitionId,
-                },
-            });
-
-            console.log(`✓ Successfully transitioned Jira issue ${issueKey}`);
-            return true;
-        } catch (error) {
-            console.error(`Error transitioning Jira issue ${issueKey}:`, error);
-            return false;
-        }
-    }
-
-    /**
      * Adds a comment to a Jira issue
      *
      * @param issueKey - Jira issue key (e.g., PROJ-123)
      * @param adfDocument - Comment in Atlassian Document Format (ADF)
-     * @returns true if successful, false otherwise
+     * @returns comment ID if successful, null otherwise
      */
-    async addComment(issueKey: string, adfDocument: any): Promise<boolean> {
+    async addComment(issueKey: string, adfDocument: any): Promise<string | null> {
         try {
             console.log(`Adding comment to Jira issue ${issueKey}`);
 
-            await this.client.issueComments.addComment({
+            const result = await this.client.issueComments.addComment({
                 issueIdOrKey: issueKey,
                 comment: adfDocument,
             });
 
-            console.log(`✓ Successfully added comment to Jira issue ${issueKey}`);
-            return true;
+            console.log(`✓ Successfully added comment to Jira issue ${issueKey}, comment ID: ${result.id}`);
+            return result.id ?? null;
         } catch (error) {
             console.error(`Error adding comment to Jira issue ${issueKey}:`, error);
-            return false;
+            return null;
         }
     }
 
     /**
-     * Starts work on a Jira issue (transitions to "In Progress")
+     * Updates an existing comment on a Jira issue
+     *
+     * @param issueKey - Jira issue key (e.g., PROJ-123)
+     * @param commentId - ID of the comment to update
+     * @param adfDocument - New comment content in Atlassian Document Format (ADF)
+     * @returns true if successful, false otherwise
      */
-    async startIssue(issueKey: string): Promise<boolean> {
-        return await this.transitionIssue(issueKey, JIRA_TRANSITIONS.IN_PROGRESS);
-    }
+    async updateComment(issueKey: string, commentId: string, adfDocument: any): Promise<boolean> {
+        try {
+            console.log(`Updating comment ${commentId} on Jira issue ${issueKey}`);
 
-    /**
-     * Moves Jira issue to review (transitions to "In Review")
-     */
-    async moveIssueToReview(issueKey: string): Promise<boolean> {
-        return await this.transitionIssue(issueKey, JIRA_TRANSITIONS.IN_REVIEW);
+            await this.client.issueComments.updateComment({
+                issueIdOrKey: issueKey,
+                id: commentId,
+                comment: adfDocument,
+            });
+
+            console.log(`✓ Successfully updated comment ${commentId} on Jira issue ${issueKey}`);
+            return true;
+        } catch (error) {
+            console.error(`Error updating comment ${commentId} on Jira issue ${issueKey}:`, error);
+            return false;
+        }
     }
 
     /**
