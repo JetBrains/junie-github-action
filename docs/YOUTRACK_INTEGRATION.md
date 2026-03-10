@@ -7,7 +7,7 @@ This integration allows Junie to automatically implement features and fixes base
 The integration uses the [YouTrack Junie App](https://plugins.jetbrains.com/plugin/26849-junie?noRedirect=true) to dispatch GitHub Actions workflows directly from a YouTrack issue. There are two ways to trigger Junie:
 
 - **Widget button:** Click **Run Junie** on the issue page.
-- **Comment mention:** Add a comment containing `@junie`. The app detects it automatically and passes the comment text as `trigger_comment`.
+- **Comment mention:** Add a comment starting with `@junie` (configurable). The app detects it automatically and passes the comment text as `trigger_comment`.
 
 In both cases, the app sends the issue data to GitHub Actions, and Junie:
 
@@ -115,7 +115,9 @@ jobs:
 The YouTrack Junie App handles the workflow dispatch automatically — no custom scripting required.
 
 1. Install the [YouTrack Junie App](https://plugins.jetbrains.com/plugin/26849-junie?noRedirect=true)
-2. In your YouTrack project, go to **Apps → Junie → Settings** and enter the GitHub token.
+2. In your YouTrack project, go to **Apps → Junie → Settings** and configure:
+   - **GitHub Token** (required): the personal access token with `workflow` permission.
+   - **Trigger Name** (optional): the phrase that triggers Junie when a comment starts with it. Defaults to `@junie`. Change it to e.g. `/junie` if you prefer a slash command style.
 3. In your YouTrack project, go to **Settings → Version Control** and add a GitHub VCS integration pointing to the target repository.
 
 After setup, a **Run Junie** button will appear on every issue in the project. Clicking it dispatches the `junie-youtrack.yml` workflow with the issue data automatically.
