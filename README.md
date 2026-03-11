@@ -33,6 +33,7 @@ A powerful GitHub Action that integrates [Junie](https://www.jetbrains.com/junie
 - **Smart Branch Management**: Context-aware branch creation and management
 - **Silent Mode**: Run analysis-only workflows without comments or git operations
 - **Single Comment Mode**: Update a single comment instead of creating multiple comments for each run (per workflow)
+- **Automatic Conflict Resolution**: Resolves merge conflicts in PRs automatically when triggered via `@junie-agent resolve conflicts` or configuration
 - **Comprehensive Feedback**: Updates via GitHub comments with links to PRs and commits
 - **Rich Job Summaries**: Beautiful markdown reports in GitHub Actions with execution details
 - **Attachment Support**: Automatically downloads and processes attachments from GitHub issues and PRs
@@ -143,6 +144,7 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 | Input | Description | Default |
 |-------|-------------|---------|
 | `base_branch` | Base branch for creating new branches | `github.base_ref` |
+| `resolve_conflicts` | Whether to resolve merge conflicts automatically in pull requests | `false` |
 | `create_new_branch_for_pr` | Create new branch for PR contributors | `false` |
 
 #### Junie Configuration
