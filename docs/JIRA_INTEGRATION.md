@@ -124,7 +124,7 @@ Create two automation rules in Jira — one triggered by a label, one triggered 
 - **Method**: POST
 - **Headers**:
   ```
-  Authorization: Bearer {{secrets.GITHUB_TOKEN}}
+  Authorization: Bearer YOUR_GITHUB_TOKEN
   Content-Type: application/json
   ```
 - **Body** (Custom data):
