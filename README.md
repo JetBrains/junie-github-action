@@ -26,6 +26,7 @@ A powerful GitHub Action that integrates [Junie](https://www.jetbrains.com/junie
 - **Interactive Code Assistant**: Responds to @junie-agent mentions in comments, issues, and PRs
 - **Issue Resolution**: Automatically implements solutions for GitHub issues
 - **PR Management**: Reviews code changes and implements requested modifications
+- **Conflict Resolution**: Automatically resolves merge conflicts with the base branch using `@junie-agent resolve conflicts`
 - **Inline Code Reviews**: Create code review comments with GitHub suggestions directly on PR diffs
 - **Minor PR Fixes**: Quickly implement small changes in PRs using `@junie-agent minor-fix [instruction]`
 - **CI Failure Analysis**: Investigates failed checks and suggests fixes using MCP integration
@@ -144,11 +145,12 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 |-------|-------------|---------|
 | `base_branch` | Base branch for creating new branches | `github.base_ref` |
 | `create_new_branch_for_pr` | Create new branch for PR contributors | `false` |
+| `resolve_conflicts` | Whether to resolve conflicts automatically | `false` |
 
 #### Junie Configuration
 
 | Input | Description | Default |
-|-------|-------------|----|
+|-------|-------------|---------|
 | `prompt` | Custom instructions for Junie. Special values: `code-review` for PR reviews, `fix-ci` for CI failure analysis, `minor-fix` for quick PR adjustments. See [Cookbook](COOKBOOK.md) for examples. | - |
 | `junie_version` | Junie CLI version to install | `888.195` |
 | `model` | Model to use for the primary agent. Available: `sonnet`, `opus`, `gpt`, `gpt-codex`, `gemini-pro`, `gemini-flash`, `grok` | - |
