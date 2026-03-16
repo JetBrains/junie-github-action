@@ -10,7 +10,7 @@ describe("Fix Failing CI: built-in", () => {
         repoName = await testClient.createTestRepo();
         await testClient.setupWorkflow(repoName, ".github/workflows/fix-ci.yml", "test/workflows/fix-ci.yml");
         await testClient.setupWorkflow(repoName, ".github/workflows/ci.yml", "test/workflows/failing-ci.yml");
-    }, 24000);
+    }, 30000);
 
     afterAll(async () => {
         if (repoName && testPassed) {
@@ -68,7 +68,9 @@ async function testFixCi(repoName: string, fixCiInComment: (prNumber: number) =>
         "Add failing code",
         branchName
     );
-    const {data: pr} = await testClient.createPullRequest(repoName, branchName, "Trigger test", "Should trigger CI", "main");
+    const prTitle = "Trigger test";
+    const {data: pr} = await testClient.createPullRequest(repoName, branchName, prTitle, "Should trigger CI", "main");
+    testClient.waitForPR(testClient.conditionIncludes([prTitle]));
     fixCiInComment(pr.number);
     await testClient.waitForJunieComment(pr.number, INIT_COMMENT_BODY);
     const titleKeywords = ["ci", "fail", "fix", "workflow"]

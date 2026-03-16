@@ -13,7 +13,7 @@ describe("Code Review: Built-in", () => {
             ".github/workflows/code-review.yml",
             "test/workflows/code-review.yml"
         );
-    }, 15000);
+    }, 30000);
 
     afterAll(async () => {
         if (repoName && testPassed) {
@@ -58,14 +58,16 @@ describe("Code Review: Built-in", () => {
                 "Add calculator with print statement",
                 branchName
             );
+            const prTitle = "Add calculator functions";
 
             const {data: pr} = await testClient.createPullRequest(
                 repoName,
                 branchName,
-                "Add calculator functions",
+                prTitle,
                 "Trigger built-in code review",
                 "main"
             );
+            testClient.waitForPR(testClient.conditionIncludes([prTitle]));
 
             const prNumber = pr.number;
             await testClient.waitForJunieComment(prNumber, INIT_COMMENT_BODY);
@@ -137,14 +139,17 @@ describe("Code Review: On-Demand via comment", () => {
                 "Add stats with print statement",
                 branchName
             );
+            const prTitle = "Add statistics functions";
 
             const {data: pr} = await testClient.createPullRequest(
                 repoName,
                 branchName,
-                "Add statistics functions",
+                prTitle,
                 "This PR will be reviewed after a comment command.",
                 "main"
             );
+
+            testClient.waitForPR(testClient.conditionIncludes([prTitle]));
 
             const prNumber = pr.number;
 

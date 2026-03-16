@@ -9,7 +9,7 @@ describe("Trigger Junie in PR comment", () => {
     beforeAll(async () => {
         repoName = await testClient.createTestRepo();
         await testClient.setupWorkflow(repoName);
-    }, 15000);
+    }, 30000);
 
     afterAll(async () => {
         if (repoName && testPassed) {
@@ -36,7 +36,11 @@ describe("Trigger Junie in PR comment", () => {
             "Add math utils", branchName
         );
 
-        const {data: pr} = await testClient.createPullRequest(repoName, branchName, "Add math utilities", "Basic math functions", "main");
+        const prTitle = "Add math utilities";
+
+        const {data: pr} = await testClient.createPullRequest(repoName, branchName, prTitle, "Basic math functions", "main");
+
+        testClient.waitForPR(testClient.conditionIncludes([prTitle]));
 
         const prNumber = pr.number;
         console.log(`PR created: #${prNumber}`);
