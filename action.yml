@@ -303,32 +303,16 @@ runs:
         IS_NEW_BRANCH: ${{ steps.prepare.outputs.IS_NEW_BRANCH }}
         WORKING_DIR: ${{ inputs.junie_work_dir }}
 
-    - name: Upload Junie working directory as artifact
+    - name: Upload Junie artifacts
       if: always() && steps.prepare.outputs.SHOULD_SKIP != 'true'
+      continue-on-error: true
       uses: actions/upload-artifact@v4
       with:
-        name: junie-working-directory
-        path: ${{ inputs.junie_work_dir }}
-        retention-days: 7
-        if-no-files-found: warn
-        include-hidden-files: true
-
-    - name: Upload Junie logs as artifact
-      if: always() && steps.prepare.outputs.SHOULD_SKIP != 'true'
-      uses: actions/upload-artifact@v4
-      with:
-        name: junie-logs
-        path: ~/.junie/logs
-        retention-days: 7
-        if-no-files-found: warn
-        include-hidden-files: true
-
-    - name: Upload Junie sessions as artifact
-      if: always() && steps.prepare.outputs.SHOULD_SKIP != 'true'
-      uses: actions/upload-artifact@v4
-      with:
-        name: junie-sessions
-        path: ~/.junie/sessions
+        name: junie-artifacts
+        path: |
+          ${{ inputs.junie_work_dir }}
+          ~/.junie/logs
+          ~/.junie/sessions
         retention-days: 7
         if-no-files-found: warn
         include-hidden-files: true
