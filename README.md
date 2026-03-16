@@ -28,6 +28,7 @@ A powerful GitHub Action that integrates [Junie](https://www.jetbrains.com/junie
 - **PR Management**: Reviews code changes and implements requested modifications
 - **Inline Code Reviews**: Create code review comments with GitHub suggestions directly on PR diffs
 - **Minor PR Fixes**: Quickly implement small changes in PRs using `@junie-agent minor-fix [instruction]`
+- **Automated Conflict Resolution**: Automatically resolves merge conflicts in PRs using `@junie-agent resolve conflicts`
 - **CI Failure Analysis**: Investigates failed checks and suggests fixes using MCP integration
 - **Flexible Triggers**: Activate via mentions, assignees, labels, or custom prompts
 - **Smart Branch Management**: Context-aware branch creation and management
@@ -104,7 +105,8 @@ jobs:
 
 3. Start using Junie:
    - Comment `@junie-agent help me fix this bug` on an issue
-   - Mention `@junie-agent review this change` in a PR
+   - Mention `@junie-agent code-review this change` in a PR
+   - Comment `@junie-agent resolve conflicts` on a PR to automatically fix merge conflicts
    - Comment `@junie-agent minor-fix rename variable x to y` in a PR to make quick adjustments
 
 ## Jira Integration
@@ -143,6 +145,8 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 | Input | Description | Default |
 |-------|-------------|---------|
 | `base_branch` | Base branch for creating new branches | `github.base_ref` |
+| `target_branch` | Target branch for creating new branches (defaults to `base_branch`) | - |
+| `resolve_conflicts` | Whether to resolve conflicts automatically when triggered | `false` |
 | `create_new_branch_for_pr` | Create new branch for PR contributors | `false` |
 
 #### Junie Configuration
