@@ -143,6 +143,7 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 | Input | Description | Default |
 |-------|-------------|---------|
 | `base_branch` | Base branch for creating new branches | `github.base_ref` |
+| `resolve_conflicts` | Whether to resolve conflicts automatically | `false` |
 | `create_new_branch_for_pr` | Create new branch for PR contributors | `false` |
 
 #### Junie Configuration
@@ -406,7 +407,7 @@ jobs:
 1. **Trigger Detection**: The action detects triggers (mentions, labels, assignments, or prompts)
 2. **Validation**: Verifies permissions and checks if the actor is human (when applicable - see Security Considerations)
 3. **Branch Management**: Creates or checks out the appropriate working branch
-4. **Task Preparation**: Converts GitHub context into a Junie-compatible task, applying security sanitization to user-submitted content to prevent prompt injection
+4. **Task Preparation**: Converts GitHub context into a Junie-compatible task, handles truncated PR details (title and body), and includes full commit messages for better context. It also applies security sanitization to user-submitted content to prevent prompt injection
 5. **Attachment Processing**: Automatically downloads attachments from issues, PRs, and comments
    - Downloaded files are made available to Junie for analysis and context
 6. **MCP Setup**: Configures enabled MCP servers for enhanced capabilities
