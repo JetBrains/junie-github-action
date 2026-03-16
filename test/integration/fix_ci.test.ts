@@ -10,7 +10,7 @@ describe("Fix Failing CI: built-in", () => {
         repoName = await testClient.createTestRepo();
         await testClient.setupWorkflow(repoName, ".github/workflows/fix-ci.yml", "test/workflows/fix-ci.yml");
         await testClient.setupWorkflow(repoName, ".github/workflows/ci.yml", "test/workflows/failing-ci.yml");
-    }, 24000);
+    }, 30000);
 
     afterAll(async () => {
         if (repoName && testPassed) {

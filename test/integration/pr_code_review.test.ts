@@ -13,7 +13,7 @@ describe("Code Review: Built-in", () => {
             ".github/workflows/code-review.yml",
             "test/workflows/code-review.yml"
         );
-    }, 15000);
+    }, 30000);
 
     afterAll(async () => {
         if (repoName && testPassed) {
