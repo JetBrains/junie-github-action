@@ -427,9 +427,8 @@ describe("prepareJunieTask", () => {
             // Header should NOT contain "Your task is to:"
             expect(result.codeReviewTask?.description).toContain("You were triggered as a GitHub AI Assistant by pull_request action.");
             expect(result.codeReviewTask?.description).not.toContain("Your task is to:");
-            // Keyword is wrapped in user_instruction tags
-            expect(result.codeReviewTask?.description).toContain("<user_instruction>");
-            expect(result.codeReviewTask?.description).toContain("code-review");
+            // code-review keyword should NOT produce a user_instruction block since it's not informative
+            expect(result.codeReviewTask?.description).not.toContain("code-review");
         });
 
         test("should trigger codeReviewTask from comment when inputs.prompt is empty and code-review keyword is used", async () => {
