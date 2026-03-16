@@ -359,17 +359,30 @@ Description: ${jira.issueDescription}${commentsInfo}
         const pr = fetchedData.pullRequest;
         if (!pr) return "";
 
+        // Reconstruct full title/body when GitHub auto-created a PR from a long commit message
+        // GitHub truncates the title with "…" and puts the continuation in the body starting with "…"
+        let title = pr.title;
+        let body = pr.body;
+        const ELLIPSIS = '\u2026';
+        if (title.endsWith(ELLIPSIS) && body?.startsWith(ELLIPSIS)) {
+            const bodyLines = body.split('\n');
+            const continuation = bodyLines[0].slice(1); // Remove leading "…"
+            title = title.slice(0, -1) + continuation; // Remove trailing "…" and append continuation
+            const remainingBody = bodyLines.slice(1).join('\n').trim();
+            body = remainingBody.length > 0 ? remainingBody : '';
+        }
+
         // Add PR body only if it's not already in userInstruction (to avoid duplication)
-        const shouldIncludeBody = pr.body &&
-                                   pr.body.trim().length > 0 &&
-                                   (!userInstruction || !userInstruction.includes(pr.body));
+        const shouldIncludeBody = body &&
+                                   body.trim().length > 0 &&
+                                   (!userInstruction || !userInstruction.includes(body));
 
         const bodySection = shouldIncludeBody
-            ? `\nDescription:\n${pr.body}`
+            ? `\nDescription:\n${body}`
             : '';
 
         return `PR Number: #${pr.number}
-Title: ${pr.title}
+Title: ${title}
 Author: @${pr.author?.login}
 State: ${pr.state}
 Branch: ${pr.headRefName} -> ${pr.baseRefName}
@@ -411,7 +424,7 @@ State: ${issue.state}${bodySection}`
     private formatCommits(commits: GraphQLCommitNode[]): string {
         return commits.map(({commit}) => {
             const shortHash = commit.oid.substring(0, 7);
-            const message = commit.messageHeadline || commit.message || 'No message';
+            const message = commit.message || commit.messageHeadline || 'No message';
             const date = commit.committedDate || '';
             return `[${date}] ${shortHash} - ${message}`;
         }).join('\n');
