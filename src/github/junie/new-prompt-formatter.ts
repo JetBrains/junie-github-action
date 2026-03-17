@@ -109,14 +109,16 @@ export class NewGitHubPromptFormatter {
         const actorInfo = this.getActorInfo(context);
 
         // Extract junie-args ONLY from user instruction, not from GitHub context (timeline, reviews, etc.)
-        // For code-review, suppress the keyword since it's not informative as a user instruction.
-        // For other commands (fix-ci, minor-fix), pass the command prompt through as it contains detailed instructions.
-        const isCodeReview = commandPrompt === CODE_REVIEW_ACTION;
-        let userInstruction = this.getUserInstruction(context, fetchedData, isCodeReview ? undefined : prompt);
+        let userInstruction = this.getUserInstruction(context, fetchedData, prompt);
         if (userInstruction) {
             const parsed = extractJunieArgs(userInstruction);
             userInstruction = parsed.cleanedText;
             customJunieArgs.push(...parsed.args);
+        }
+
+        // Don't attach user_instruction for code review — it's handled separately via codeReviewTask
+        if (commandPrompt === CODE_REVIEW_ACTION) {
+            userInstruction = undefined;
         }
 
         const prOrIssueInfo = this.getPrOrIssueInfo(context, fetchedData, userInstruction);

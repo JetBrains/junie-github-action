@@ -427,7 +427,8 @@ describe("prepareJunieTask", () => {
             // Header should NOT contain "Your task is to:"
             expect(result.codeReviewTask?.description).toContain("You were triggered as a GitHub AI Assistant by pull_request action.");
             expect(result.codeReviewTask?.description).not.toContain("Your task is to:");
-            // code-review keyword should NOT produce a user_instruction block since it's not informative
+            // For code review, user_instruction should not be attached at all
+            expect(result.codeReviewTask?.description).not.toContain("<user_instruction>");
             expect(result.codeReviewTask?.description).not.toContain("code-review");
         });
 
@@ -471,8 +472,8 @@ describe("prepareJunieTask", () => {
             // Header should NOT contain "Your task is to:"
             expect(result.codeReviewTask?.description).toContain("You were triggered as a GitHub AI Assistant by pull_request_review action.");
             expect(result.codeReviewTask?.description).not.toContain("Your task is to:");
-            // Keyword is wrapped in user_instruction tags
-            expect(result.codeReviewTask?.description).toContain("<user_instruction>");
+            // For code review, user_instruction should not be attached
+            expect(result.codeReviewTask?.description).not.toContain("<user_instruction>");
         });
 
         test("should not trigger fix CI prompt when workflow_run event has success conclusion", async () => {
