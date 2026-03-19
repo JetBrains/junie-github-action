@@ -1,0 +1,73 @@
+name: Junie YouTrack Integration
+
+on:
+  workflow_dispatch:
+    inputs:
+      prompt:
+        description: 'Instructions for Junie'
+        required: false
+        type: string
+      action:
+        description: 'Action type'
+        default: 'youtrack_event'
+        required: true
+        type: string
+      issue_id:
+        description: 'YouTrack issue ID (e.g., PROJ-123)'
+        required: true
+        type: string
+      issue_url:
+        description: 'Full URL to the YouTrack issue'
+        required: false
+        type: string
+      issue_title:
+        description: 'YouTrack issue summary/title'
+        required: true
+        type: string
+      issue_description:
+        description: 'YouTrack issue description'
+        required: false
+        type: string
+      issue_comments:
+        description: 'Issue comments, formatted as "author at date:\ntext"'
+        required: false
+        type: string
+      trigger_comment:
+        description: 'Optional comment that triggered Junie (used as user instruction)'
+        required: false
+        type: string
+      youtrack_base_url:
+        description: 'YouTrack instance base URL (e.g., https://youtrack.example.com)'
+        required: true
+        type: string
+
+jobs:
+  junie:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    if: ${{ inputs.action == 'youtrack_event' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run Junie
+        id: junie
+        uses: JetBrains/junie-github-action@main
+        with:
+          junie_api_key: ${{ secrets.JUNIE_API_KEY }}
+          youtrack_token: ${{ secrets.YOUTRACK_TOKEN }}
+          prompt: ${{ inputs.prompt }}
+
+      - name: Upload YouTrack Attachments
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: youtrack-attachments-${{ inputs.issue_id }}
+          path: /tmp/youtrack-attachments/
+          if-no-files-found: ignore
