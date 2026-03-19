@@ -323,6 +323,7 @@ export class Client {
                     const snippets = Array.isArray(expectedSnippet) ? expectedSnippet : [expectedSnippet];
 
                     if (!matcher(snippets, decodedContent)) {
+                        console.log(`Content check failed for ${filename}: ${expectedSnippet}`);
                         return false;
                     }
                 }
