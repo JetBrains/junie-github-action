@@ -60,7 +60,7 @@ describe("Trigger Junie in PR comment", () => {
                 await testClient.checkPRFiles(pr, testClient.conditionPRFilesCountIncrease(filesCount));
         });
 
-        const result = await testClient.checkPRFiles(foundPR, testClient.conditionPRFilesInclude({[filename]: "zero", ["README.md"]: ""}));
+        const result = await testClient.checkPRFiles(foundPR, testClient.conditionPRFilesIncludeAny({[filename]: ["b == 0", "b != 0"], ["README.md"]: ""}));
         expect(result, "PR files check failed - required content not found in files").toBe(true);
 
         await testClient.waitForJunieComment(prNumber, SUCCESS_FEEDBACK_COMMENT);
