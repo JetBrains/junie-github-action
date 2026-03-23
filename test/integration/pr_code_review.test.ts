@@ -67,7 +67,7 @@ describe("Code Review: Built-in", () => {
                 "Trigger built-in code review",
                 "main"
             );
-            testClient.waitForPR(testClient.conditionIncludes([prTitle]));
+            await testClient.waitForPR(testClient.conditionIncludes([prTitle]));
 
             const prNumber = pr.number;
             await testClient.waitForJunieComment(prNumber, INIT_COMMENT_BODY);
@@ -149,7 +149,7 @@ describe("Code Review: On-Demand via comment", () => {
                 "main"
             );
 
-            testClient.waitForPR(testClient.conditionIncludes([prTitle]));
+            await testClient.waitForPR(testClient.conditionIncludes([prTitle]));
 
             const prNumber = pr.number;
 
