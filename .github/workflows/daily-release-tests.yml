@@ -40,6 +40,7 @@ jobs:
           TEST_ORG: melotria
           CURRENT_BRANCH: ${{ github.head_ref || github.ref_name }}
           JUNIE_VERSION: latest
+          YOUTRACK_TOKEN: ${{ secrets.YOUTRACK_TOKEN }}
         run: |
           set -o pipefail
           mkdir -p test-results
