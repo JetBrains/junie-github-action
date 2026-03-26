@@ -1,0 +1,32 @@
+name: Update Junie Version
+
+on:
+  repository_dispatch:
+    types: [junie_release]
+
+jobs:
+  update-junie-version:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Update Junie Version via Junie
+        uses: JetBrains/junie-github-action@main
+        with:
+          junie_api_key: ${{ secrets.JUNIE_API_KEY }}
+          prompt: |
+            Please update Junie CLI version to ${{ github.event.client_payload.version }} in the following files:
+            
+            1. **action.yml**
+               - Find the `junie_version` input parameter
+               - Update the default value to `${{ github.event.client_payload.version }}`
+            
+            2. **README.md**
+               - In the "Junie Configuration" section, find the table with input parameters
+               - Locate the row for `junie_version` parameter
+               - Update the default value in that row to `${{ github.event.client_payload.version }}`
