@@ -229,6 +229,7 @@ async function downloadJiraAttachment(url: string, filename: string): Promise<st
 /**
  * Pattern for YouTrack markdown attachment refs:
  * [display text](filename.ext) or ![alt](filename.png){width=70%}
+ * Supports nested parentheses and spaces in filename
  */
 const YOUTRACK_ATTACHMENT_PATTERN = /!?\[([^\]]*)\]\(([^)]+)\)(?:\{[^}]*\})?/g;
 
@@ -237,7 +238,17 @@ async function saveYouTrackAttachment(attachment: YouTrackAttachment): Promise<s
     const localPath = join(YOUTRACK_DOWNLOAD_DIR, filename);
 
     if (attachment.base64Content) {
-        await writeFile(localPath, Buffer.from(attachment.base64Content, 'base64'));
+        let base64 = attachment.base64Content;
+        // YouTrack API returns data URI: data:[<media type>][;base64],<data>
+        if (base64.startsWith('data:')) {
+            const commaIndex = base64.indexOf(',');
+            if (commaIndex !== -1) {
+                base64 = base64.substring(commaIndex + 1);
+            }
+        }
+        // Remove any whitespace or newlines that might be present in the API response
+        base64 = base64.replace(/\s/g, '');
+        await writeFile(localPath, Buffer.from(base64, 'base64'));
     } else {
         // Fallback: fetch by URL (shouldn't normally happen since we request base64Content from API)
         const response = await fetch(attachment.url);

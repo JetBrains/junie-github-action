@@ -100,7 +100,7 @@ class YouTrackClient {
         try {
             console.log(`Fetching attachments for YouTrack issue ${issueId}`);
 
-            const url = `${this.baseUrl}/api/issues/${issueId}/attachments?fields=name,url,mimeType,base64Content`;
+            const url = `${this.baseUrl}/api/issues/${issueId}/attachments?fields=name,url,mimeType,base64Content,size`;
             const response = await fetch(url, { headers: this.authHeaders });
 
             if (!response.ok) {
