@@ -31,6 +31,7 @@ describe("Trigger Junie in Issue", () => {
         const {data: issue} = await testClient.createIssue(issueTitle, issueBody, repoName)
 
         const issueNumber = issue.number;
+        await testClient.waitForIssue(issueNumber);
         console.log(`Issue created: #${issue.number}`);
 
         await testClient.waitForJunieComment(issueNumber, INIT_COMMENT_BODY);

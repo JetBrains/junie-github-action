@@ -28,6 +28,7 @@ describe("Trigger Junie in Issue Comment", () => {
         console.log(`Creating issue: "${issueTitle}" in ${testClient.org}/${repoName}`);
         const {data: issue} = await testClient.createIssue(issueTitle, issueBody, repoName);
         const issueNumber = issue.number;
+        await testClient.waitForIssue(issueNumber);
         console.log(`Issue created: #${issueNumber}`);
 
         const commentBody = `@junie-agent please implement a function ${functionName} in a new file ${filename}. The function should return the factorial of n. Also add a README.md file.`;
