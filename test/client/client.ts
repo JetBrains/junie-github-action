@@ -209,6 +209,32 @@ export class Client {
         return foundPR!;
     }
 
+    async waitForIssue(issueNumber: number): Promise<void> {
+        console.log(`Waiting for issue #${issueNumber} to be available in ${this.currentRepo}...`);
+        await startPoll(
+            `Issue #${issueNumber} was not found in ${this.currentRepo}`,
+            {},
+            async () => {
+                try {
+                    const { data: issue } = await this.octokit.issues.get({
+                        owner: this.org,
+                        repo: this.currentRepo,
+                        issue_number: issueNumber,
+                    });
+
+                    if (issue && issue.number === issueNumber) {
+                        console.log(`✓ Issue #${issueNumber} is available`);
+                        return true;
+                    }
+                    return false;
+                } catch (error) {
+                    console.log(`Issue #${issueNumber} not yet available, waiting...`);
+                    return false;
+                }
+            }
+        );
+    }
+
 
     async waitForSuccessfulCI(prNumber: number): Promise<void> {
         console.log(`Waiting for CI checks to pass on PR #${prNumber}...`);
