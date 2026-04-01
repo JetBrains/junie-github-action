@@ -26,6 +26,7 @@ import type {FailureFeedbackData, FinishFeedbackData, SuccessFeedbackData} from 
 import {getJiraClient} from "../../jira/client";
 import {convertMarkdownToADF} from "../../jira/markdown-to-jira";
 import {getYouTrackClient} from "../../youtrack/client";
+import {ActionType} from "../../../entrypoints/handle-results";
 
 /**
  * Adds a thumbs up reaction to the trigger comment/review that started the workflow.
@@ -493,7 +494,9 @@ async function postYouTrackFeedback(data: FinishFeedbackData): Promise<void> {
         comment = getFailedBody(ownerLogin, name, data.parsedContext.runId, data.failureData!);
     } else {
         console.log(`Add success comment to YouTrack issue ${ytPayload.issueId}`);
-        comment = data.successData?.prLink ? getSuccessBody(`${ownerLogin}/${name}`, data.successData) : data.successData?.junieSummary || '';
+        comment = data.successData?.actionToDo === ActionType.CREATE_PR
+            ? getSuccessBody(`${ownerLogin}/${name}`, data.successData)
+            : data.successData?.junieSummary || '';
     }
 
     if (comment) {
