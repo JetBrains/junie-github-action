@@ -42,8 +42,13 @@ export async function prepareJunieTask(
     enabledMcpServers: string[] = [],
     isDefaultToken: boolean = false,
 ) {
-    const owner = context.payload.repository.owner.login;
-    const repo = context.payload.repository.name;
+    const repoFullName = process.env.GITHUB_REPOSITORY || '';
+    const [owner, repo] = repoFullName.split('/');
+    
+    if (!owner || !repo) {
+        throw new Error("Could not determine repository owner or name from GITHUB_REPOSITORY environment variable");
+    }
+
     const fetcher = new GraphQLGitHubDataFetcher(octokit);
     let junieCLITask: CliInput = {}
     let customJunieArgs: string[] = [];

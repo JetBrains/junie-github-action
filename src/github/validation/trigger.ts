@@ -19,6 +19,12 @@ export function detectJunieTriggerPhrase(context: JunieExecutionContext): boolea
     const {
         inputs: {assigneeTrigger, labelTrigger, triggerPhrase},
     } = context;
+
+    // Linear/Jira tasks are pre-validated in shouldHandle and don't require trigger phrase
+    if ('action' in context.payload && (context.payload.action === 'linear_event' || context.payload.action === 'jira_event')) {
+        return true;
+    }
+
     const triggerPhraseRegex = new RegExp(`(^|\\s)${escapeRegExp(triggerPhrase)}([\\s.,!?;:]|$)`, 'i');
 
     if (isIssuesAssignedEvent(context)) {

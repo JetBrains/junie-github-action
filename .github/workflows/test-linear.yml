@@ -1,0 +1,61 @@
+name: Test Linear Integration
+on:
+  push:
+    branches:
+      - fadeeva/linear
+  workflow_dispatch:
+    inputs:
+      issue_id:
+        description: 'Linear Issue ID (e.g., ENG-123)'
+        required: true
+        default: 'JUN-5'
+      issue_title:
+        description: 'Create Hello World file'
+        required: true
+        default: 'Test Title'
+      issue_description:
+        description: 'Linear Issue Description'
+        required: false
+        default: 'Create new file and write there Hello World code on Kotlin'
+      action:
+        description: 'Action'
+        required: true
+        default: 'linear_event'
+
+jobs:
+  test-linear:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Run type check
+        run: bun run typecheck
+
+      - name: Run Junie Action
+        uses: ./
+        with:
+          openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          junie_api_key: ${{ secrets.JUNIE_API_KEY }}
+          linear_api_token: ${{ secrets.LINEAR_API_TOKEN }}
+          linear_state_in_progress: ${{ secrets.LINEAR_STATE_IN_PROGRESS }}
+          linear_state_in_review: ${{ secrets.LINEAR_STATE_IN_review }}
+          # Explicitly pass inputs for push events
+          action: ${{ github.event.inputs.action || 'linear_event' }}
+          issue_id: ${{ github.event.inputs.issue_id || 'JUN-5' }}
+          issue_title: ${{ github.event.inputs.issue_title || 'Test task' }}
+          issue_description: ${{ github.event.inputs.issue_description || 'Please add a comment \"Test\" to README.md' }}

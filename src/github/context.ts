@@ -21,6 +21,7 @@ import {
     DEFAULT_TRIGGER_PHRASE,
     FIX_CI_ACTION,
     JIRA_EVENT_ACTION, JUNIE_AGENT,
+    LINEAR_EVENT_ACTION,
     MINOR_FIX_ACTION,
     RESOLVE_CONFLICTS_ACTION
 } from "../constants/github";
@@ -47,6 +48,14 @@ export type JiraIssuePayload = WorkflowDispatchEvent & {
     comments: JiraComment[];
     attachments: JiraAttachment[];
     action: typeof JIRA_EVENT_ACTION;
+};
+
+// Linear integration types
+export type LinearIssuePayload = WorkflowDispatchEvent & {
+    issueId: string;
+    issueTitle: string;
+    issueDescription: string;
+    action: typeof LINEAR_EVENT_ACTION;
 };
 
 // Jira integration types
@@ -100,6 +109,8 @@ type JunieWorkflowContext = {
         attachGithubContextToCustomPrompt: boolean;
         junieWorkingDir: string;
         appToken: string;
+        openaiApiKey: string;
+        anthropicApiKey: string;
         baseBranch?: string;
         targetBranch?: string;
         prompt: string;
@@ -133,6 +144,7 @@ export type AutomationEventContext = JunieWorkflowContext & {
         | ScheduleEvent
         | WorkflowRunEvent
         | JiraIssuePayload
+        | LinearIssuePayload
         | ResolveConflictsEventPayload;
 };
 
@@ -162,6 +174,8 @@ export function extractJunieWorkflowContext(tokenOwner: TokenOwner): JunieExecut
             junieWorkingDir: process.env.WORKING_DIR!,
             headRef: process.env.GITHUB_HEAD_REF,
             appToken: process.env.APP_TOKEN!,
+            openaiApiKey: process.env.OPENAI_API_KEY!,
+            anthropicApiKey: process.env.ANTHROPIC_API_KEY!,
             prompt: process.env.PROMPT || "",
             triggerPhrase: process.env.TRIGGER_PHRASE ?? DEFAULT_TRIGGER_PHRASE,
             assigneeTrigger: process.env.ASSIGNEE_TRIGGER ?? "",
@@ -244,11 +258,56 @@ export function extractJunieWorkflowContext(tokenOwner: TokenOwner): JunieExecut
         }
         case "push": {
             const payload = context.payload as PushEvent;
-            parsedContext = {
+
+            const baseContext = {
                 ...commonFields,
                 eventName: context.eventName,
                 payload: payload
             };
+
+            // Support triggered Linear/Jira tasks even on push events (e.g. for testing)
+            if (process.env.LINEAR_API_TOKEN) {
+                try {
+                    const allInputs = process.env.ALL_INPUTS ? JSON.parse(process.env.ALL_INPUTS) : {};
+                    const issueId = allInputs.issue_id || core.getInput('issue_id');
+                    const issueTitle = allInputs.issue_title || core.getInput('issue_title');
+                    const issueDescription = allInputs.issue_description || core.getInput('issue_description');
+                    const action = allInputs.action || core.getInput('action');
+                    
+                    const issueKey = allInputs.issue_key || core.getInput('issue_key');
+                    const issueSummary = allInputs.issue_summary || core.getInput('issue_summary');
+
+                    console.log(`Checking inputs for Linear/Jira in push event: action=${action}, id=${issueId}, key=${issueKey}`);
+                    
+                    if (action === LINEAR_EVENT_ACTION || (issueId && issueTitle)) {
+                        console.log("✓ Detected Linear issue data in push event inputs - promoting to Linear event context");
+                        return extractLinearEventData({ 
+                            inputs: { 
+                                ...allInputs, 
+                                issue_id: issueId, 
+                                issue_title: issueTitle, 
+                                issue_description: issueDescription, 
+                                action: action || LINEAR_EVENT_ACTION 
+                            } 
+                        } as any, commonFields);
+                    }
+                    if (action === JIRA_EVENT_ACTION || (issueKey && issueSummary)) {
+                        console.log("✓ Detected Jira issue data in push event inputs - promoting to Jira event context");
+                        return extractJiraEventData({ 
+                            inputs: { 
+                                ...allInputs, 
+                                issue_key: issueKey, 
+                                issue_summary: issueSummary, 
+                                action: action || JIRA_EVENT_ACTION 
+                            } 
+                        } as any, commonFields);
+                    }
+                } catch (e) {
+                    console.warn("Failed to check inputs for action promotion:", e);
+                }
+            }
+
+            parsedContext = baseContext;
             break
         }
         case "workflow_dispatch": {
@@ -271,6 +330,12 @@ export function extractJunieWorkflowContext(tokenOwner: TokenOwner): JunieExecut
             // Handle Jira integration event
             if (payload.inputs?.action == JIRA_EVENT_ACTION) {
                 parsedContext = extractJiraEventData(payload, commonFields)
+                break;
+            }
+
+            // Handle Linear integration event
+            if (payload.inputs?.action == LINEAR_EVENT_ACTION) {
+                parsedContext = extractLinearEventData(payload, commonFields)
                 break;
             }
 
@@ -416,16 +481,46 @@ function extractJiraEventData(workflowPayload: WorkflowDispatchEvent, context: J
     };
 }
 
+function extractLinearEventData(workflowPayload: WorkflowDispatchEvent, context: JunieWorkflowContext): JunieExecutionContext {
+    const issueId = workflowPayload.inputs?.issue_id as string;
+    const issueTitle = workflowPayload.inputs?.issue_title as string;
+    const issueDescription = workflowPayload.inputs?.issue_description as string;
+
+    if (!issueId || !issueTitle) {
+        throw new Error(`Missing Linear issue data in workflow payload: ${JSON.stringify(workflowPayload)}`);
+    }
+
+    console.log(`✓ Linear issue detected: ${issueId} - ${issueTitle}`);
+
+    return {
+        ...context,
+        eventName: "workflow_dispatch",
+        payload: {
+            ...workflowPayload,
+            issueId,
+            issueTitle,
+            issueDescription: issueDescription || '',
+            action: LINEAR_EVENT_ACTION,
+        },
+    };
+}
+
 export function isJiraWorkflowDispatchEvent(context: JunieExecutionContext): context is AutomationEventContext & {
     payload: JiraIssuePayload
 } {
-    return context.eventName === "workflow_dispatch" && 'action' in context.payload && context.payload.action === JIRA_EVENT_ACTION;
+    return 'action' in context.payload && context.payload.action === JIRA_EVENT_ACTION;
+}
+
+export function isLinearWorkflowDispatchEvent(context: JunieExecutionContext): context is AutomationEventContext & {
+    payload: LinearIssuePayload
+} {
+    return 'action' in context.payload && context.payload.action === LINEAR_EVENT_ACTION;
 }
 
 export function isResolveConflictsWorkflowDispatchEvent(context: JunieExecutionContext): context is AutomationEventContext & {
     payload: ResolveConflictsEventPayload
 } {
-    return context.eventName === "workflow_dispatch" && 'action' in context.payload && context.payload.action === RESOLVE_CONFLICTS_ACTION;
+    return 'action' in context.payload && context.payload.action === RESOLVE_CONFLICTS_ACTION;
 }
 
 export function isCheckSuiteEvent(context: JunieExecutionContext): context is AutomationEventContext & {
@@ -514,6 +609,11 @@ export function isMinorFixEvent(context: JunieExecutionContext) {
 export function isTriggeredByUserInteraction(
     context: JunieExecutionContext,
 ): context is UserInitiatedEventContext {
+    // Exclude push events from "user interaction" because they don't have trigger phrases usually
+    // and we want to avoid unnecessary permission checks on every push
+    if (context.eventName === "push") {
+        return false;
+    }
     return USER_TRIGGERED_EVENTS.includes(context.eventName as UserTriggeredEventName);
 }
 

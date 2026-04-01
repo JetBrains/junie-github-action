@@ -84,9 +84,26 @@ inputs:
     required: false
     default: "31"
 
+  # Linear integration configuration (for workflow_dispatch events)
+  linear_api_token:
+    description: "Linear API token (required for Linear integration)"
+    required: false
+  linear_state_in_progress:
+    description: "Linear state ID for 'In Progress' status"
+    required: false
+  linear_state_in_review:
+    description: "Linear state ID for 'In Review' status"
+    required: false
+
   # Auth configuration
+  openai_api_key:
+    description: "OpenAI API key (required if using OpenAI model)"
+    required: false
+  anthropic_api_key:
+    description: "Anthropic API key (required if using Anthropic model)"
+    required: false
   junie_api_key:
-    description: "Junie API key"
+    description: "Junie API key (required if using Junie cloud service)"
     required: false
   custom_github_token:
     description: "GitHub token with repo and pull request permissions (optional if using GitHub App)"
@@ -199,6 +216,11 @@ runs:
         JIRA_API_TOKEN: ${{ inputs.jira_api_token }}
         JIRA_TRANSITION_IN_PROGRESS: ${{ inputs.jira_transition_in_progress }}
         JIRA_TRANSITION_IN_REVIEW: ${{ inputs.jira_transition_in_review }}
+        LINEAR_API_TOKEN: ${{ inputs.linear_api_token }}
+        LINEAR_STATE_IN_PROGRESS: ${{ inputs.linear_state_in_progress }}
+        LINEAR_STATE_IN_REVIEW: ${{ inputs.linear_state_in_review }}
+        OPENAI_API_KEY: ${{ inputs.openai_api_key }}
+        ANTHROPIC_API_KEY: ${{ inputs.anthropic_api_key }}
         ALL_INPUTS: ${{ toJson(inputs) }}
 
 
@@ -223,6 +245,8 @@ runs:
         JUNIE_INPUT_FILE: ${{ steps.prepare.outputs.JUNIE_INPUT_FILE }}
         EJ_AUTH_GITHUB_TOKEN: ${{ steps.prepare.outputs.EJ_AUTH_GITHUB_TOKEN  }}
         GH_TOKEN: ${{ steps.prepare.outputs.EJ_AUTH_GITHUB_TOKEN }}
+        OPENAI_API_KEY: ${{ inputs.openai_api_key }}
+        ANTHROPIC_API_KEY: ${{ inputs.anthropic_api_key }}
         MULTI_RUNS: true
         MATTERHORN_DEBUG_LOG: false
         WORKING_DIR: ${{ inputs.junie_work_dir }}
@@ -353,6 +377,9 @@ runs:
         JIRA_API_TOKEN: ${{ inputs.jira_api_token }}
         JIRA_TRANSITION_IN_PROGRESS: ${{ inputs.jira_transition_in_progress }}
         JIRA_TRANSITION_IN_REVIEW: ${{ inputs.jira_transition_in_review }}
+        LINEAR_API_TOKEN: ${{ inputs.linear_api_token }}
+        LINEAR_STATE_IN_PROGRESS: ${{ inputs.linear_state_in_progress }}
+        LINEAR_STATE_IN_REVIEW: ${{ inputs.linear_state_in_review }}
 
     - name: Give feedback and update summary (failure)
       if: failure() && steps.prepare.outputs.SHOULD_SKIP != 'true'
@@ -377,4 +404,7 @@ runs:
         JIRA_API_TOKEN: ${{ inputs.jira_api_token }}
         JIRA_TRANSITION_IN_PROGRESS: ${{ inputs.jira_transition_in_progress }}
         JIRA_TRANSITION_IN_REVIEW: ${{ inputs.jira_transition_in_review }}
+        LINEAR_API_TOKEN: ${{ inputs.linear_api_token }}
+        LINEAR_STATE_IN_PROGRESS: ${{ inputs.linear_state_in_progress }}
+        LINEAR_STATE_IN_REVIEW: ${{ inputs.linear_state_in_review }}
         ERROR: ${{ steps.prepare.outputs.EXCEPTION || steps.junie-run-results.outputs.EXCEPTION }}

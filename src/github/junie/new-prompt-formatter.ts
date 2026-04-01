@@ -12,6 +12,7 @@ import {
     isIssueCommentEvent,
     isIssuesEvent,
     isJiraWorkflowDispatchEvent,
+    isLinearWorkflowDispatchEvent,
     isMinorFixEvent,
     isPullRequestEvent,
     isPullRequestReviewCommentEvent,
@@ -19,6 +20,7 @@ import {
     isPushEvent,
     isTriggeredByUserInteraction,
     JiraIssuePayload,
+    LinearIssuePayload,
     JunieExecutionContext
 } from "../context";
 import {downloadJiraAttachmentsAndRewriteText} from "./attachment-downloader";
@@ -88,6 +90,16 @@ export class NewGitHubPromptFormatter {
         if (isJiraWorkflowDispatchEvent(context)) {
             const jiraPrompt = await this.generateJiraPrompt(context);
             const parsed = extractJunieArgs(jiraPrompt);
+            return {
+                prompt: sanitizeContent(parsed.cleanedText),
+                customJunieArgs: parsed.args
+            };
+        }
+
+        // 5. Handle Linear issue integration
+        if (isLinearWorkflowDispatchEvent(context)) {
+            const linearPrompt = this.generateLinearPrompt(context);
+            const parsed = extractJunieArgs(linearPrompt);
             return {
                 prompt: sanitizeContent(parsed.cleanedText),
                 customJunieArgs: parsed.args
@@ -214,6 +226,21 @@ Description: ${jira.issueDescription}${commentsInfo}
 
         // Download all attachments referenced in text (single pass), then return
         return await downloadJiraAttachmentsAndRewriteText(promptText, jira.attachments);
+    }
+
+    private generateLinearPrompt(context: JunieExecutionContext): string {
+        const linear = context.payload as LinearIssuePayload;
+
+        // Form the complete prompt text
+        return `You were triggered as a GitHub AI Assistant by a Linear issue. Your task is to implement the requested feature or fix based on the Linear issue details below.
+
+<linear_issue>
+Issue ID: ${linear.issueId}
+Title: ${linear.issueTitle}
+
+Description: ${linear.issueDescription}
+</linear_issue>
+`;
     }
 
     private getUserInstruction(context: JunieExecutionContext, fetchedData: FetchedData, customPrompt?: string): string | undefined {

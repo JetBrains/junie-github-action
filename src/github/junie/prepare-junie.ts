@@ -4,10 +4,12 @@ import {
     isTriggeredByUserInteraction,
     isPushEvent,
     isJiraWorkflowDispatchEvent,
+    isLinearWorkflowDispatchEvent,
     isResolveConflictsWorkflowDispatchEvent, isWorkflowRunFailureEvent, isFixCIEvent
 } from "../context";
 import {checkHumanActor} from "../validation/actor";
 import {postJunieWorkingStatusComment} from "../operations/comments/feedback";
+import {addJunieMarker, createCommentBody, createJobRunLink, hasJunieMarker} from "../operations/comments/common";
 import {initializeJunieWorkspace} from "../operations/branch";
 import {PrepareJunieOptions} from "./types/junie";
 import {configureGitCredentials} from "../operations/auth";
@@ -19,7 +21,9 @@ import {prepareJunieCLIToken} from "./junie-token";
 import {OUTPUT_VARS} from "../../constants/environment";
 import {RESOLVE_CONFLICTS_ACTION,} from "../../constants/github";
 import {getJiraClient} from "../jira/client";
+import {getLinearClient} from "../linear/client";
 import {detectJunieTriggerPhrase} from "../validation/trigger";
+import {convertMarkdownToADF} from "../jira/markdown-to-jira";
 
 /**
  * Initializes Junie execution by preparing environment, auth, and workflow context
@@ -45,14 +49,40 @@ export async function initializeJunieExecution({
 
     await postJunieWorkingStatusComment(octokit.rest, context);
 
+    // Repository owner and name for external clients
+    const repoFullName = process.env.GITHUB_REPOSITORY || '';
+    const [repoOwner, repoName] = repoFullName.split('/');
+
     // Start Jira issue if this is a Jira-triggered workflow
     if (isJiraWorkflowDispatchEvent(context)) {
         try {
+            console.log(`Starting Jira issue ${context.payload.issueKey}...`);
             const client = getJiraClient();
+            const jobRunLinkForExternal = createJobRunLink(repoOwner || context.actor, repoName || context.workflow, context.runId);
+            const initialComment = `🤖 Junie is starting work on this task. ${jobRunLinkForExternal}`;
+            const jiraComment = convertMarkdownToADF(initialComment);
+            await client.addComment(context.payload.issueKey, jiraComment);
             await client.startIssue(context.payload.issueKey);
+            console.log(`✓ Initial comment posted and issue started in Jira for ${context.payload.issueKey}`);
         } catch (jiraError) {
-            console.warn('Failed to start Jira issue:', jiraError);
+            console.warn('Failed to start Jira issue or post initial comment:', jiraError);
             // Don't fail the workflow if Jira update fails
+        }
+    }
+
+    // Start Linear issue if this is a Linear-triggered workflow
+    if (isLinearWorkflowDispatchEvent(context)) {
+        try {
+            console.log(`Starting Linear issue ${context.payload.issueId}...`);
+            const client = getLinearClient();
+            const jobRunLinkForExternal = createJobRunLink(repoOwner || context.actor, repoName || context.workflow, context.runId);
+            const initialComment = `🤖 Junie is starting work on this task. ${jobRunLinkForExternal}`;
+            await client.addComment(context.payload.issueId, initialComment);
+            await client.startIssue(context.payload.issueId);
+            console.log(`✓ Initial comment posted and issue started in Linear for ${context.payload.issueId}`);
+        } catch (linearError) {
+            console.warn('Failed to start Linear issue or post initial comment:', linearError);
+            // Don't fail the workflow if Linear update fails
         }
     }
 
@@ -81,8 +111,8 @@ export async function initializeJunieExecution({
         junieWorkingDir: context.inputs.junieWorkingDir,
         allowedMcpServers: mcpServers,
         githubToken: tokenConfig.workingToken,
-        owner: context.payload.repository.owner.login,
-        repo: context.payload.repository.name,
+        owner: repoOwner || context.actor,
+        repo: repoName || context.workflow,
         branchInfo: branchInfo,
         prNumber: prNumber,
         commitSha: commitSha,
@@ -93,7 +123,37 @@ export async function initializeJunieExecution({
 }
 
 async function shouldHandle(context: JunieExecutionContext, octokit: Octokits): Promise<boolean> {
+    console.log(`Checking if Junie should handle event: ${context.eventName}`);
+    console.log(`Payload action: ${'action' in context.payload ? context.payload.action : 'none'}`);
+    
+    // Check for Linear/Jira first, regardless of event type (support push event triggers for tests)
+    if (isLinearWorkflowDispatchEvent(context)) {
+        console.log("✓ Linear task detected - handling task");
+        try {
+            getLinearClient(); // Just to verify token early
+        } catch (e) {
+            console.warn(`Linear client initialization failed: ${e instanceof Error ? e.message : String(e)}`);
+        }
+        return true;
+    }
+
+    if (isJiraWorkflowDispatchEvent(context)) {
+        console.log("✓ Jira task detected - handling task");
+        return true;
+    }
+
+    if (context.inputs.prompt) {
+        console.log("✓ User prompt provided - handling task");
+        return true;
+    }
+
+    if (context.inputs.resolveConflicts) {
+        console.log("✓ Conflict resolution requested - handling task");
+        return await shouldResolveConflicts(context, octokit)
+    }
+
     if (isTriggeredByUserInteraction(context)) {
+        console.log("Checking user interaction trigger...");
         const hasWritePermissions = await verifyRepositoryAccess(
             octokit.rest,
             context,
@@ -102,21 +162,14 @@ async function shouldHandle(context: JunieExecutionContext, octokit: Octokits): 
             console.log("No write permissions, skipping junie");
             return false;
         }
+
+        const triggered = detectJunieTriggerPhrase(context) && await checkHumanActor(octokit.rest, context);
+        console.log(`User interaction trigger matched: ${triggered}`);
+        return triggered;
     }
 
-    if (context.inputs.prompt) {
-        return true;
-    }
-
-    if (context.inputs.resolveConflicts) {
-        return await shouldResolveConflicts(context, octokit)
-    }
-
-    if (isJiraWorkflowDispatchEvent(context)) {
-        return true;
-    }
-
-    return isTriggeredByUserInteraction(context) && detectJunieTriggerPhrase(context) && checkHumanActor(octokit.rest, context);
+    console.log("No trigger condition met - skipping junie");
+    return false;
 }
 
 async function shouldResolveConflicts(context: JunieExecutionContext, octokit: Octokits): Promise<boolean> {

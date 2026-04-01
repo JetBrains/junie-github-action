@@ -124,7 +124,10 @@ async function createNewBranch(baseBranch: string, branchName: string, prBaseBra
 }
 
 async function prepareWorkingBranchForJunie(context: JunieExecutionContext, octokit: Octokits): Promise<BranchInfo> {
-    let baseBranch = context.inputs.baseBranch || context.payload.repository.default_branch
+    const repoFullName = process.env.GITHUB_REPOSITORY || '';
+    const [owner, repo] = repoFullName.split('/');
+    
+    let baseBranch = context.inputs.baseBranch || context.payload.repository?.default_branch || 'main';
     let prBaseBranch: string | undefined;
     let headSha: string | undefined;
     const entityNumber = context.entityNumber;
@@ -147,9 +150,12 @@ async function prepareWorkingBranchForJunie(context: JunieExecutionContext, octo
             headSha = context.payload.pull_request.head.sha;
         } else {
             try {
+                if (!owner || !repo) {
+                    throw new Error("Could not determine repository owner or name from GITHUB_REPOSITORY environment variable");
+                }
                 const data = (await octokit.rest.pulls.get({
-                    owner: context.payload.repository.owner.login,
-                    repo: context.payload.repository.name,
+                    owner,
+                    repo,
                     pull_number: entityNumber,
                 })).data;
                 baseBranch = data.base.ref;
