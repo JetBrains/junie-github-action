@@ -40,6 +40,7 @@ describe("Trigger Junie in PR comment", () => {
 
         const {data: pr} = await testClient.createPullRequest(repoName, branchName, prTitle, "Basic math functions", "main");
 
+        await testClient.waitForPR(testClient.conditionIncludes([prTitle]));
         testClient.waitForPR(testClient.conditionIncludes([prTitle]));
 
         const prNumber = pr.number;
