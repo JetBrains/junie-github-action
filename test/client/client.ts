@@ -166,15 +166,20 @@ export class GitHubClient {
             `Junie didn't post comment containing "${message}" in issue #${issueOrPRNumber}`,
             {},
             async () => {
-                const { data: comments } = await this.getAllIssueOrPRComments(issueOrPRNumber);
-                const junieComment = comments.find(c => c.body?.includes(message));
+                try {
+                    const { data: comments } = await this.getAllIssueOrPRComments(issueOrPRNumber);
+                    const junieComment = comments.find(c => c.body?.includes(message));
 
-                if (junieComment) {
-                    foundComment = junieComment;
-                    console.log(`Found comment with message: "${message}"`);
-                    return true;
+                    if (junieComment) {
+                        foundComment = junieComment;
+                        console.log(`Found comment with message: "${message}"`);
+                        return true;
+                    }
+                    return false;
+                } catch (error) {
+                    console.log(`Comments not yet available for #${issueOrPRNumber}, waiting...`);
+                    return false;
                 }
-                return false;
             }
         );
         return foundComment!;
@@ -187,15 +192,20 @@ export class GitHubClient {
             `Reaction "${reactionType}" not found on comment #${commentId}`,
             {},
             async () => {
-                const { data: reactions } = await this.getAllCommentReactions(commentId);
+                try {
+                    const { data: reactions } = await this.getAllCommentReactions(commentId);
 
-                const hasReaction = reactions.some(r => r.content === reactionType);
-                if (hasReaction) {
-                    foundReaction = reactions.find(r => r.content === reactionType);
-                    console.log(`Found "${reactionType}" reaction on comment #${commentId}`);
-                    return true;
+                    const hasReaction = reactions.some(r => r.content === reactionType);
+                    if (hasReaction) {
+                        foundReaction = reactions.find(r => r.content === reactionType);
+                        console.log(`Found "${reactionType}" reaction on comment #${commentId}`);
+                        return true;
+                    }
+                    return false;
+                } catch (error) {
+                    console.log(`Reactions not yet available for comment #${commentId}, waiting...`);
+                    return false;
                 }
-                return false;
             }
         );
         return foundReaction!;
@@ -211,9 +221,13 @@ export class GitHubClient {
             `Not enough inline comments found for PR #${prNumber}`,
             {},
             async () => {
-                const { data: comments } = await this.getAllReviewComments(prNumber);
-
-                return (condition(comments));
+                try {
+                    const { data: comments } = await this.getAllReviewComments(prNumber);
+                    return (condition(comments));
+                } catch (error) {
+                    console.log(`Review comments not yet available for PR #${prNumber}, waiting...`);
+                    return false;
+                }
             }
         );
     }
@@ -228,18 +242,23 @@ export class GitHubClient {
             `Junie didn't create a PR in ${this.currentRepo}`,
             {},
             async () => {
-                const { data: pulls } = await this.getAllPRs();
-                const relevantPRs = createdAfter
-                    ? pulls.filter(pr => new Date(pr.created_at) > createdAfter)
-                    : pulls;
-                for (const pull of relevantPRs) {
-                    if (await condition(pull)) {
-                        console.log(`PR found: ${pull.html_url}`);
-                        foundPR = pull;
-                        return true;
+                try {
+                    const { data: pulls } = await this.getAllPRs();
+                    const relevantPRs = createdAfter
+                        ? pulls.filter(pr => new Date(pr.created_at) > createdAfter)
+                        : pulls;
+                    for (const pull of relevantPRs) {
+                        if (await condition(pull)) {
+                            console.log(`PR found: ${pull.html_url}`);
+                            foundPR = pull;
+                            return true;
+                        }
                     }
+                    return false;
+                } catch (error) {
+                    console.log(`PRs not yet available in ${this.currentRepo}, waiting...`);
+                    return false;
                 }
-                return false;
             }
         );
 
@@ -252,15 +271,20 @@ export class GitHubClient {
             `PR #${prNumber} was not closed in ${this.currentRepo}`,
             {},
             async () => {
-                const pr = await this.getPullRequest(prNumber);
+                try {
+                    const pr = await this.getPullRequest(prNumber);
 
-                if (pr.state === "closed") {
-                    console.log(`✓ PR #${prNumber} is now closed`);
-                    return true;
+                    if (pr.state === "closed") {
+                        console.log(`✓ PR #${prNumber} is now closed`);
+                        return true;
+                    }
+
+                    console.log(`PR #${prNumber} is still open, waiting...`);
+                    return false;
+                } catch (error) {
+                    console.log(`PR #${prNumber} not yet available, waiting...`);
+                    return false;
                 }
-
-                console.log(`PR #${prNumber} is still open, waiting...`);
-                return false;
             }
         );
     }
@@ -298,33 +322,37 @@ export class GitHubClient {
             `CI checks did not pass on PR #${prNumber}`,
             {},
             async () => {
-                const pr = await this.getPullRequest(prNumber);
+                try {
+                    const pr = await this.getPullRequest(prNumber);
+                    const checkRuns = await this.getListOfChecks(pr.head.sha);
 
-                const checkRuns = await this.getListOfChecks(pr.head.sha);
+                    if (checkRuns.total_count === 0) {
+                        console.log(`No CI checks found yet for PR #${prNumber}`);
+                        return false;
+                    }
 
-                if (checkRuns.total_count === 0) {
-                    console.log(`No CI checks found yet for PR #${prNumber}`);
+                    const completedRun = checkRuns.check_runs.every(
+                        check => check.status === 'completed'
+                    );
+                    const successfulRun = checkRuns.check_runs.every(
+                        check => check.conclusion === 'success'
+                    );
+
+                    if (!completedRun) {
+                        console.log(`CI checks still running on PR #${prNumber}...`);
+                        return false;
+                    }
+
+                    if (successfulRun) {
+                        console.log(`All CI checks passed on PR #${prNumber}`);
+                        return true;
+                    }
+                    console.log(`CI run failed on PR #${prNumber}`);
+                    return false;
+                } catch (error) {
+                    console.log(`CI checks not yet available for PR #${prNumber}, waiting...`);
                     return false;
                 }
-
-                const completedRun = checkRuns.check_runs.every(
-                    check => check.status === 'completed'
-                );
-                const successfulRun = checkRuns.check_runs.every(
-                    check => check.conclusion === 'success'
-                );
-
-                if (!completedRun) {
-                    console.log(`CI checks still running on PR #${prNumber}...`);
-                    return false;
-                }
-
-                if (successfulRun) {
-                    console.log(`All CI checks passed on PR #${prNumber}`);
-                    return true;
-                }
-                console.log(`CI run failed on PR #${prNumber}`);
-                return false;
             }
         );
     }
@@ -489,25 +517,30 @@ export class GitHubClient {
             `PR #${prNumber} didn't get merge conflicts`,
             {},
             async () => {
-                const pr = await this.getPullRequest(prNumber);
+                try {
+                    const pr = await this.getPullRequest(prNumber);
 
-                if (pr.mergeable === null) {
-                    console.log(`GitHub still calculating mergeable status for PR #${prNumber}...`);
+                    if (pr.mergeable === null) {
+                        console.log(`GitHub still calculating mergeable status for PR #${prNumber}...`);
+                        return false;
+                    }
+
+                    if (pr.mergeable === false) {
+                        console.log(`✓ PR #${prNumber} has merge conflicts (mergeable: false)`);
+                        return true;
+                    }
+
+                    if (pr.mergeable_state === 'dirty') {
+                        console.log(`✓ PR #${prNumber} has conflicts (mergeable_state: dirty)`);
+                        return true;
+                    }
+
+                    console.log(`PR #${prNumber} still has no conflicts (mergeable: ${pr.mergeable}, state: ${pr.mergeable_state}), waiting...`);
+                    return false;
+                } catch (error) {
+                    console.log(`PR #${prNumber} not yet available, waiting...`);
                     return false;
                 }
-
-                if (pr.mergeable === false) {
-                    console.log(`✓ PR #${prNumber} has merge conflicts (mergeable: false)`);
-                    return true;
-                }
-
-                if (pr.mergeable_state === 'dirty') {
-                    console.log(`✓ PR #${prNumber} has conflicts (mergeable_state: dirty)`);
-                    return true;
-                }
-
-                console.log(`PR #${prNumber} still has no conflicts (mergeable: ${pr.mergeable}, state: ${pr.mergeable_state}), waiting...`);
-                return false;
             }
         );
     }
