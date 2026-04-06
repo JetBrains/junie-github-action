@@ -9,7 +9,7 @@ describe("Trigger Junie in PR comment", () => {
     beforeAll(async () => {
         repoName = await testClient.createTestRepo();
         await testClient.setupWorkflow(repoName);
-    }, 30000);
+    }, 60000);
 
     afterAll(async () => {
         if (repoName && testPassed) {

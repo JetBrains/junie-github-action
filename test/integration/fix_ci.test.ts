@@ -10,7 +10,7 @@ describe("Fix Failing CI: built-in", () => {
         repoName = await testClient.createTestRepo();
         await testClient.setupWorkflow(repoName, ".github/workflows/fix-ci.yml", "test/workflows/fix-ci.yml");
         await testClient.setupWorkflow(repoName, ".github/workflows/ci.yml", "test/workflows/failing-ci.yml");
-    }, 30000);
+    }, 60000);
 
     afterAll(async () => {
         if (repoName && testPassed) {
@@ -37,7 +37,7 @@ describe("Fix Failing CI: via comment", () => {
             "use_single_comment: true",
             "use_single_comment: true\n          create_new_branch_for_pr: \"true\""
         ));
-    }, 24000);
+    }, 60000);
 
     afterAll(async () => {
         if (repoName && testPassed) {
