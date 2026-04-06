@@ -99,6 +99,25 @@ export class GitHubClient {
         );
     }
 
+    private async retryOnError<T>(call: () => Promise<T>, retries: number = 5, delayMs: number = 3000): Promise<T> {
+        let lastError: unknown;
+        for (let i = 0; i < retries; i++) {
+            try {
+                return await call();
+            } catch (error: any) {
+                lastError = error;
+                const status = error?.status ?? error?.response?.status;
+                if (status === 404 || status === 422) {
+                    console.log(`Write operation failed with ${status}, retrying in ${delayMs}ms (attempt ${i + 1}/${retries})...`);
+                    await new Promise(r => setTimeout(r, delayMs));
+                } else {
+                    throw error;
+                }
+            }
+        }
+        throw lastError;
+    }
+
     async setupWorkflow(
         repoName: string,
         workflowFilePathInRepo: string = this.TEST_WORKFLOW_FILE_PATHS.workflowFilePathInRepo,
@@ -128,13 +147,13 @@ export class GitHubClient {
             );
         }
 
-        await this.createOrUpdateFileContents(
+        await this.retryOnError(() => this.createOrUpdateFileContents(
             repoName,
             Buffer.from(workflowContent).toString("base64"),
             workflowFilePathInRepo,
             "Add Junie workflow",
             branch
-        );
+        ));
 
         await new Promise(resolve => setTimeout(resolve, 6000));
     }
@@ -612,12 +631,12 @@ export class GitHubClient {
     }
 
     async createCommentToPROrIssue(repoName: string, issueOrPRNumber: number, commentBody: string) {
-        return this.octokit.issues.createComment({
+        return this.retryOnError(() => this.octokit.issues.createComment({
             owner: this.org,
             repo: repoName,
             issue_number: issueOrPRNumber,
             body: commentBody,
-        });
+        }));
     }
 
     async triggerWorkflowDispatch(repoName: string, workflowFileName: string, inputs: Record<string, string>, ref: string = "main") {
