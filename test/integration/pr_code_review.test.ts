@@ -13,7 +13,7 @@ describe("Code Review: Built-in", () => {
             ".github/workflows/code-review.yml",
             "test/workflows/code-review.yml"
         );
-    }, 30000);
+    }, 60000);
 
     afterAll(async () => {
         if (repoName && testPassed) {
@@ -95,7 +95,7 @@ describe("Code Review: On-Demand via comment", () => {
     beforeAll(async () => {
         repoName = await testClient.createTestRepo();
         await testClient.setupWorkflow(repoName);
-    }, 15000);
+    }, 60000);
 
     afterAll(async () => {
         if (repoName && testPassed) {

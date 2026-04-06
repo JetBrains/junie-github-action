@@ -67,8 +67,36 @@ export class GitHubClient {
             private: true,
         });
 
+        await this.waitForRepoInitialization(repoName);
         this.currentRepo = repoName;
         return repoName;
+    }
+
+    private async waitForRepoInitialization(repoName: string): Promise<void> {
+        console.log(`Waiting for repository ${this.org}/${repoName} to initialize...`);
+        await startPoll(
+            `Repository ${this.org}/${repoName} didn't initialize in time`,
+            {pollIntervalMs: 2000, timeoutMs: 60000},
+            async () => {
+                try {
+                    const { data } = await this.octokit.repos.getContent({
+                        owner: this.org,
+                        repo: repoName,
+                        path: 'README.md',
+                        ref: 'main',
+                    });
+
+                    if (data && 'content' in data) {
+                        console.log(`✓ Repository ${this.org}/${repoName} is fully initialized`);
+                        return true;
+                    }
+                    return false;
+                } catch (error) {
+                    console.log(`README.md not yet available in ${repoName}, waiting...`);
+                    return false;
+                }
+            }
+        );
     }
 
     async setupWorkflow(
@@ -379,7 +407,7 @@ export class GitHubClient {
                     return false;
                 }
 
-                const {data: contentData} = await this.getFileContent(pr.head.sha, file);
+                const {data: contentData} = await this.getFileContent(pr.head.sha, file.filename);
 
                 if ("content" in contentData && typeof contentData.content === "string") {
                     const decodedContent = Buffer.from(contentData.content, "base64").toString("utf-8");
@@ -424,12 +452,12 @@ export class GitHubClient {
         });
     }
 
-    private async getFileContent(sha: string, file: GitHubFile) {
+    private async getFileContent(ref: string, filePath: string) {
         return this.octokit.repos.getContent({
             owner: this.org,
             repo: this.currentRepo,
-            path: file.filename,
-            ref: sha,
+            path: filePath,
+            ref: ref,
         });
     }
 
