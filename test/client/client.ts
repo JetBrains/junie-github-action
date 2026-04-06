@@ -7,7 +7,6 @@ import {
 } from "../utils/test-utils";
 
 import {RestEndpointMethodTypes} from "@octokit/rest";
-
 type PullRequest = RestEndpointMethodTypes["pulls"]["list"]["response"]["data"][number];
 type Comment = RestEndpointMethodTypes["issues"]["listComments"]["response"]["data"][number];
 type Reaction = RestEndpointMethodTypes["reactions"]["listForIssueComment"]["response"]["data"][number];
@@ -22,7 +21,7 @@ type ReviewCommentCondition = {
 type PullRequestDetailed = RestEndpointMethodTypes["pulls"]["get"]["response"]["data"];
 type CheckRunsResponse = RestEndpointMethodTypes["checks"]["listForRef"]["response"]["data"];
 
-export class Client {
+export class GitHubClient {
     private octokit: Octokit;
     public readonly org: string;
     public currentRepo: string = "";
@@ -36,7 +35,13 @@ export class Client {
         this.org = e2eConfig.org;
     }
 
-    async createTestRepo(): Promise<string> {
+    async createTestRepo(fixedRepoName?: string): Promise<string> {
+        if (fixedRepoName) {
+            console.log(`Using fixed test repository: ${this.org}/${fixedRepoName}`);
+            this.currentRepo = fixedRepoName;
+            return fixedRepoName;
+        }
+
         const stack = new Error().stack || '';
         const stackLines = stack.split('\n');
 
@@ -186,7 +191,8 @@ export class Client {
     }
 
     async waitForPR(
-        condition: (pr: PullRequest) => boolean | Promise<boolean>
+        condition: (pr: PullRequest) => boolean | Promise<boolean>,
+        createdAfter?: Date
     ): Promise<PullRequest> {
         console.log(`Waiting for Junie to create a PR in ${this.currentRepo}...`);
         let foundPR: PullRequest | undefined;
@@ -195,7 +201,10 @@ export class Client {
             {},
             async () => {
                 const { data: pulls } = await this.getAllPRs();
-                for (const pull of pulls) {
+                const relevantPRs = createdAfter
+                    ? pulls.filter(pr => new Date(pr.created_at) > createdAfter)
+                    : pulls;
+                for (const pull of relevantPRs) {
                     if (await condition(pull)) {
                         console.log(`PR found: ${pull.html_url}`);
                         foundPR = pull;
@@ -207,6 +216,25 @@ export class Client {
         );
 
         return foundPR!;
+    }
+
+    async waitForClosedPR(prNumber: number): Promise<void> {
+        console.log(`Waiting for PR #${prNumber} to be closed in ${this.currentRepo}...`);
+        await startPoll(
+            `PR #${prNumber} was not closed in ${this.currentRepo}`,
+            {},
+            async () => {
+                const pr = await this.getPullRequest(prNumber);
+
+                if (pr.state === "closed") {
+                    console.log(`✓ PR #${prNumber} is now closed`);
+                    return true;
+                }
+
+                console.log(`PR #${prNumber} is still open, waiting...`);
+                return false;
+            }
+        );
     }
 
     async waitForIssue(issueNumber: number): Promise<void> {
@@ -292,6 +320,15 @@ export class Client {
             repo: this.currentRepo,
             pull_number: prNumber,
         }).then(response => response.data);
+    }
+
+    async closePullRequest(prNumber: number) {
+        await this.octokit.pulls.update({
+            owner: this.org,
+            repo: this.currentRepo,
+            pull_number: prNumber,
+            state: "closed"
+        });
     }
 
     async getListOfChecks(ref: string): Promise<CheckRunsResponse> {
@@ -468,7 +505,7 @@ export class Client {
 
     conditionIncludes(titles: string[]) {
         return (pr: PullRequest) => {
-            return titles.some(title => pr.title.toLowerCase().includes(title));
+            return titles.some(title => pr.title.toLowerCase().includes(title.toLowerCase()));
         };
     }
 
@@ -522,6 +559,16 @@ export class Client {
         });
     }
 
+    async triggerWorkflowDispatch(repoName: string, workflowFileName: string, inputs: Record<string, string>, ref: string = "main") {
+        return this.octokit.actions.createWorkflowDispatch({
+            owner: this.org,
+            repo: repoName,
+            workflow_id: workflowFileName,
+            ref: ref,
+            inputs: inputs,
+        });
+    }
+
     private async getAllCommentReactions(commentId: number) {
         return this.octokit.reactions.listForIssueComment({
             owner: this.org,
@@ -539,4 +586,4 @@ export class Client {
     }
 }
 
-export const testClient = new Client();
+export const testClient = new GitHubClient();

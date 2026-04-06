@@ -34,6 +34,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
           TEST_ORG: melotria
           CURRENT_BRANCH: ${{ github.head_ref || github.ref_name }}
+          YOUTRACK_TOKEN: ${{ secrets.YOUTRACK_TOKEN }}
         run: |
           set -o pipefail
           mkdir -p test-results
