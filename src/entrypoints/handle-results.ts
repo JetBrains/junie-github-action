@@ -14,6 +14,7 @@ import * as fs from "node:fs";
 export enum ActionType {
     WRITE_COMMENT = 'WRITE_COMMENT',
     CREATE_PR = 'CREATE_PR',
+    COMMIT_AND_PUSH = 'COMMIT_AND_PUSH',
     COMMIT_CHANGES = 'COMMIT_CHANGES',
     PUSH = 'PUSH',
     NOTHING = 'NOTHING'
@@ -115,6 +116,7 @@ export async function handleResults() {
                     prTitle,
                     prBody);
                 break;
+            case ActionType.COMMIT_AND_PUSH:
             case ActionType.COMMIT_CHANGES:
             case ActionType.PUSH:
                 exportResultsOutputs(title, body, durationMs, commitMessage);
@@ -126,6 +128,35 @@ export async function handleResults() {
         }
     } catch (error) {
         handleStepError("Handle results step", error);
+    }
+}
+
+export function determineActionType(params: {
+    silentMode: boolean;
+    skipPr: boolean;
+    isCodeReview: boolean;
+    hasChangedFiles: boolean;
+    hasUnpushedCommits: boolean;
+    isNewBranch: boolean;
+    hasInitComment: boolean;
+    isExternalIntegration: boolean;
+}): ActionType {
+    if (params.silentMode) {
+        return ActionType.NOTHING;
+    } else if (params.isCodeReview) {
+        return ActionType.WRITE_COMMENT;
+    } else if ((params.hasChangedFiles || params.hasUnpushedCommits) && params.isNewBranch && params.skipPr) {
+        return ActionType.COMMIT_AND_PUSH;
+    } else if ((params.hasChangedFiles || params.hasUnpushedCommits) && params.isNewBranch) {
+        return ActionType.CREATE_PR;
+    } else if (params.hasChangedFiles && !params.isNewBranch) {
+        return ActionType.COMMIT_CHANGES;
+    } else if (params.hasUnpushedCommits) {
+        return ActionType.PUSH;
+    } else if (params.hasInitComment || params.isExternalIntegration) {
+        return ActionType.WRITE_COMMENT;
+    } else {
+        return ActionType.NOTHING;
     }
 }
 
@@ -145,29 +176,16 @@ async function getActionToDo(context: JunieExecutionContext): Promise<ActionType
     console.log(`Is external integration: ${isExternalIntegration}`)
     console.log(`Working branch: ${workingBranch}`);
 
-    let action: ActionType
-    if (context.inputs.silentMode) {
-        console.log('Silent mode enabled - no git operations will be performed');
-        action = ActionType.NOTHING;
-    } else if (isCodeReviewEvent(context)) {
-        console.log('Code review event detected - will only write comment');
-        action = ActionType.WRITE_COMMENT;
-    } else if ((hasChangedFiles || hasUnpushedCommits) && isNewBranch) {
-        console.log('Changes or unpushed commits found in new branch - will create PR');
-        action = ActionType.CREATE_PR;
-    } else if (hasChangedFiles && !isNewBranch) {
-        console.log('Changes found and working in existing branch - will commit directly');
-        action = ActionType.COMMIT_CHANGES;
-    } else if (hasUnpushedCommits) {
-        console.log('No changes but has unpushed commits in existing branch - will push');
-        action = ActionType.PUSH;
-    } else if (initCommentId || isExternalIntegration) {
-        console.log('No changes and no unpushed commits but has comment ID or it`s an external integration - will write comment');
-        action = ActionType.WRITE_COMMENT;
-    } else {
-        console.log('No specific action matched - do nothing');
-        action = ActionType.NOTHING;
-    }
+    const action = determineActionType({
+        silentMode: context.inputs.silentMode,
+        skipPr: context.inputs.skipPr,
+        isCodeReview: isCodeReviewEvent(context),
+        hasChangedFiles,
+        hasUnpushedCommits,
+        isNewBranch,
+        hasInitComment: !!initCommentId,
+        isExternalIntegration,
+    });
 
     console.log("Action to do:", action);
     core.setOutput(OUTPUT_VARS.ACTION_TO_DO, action);

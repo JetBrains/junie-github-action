@@ -16,6 +16,7 @@ import type {Octokit} from "@octokit/rest";
 import {GITHUB_SERVER_URL} from "../../api/config";
 import {OUTPUT_VARS} from "../../../constants/environment";
 import {
+    BRANCH_PUSHED_FEEDBACK_COMMENT_TEMPLATE,
     COMMIT_PUSHED_FEEDBACK_COMMENT_TEMPLATE,
     ERROR_FEEDBACK_COMMENT_TEMPLATE,
     MANUALLY_PR_CREATE_FEEDBACK_COMMENT_TEMPLATE,
@@ -522,6 +523,10 @@ function getFailedBodyWithMarker(owner: string, repoName: string, runId: string,
 function getSuccessBody(repoFullName: string, successData: SuccessFeedbackData) {
     let result: string = SUCCESS_FEEDBACK_COMMENT;
     switch (successData.actionToDo) {
+        case "COMMIT_AND_PUSH":
+            console.log(`Changes committed and pushed to branch: ${successData.workingBranch}`);
+            result = BRANCH_PUSHED_FEEDBACK_COMMENT_TEMPLATE(successData.workingBranch!, successData.junieTitle!, successData.junieSummary!);
+            break;
         case "COMMIT_CHANGES":
             console.log(`Commit pushed to current branch: ${successData.commitSHA}`);
             result = COMMIT_PUSHED_FEEDBACK_COMMENT_TEMPLATE(successData.commitSHA!, successData.junieTitle!, successData.junieSummary!);
