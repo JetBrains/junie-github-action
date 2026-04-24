@@ -142,7 +142,7 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 
 | Input | Description | Default |
 |-------|-------------|---------|
-| `base_branch` | Base branch for creating new branches | `github.base_ref` |
+| `base_branch` | Base branch for creating new branches | `github.base_ref` or `github.ref_name` |
 | `create_new_branch_for_pr` | Create new branch for PR contributors | `false` |
 
 #### Junie Configuration

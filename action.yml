@@ -201,7 +201,7 @@ runs:
         TRIGGER_PHRASE: ${{ inputs.trigger_phrase }}
         ASSIGNEE_TRIGGER: ${{ inputs.assignee_trigger }}
         LABEL_TRIGGER: ${{ inputs.label_trigger }}
-        BASE_BRANCH: ${{ inputs.base_branch || github.base_ref  }}
+        BASE_BRANCH: ${{ inputs.base_branch || github.base_ref || github.ref_name }}
         TARGET_BRANCH: ${{ github.head_ref }}
         OVERRIDE_GITHUB_TOKEN: ${{ inputs.custom_github_token }}
         DEFAULT_WORKFLOW_TOKEN: ${{ github.token }}
