@@ -118,6 +118,8 @@ type JunieWorkflowContext = {
         resolveConflicts: boolean;
         createNewBranchForPR: boolean;
         silentMode: boolean;
+        skipPr: boolean;
+        outputBranch?: string;
         useSingleComment: boolean;
         attachGithubContextToCustomPrompt: boolean;
         junieWorkingDir: string;
@@ -185,6 +187,8 @@ export function extractJunieWorkflowContext(tokenOwner: TokenOwner): JunieExecut
             resolveConflicts: process.env.RESOLVE_CONFLICTS == "true",
             createNewBranchForPR: process.env.CREATE_NEW_BRANCH_FOR_PR == "true",
             silentMode: process.env.SILENT_MODE == "true",
+            skipPr: process.env.SKIP_PR == "true",
+            outputBranch: process.env.OUTPUT_BRANCH || undefined,
             useSingleComment: process.env.USE_SINGLE_COMMENT == "true",
             attachGithubContextToCustomPrompt: process.env.ATTACH_GITHUB_CONTEXT_TO_CUSTOM_PROMPT !== "false",
             junieWorkingDir: process.env.WORKING_DIR!,

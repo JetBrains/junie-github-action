@@ -39,6 +39,13 @@ inputs:
     description: "Whether to attach GitHub context (PR/issue info, commits, reviews, etc.) when using custom prompt. Only applies when 'prompt' input is provided."
     required: false
     default: "false"
+  skip_pr:
+    description: "Skip pull request creation - only commit and push changes to the branch"
+    required: false
+    default: "false"
+  output_branch:
+    description: "Custom branch name for Junie's changes (overrides auto-generated branch name)"
+    required: false
 
   # Junie configuration
   prompt:
@@ -205,6 +212,8 @@ runs:
         SILENT_MODE: ${{ inputs.silent_mode }}
         USE_SINGLE_COMMENT: ${{ inputs.use_single_comment }}
         ATTACH_GITHUB_CONTEXT_TO_CUSTOM_PROMPT: ${{ inputs.attach_github_context_to_custom_prompt }}
+        SKIP_PR: ${{ inputs.skip_pr }}
+        OUTPUT_BRANCH: ${{ inputs.output_branch }}
         JIRA_BASE_URL: ${{ inputs.jira_base_url }}
         JIRA_EMAIL: ${{ inputs.jira_email }}
         JIRA_API_TOKEN: ${{ inputs.jira_api_token }}
@@ -320,7 +329,7 @@ runs:
     - uses: EndBug/add-and-commit@v9
       name: Commit changes
       id: commit
-      if: steps.prepare.outputs.SHOULD_SKIP != 'true' && inputs.silent_mode != 'true' && (steps.junie-run-results.outputs.ACTION_TO_DO == 'COMMIT_CHANGES' || steps.junie-run-results.outputs.ACTION_TO_DO == 'CREATE_PR')
+      if: steps.prepare.outputs.SHOULD_SKIP != 'true' && inputs.silent_mode != 'true' && (steps.junie-run-results.outputs.ACTION_TO_DO == 'COMMIT_CHANGES' || steps.junie-run-results.outputs.ACTION_TO_DO == 'CREATE_PR' || steps.junie-run-results.outputs.ACTION_TO_DO == 'COMMIT_AND_PUSH')
       with:
         author_name: ${{ steps.prepare.outputs.JUNIE_AGENT_NAME }}
         author_email: ${{ steps.prepare.outputs.JUNIE_AGENT_EMAIL }}
@@ -329,7 +338,7 @@ runs:
 
     - name: Push changes
       id: push
-      if: steps.prepare.outputs.SHOULD_SKIP != 'true' && inputs.silent_mode != 'true' && (steps.junie-run-results.outputs.ACTION_TO_DO == 'PUSH' || steps.junie-run-results.outputs.ACTION_TO_DO == 'CREATE_PR')
+      if: steps.prepare.outputs.SHOULD_SKIP != 'true' && inputs.silent_mode != 'true' && (steps.junie-run-results.outputs.ACTION_TO_DO == 'PUSH' || steps.junie-run-results.outputs.ACTION_TO_DO == 'CREATE_PR' || steps.junie-run-results.outputs.ACTION_TO_DO == 'COMMIT_AND_PUSH')
       shell: bash
       run: |
         git push --set-upstream origin HEAD
