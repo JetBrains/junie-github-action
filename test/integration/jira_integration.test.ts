@@ -1,15 +1,12 @@
 import {describe, test, beforeAll, expect} from "bun:test";
 import {INIT_COMMENT_BODY, SUCCESS_FEEDBACK_COMMENT, JIRA_EVENT_ACTION} from "../../src/constants/github";
 import {testClient} from "../client/client";
-import {jiraTestClient} from "../client/jira-client";
+import {getJiraClient} from "../../src/github/jira/client";
 import {e2eConfig} from "../config/test-config";
 
 describe("Jira Integration", () => {
     let repoName: string;
     const workflowFileName = "junie-jira.yml";
-    const jiraBaseUrl = e2eConfig.jiraBaseUrl;
-    const jiraEmail = e2eConfig.jiraEmail;
-    const jiraApiToken = e2eConfig.jiraApiToken;
     const projectKey = e2eConfig.jiraProjectKey;
 
     beforeAll(async () => {
@@ -21,7 +18,7 @@ describe("Jira Integration", () => {
         const issueTitle = "Create Calculator.java";
         const issueDescription = "Create file Calculator.java with a Calculator class and update README.md accordingly. Use the method signatures from the attached calculator_spec.txt file.";
 
-        const issueKey = await jiraTestClient.createJiraIssue(projectKey, issueTitle, issueDescription, jiraBaseUrl, jiraEmail, jiraApiToken);
+        const issueKey = await getJiraClient().createIssue(projectKey, issueTitle, issueDescription);
 
         const calculatorSpec = `public class Calculator {
     public int add(int a, int b) {
@@ -34,7 +31,7 @@ describe("Jira Integration", () => {
         return a * b;
     }
 }`;
-        const attachment = await jiraTestClient.addJiraAttachment(issueKey, "calculator_spec.txt", calculatorSpec, jiraBaseUrl, jiraEmail, jiraApiToken);
+        const attachment = await getJiraClient().addAttachment(issueKey, "calculator_spec.txt", calculatorSpec);
 
         const issueAttachments = JSON.stringify([{
             filename: attachment.filename,
@@ -62,7 +59,7 @@ describe("Jira Integration", () => {
         const issueDescription = "Create file Calculator.java with a Calculator class and update README.md accordingly. Use the method signatures from the attached calculator_spec.txt file.";
         const triggerComment = "@junie do the task and add README";
 
-        const issueKey = await jiraTestClient.createJiraIssue(projectKey, issueTitle, issueDescription, jiraBaseUrl, jiraEmail, jiraApiToken);
+        const issueKey = await getJiraClient().createIssue(projectKey, issueTitle, issueDescription);
 
         const calculatorSpec = `public class Calculator {
     public int add(int a, int b) {
@@ -75,12 +72,12 @@ describe("Jira Integration", () => {
         return a * b;
     }
 }`;
-        await jiraTestClient.addJiraAttachment(issueKey, "calculator_spec.txt", calculatorSpec, jiraBaseUrl, jiraEmail, jiraApiToken);
+        await getJiraClient().addAttachment(issueKey, "calculator_spec.txt", calculatorSpec);
 
         const testStartTime = new Date();
 
         console.log(`Posting trigger comment to Jira issue ${issueKey}...`);
-        await jiraTestClient.addJiraComment(issueKey, triggerComment, jiraBaseUrl, jiraEmail, jiraApiToken);
+        await getJiraClient().addTextComment(issueKey, triggerComment);
 
         await verifyJunieSuccess(issueKey, testStartTime);
     }, 900000);
@@ -89,8 +86,8 @@ describe("Jira Integration", () => {
         const filename = "Calculator.java";
 
         console.log(`Verifying comments in Jira issue ${issueKey}...`);
-        await jiraTestClient.waitForJiraComment(issueKey, INIT_COMMENT_BODY, jiraBaseUrl, jiraEmail, jiraApiToken);
-        const foundJiraComment = await jiraTestClient.waitForJiraComment(issueKey, SUCCESS_FEEDBACK_COMMENT, jiraBaseUrl, jiraEmail, jiraApiToken);
+        await getJiraClient().waitForComment(issueKey, INIT_COMMENT_BODY);
+        const foundJiraComment = await getJiraClient().waitForComment(issueKey, SUCCESS_FEEDBACK_COMMENT);
         console.log(`Found Jira comment: ${foundJiraComment.text}`);
         const prLinkMatch = foundJiraComment.text.match(/https:\/\/github\.com\/[^\/\s]+\/[^\/\s]+\/pull\/(\d+)/);
         const prNumber = parseInt(prLinkMatch![1]);
@@ -105,13 +102,13 @@ describe("Jira Integration", () => {
         expect(result).toBe(true);
 
         console.log(`Verifying PR link in Jira issue ${issueKey}...`);
-        await jiraTestClient.waitForJiraComment(issueKey, `pull/${foundPR.number}`, jiraBaseUrl, jiraEmail, jiraApiToken);
+        await getJiraClient().waitForComment(issueKey, `pull/${foundPR.number}`);
 
         console.log(`Closing PR #${foundPR.number}...`);
         await testClient.closePullRequest(foundPR.number);
         await testClient.waitForClosedPR(foundPR.number);
 
         console.log(`Deleting Jira issue ${issueKey}...`);
-        await jiraTestClient.deleteJiraIssue(issueKey, jiraBaseUrl, jiraEmail, jiraApiToken);
+        await getJiraClient().deleteIssue(issueKey);
     }
 });

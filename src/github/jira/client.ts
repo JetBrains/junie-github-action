@@ -2,6 +2,44 @@
 
 import {Version3Client} from 'jira.js';
 
+export type JiraCommentBody = {
+    text: string;
+};
+
+export type JiraAttachmentInfo = {
+    filename: string;
+    mimeType: string;
+    size: number;
+    contentUrl: string;
+};
+
+function extractTextFromADF(node: any): string {
+    if (!node) return '';
+    if (typeof node === 'string') return node;
+
+    if (node.type === 'text') {
+        let text = node.text || '';
+        if (node.marks) {
+            for (const mark of node.marks) {
+                if (mark.type === 'link' && mark.attrs?.href) {
+                    text += ' ' + mark.attrs.href;
+                }
+            }
+        }
+        return text;
+    }
+
+    if (node.type === 'inlineCard') {
+        return node.attrs?.url || '';
+    }
+
+    if (node.content && Array.isArray(node.content)) {
+        return node.content.map(extractTextFromADF).join('');
+    }
+
+    return '';
+}
+
 /**
  * Jira API client wrapper
  */
@@ -10,20 +48,19 @@ class JiraClient {
     private readonly client: Version3Client;
     private readonly email = process.env.JIRA_EMAIL;
     private readonly apiToken = process.env.JIRA_API_TOKEN;
+    private readonly jiraBaseUrl = process.env.JIRA_BASE_URL;
 
     constructor() {
         this.client = this.createClient();
     }
 
     private createClient(): Version3Client {
-        const jiraBaseUrl = process.env.JIRA_BASE_URL;
-
-        if (!this.email || !this.apiToken || !jiraBaseUrl) {
+        if (!this.email || !this.apiToken || !this.jiraBaseUrl) {
             throw new Error('⚠️ Jira credentials not found. Set JIRA_EMAIL, JIRA_API_TOKEN, and JIRA_BASE_URL to enable Jira integration.');
         }
 
         return new Version3Client({
-            host: jiraBaseUrl,
+            host: this.jiraBaseUrl,
             authentication: {
                 basic: {
                     email: this.email,
@@ -31,6 +68,45 @@ class JiraClient {
                 },
             },
         });
+    }
+
+    private getAuthHeader(): string {
+        return 'Basic ' + Buffer.from(`${this.email}:${this.apiToken}`).toString('base64');
+    }
+
+    async createIssue(projectKey: string, summary: string, description: string): Promise<string> {
+        console.log(`Creating Jira issue in project ${projectKey}: "${summary}"`);
+
+        const response = await fetch(`${this.jiraBaseUrl}/rest/api/3/issue`, {
+            method: 'POST',
+            headers: {
+                'Authorization': this.getAuthHeader(),
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                fields: {
+                    project: {key: projectKey},
+                    summary,
+                    description: {
+                        type: "doc",
+                        version: 1,
+                        content: [{type: "paragraph", content: [{type: "text", text: description}]}]
+                    },
+                    issuetype: {name: "Task"}
+                }
+            })
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to create Jira issue: ${response.status} ${errorText}`);
+        }
+
+        const issue: any = await response.json();
+        const issueKey = issue.key;
+        console.log(`Successfully created Jira issue: ${issueKey}`);
+        return issueKey;
     }
 
     /**
@@ -57,6 +133,33 @@ class JiraClient {
         }
     }
 
+    async addTextComment(issueKey: string, text: string): Promise<void> {
+        console.log(`Adding comment to Jira issue ${issueKey}: "${text}"`);
+
+        const response = await fetch(`${this.jiraBaseUrl}/rest/api/3/issue/${issueKey}/comment`, {
+            method: 'POST',
+            headers: {
+                'Authorization': this.getAuthHeader(),
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                body: {
+                    type: "doc",
+                    version: 1,
+                    content: [{type: "paragraph", content: [{type: "text", text}]}]
+                }
+            })
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to add comment to Jira issue ${issueKey}: ${response.status} ${errorText}`);
+        }
+
+        console.log(`Successfully added comment to Jira issue: ${issueKey}`);
+    }
+
     /**
      * Updates an existing comment on a Jira issue
      *
@@ -81,6 +184,93 @@ class JiraClient {
             console.error(`Error updating comment ${commentId} on Jira issue ${issueKey}:`, error);
             return false;
         }
+    }
+
+    async addAttachment(issueKey: string, filename: string, content: string): Promise<JiraAttachmentInfo> {
+        console.log(`Adding attachment ${filename} to Jira issue ${issueKey}...`);
+
+        const formData = new FormData();
+        const blob = new Blob([content], {type: 'text/plain'});
+        formData.append('file', blob, filename);
+
+        const response = await fetch(`${this.jiraBaseUrl}/rest/api/3/issue/${issueKey}/attachments`, {
+            method: 'POST',
+            headers: {
+                'Authorization': this.getAuthHeader(),
+                'Accept': 'application/json',
+                'X-Atlassian-Token': 'no-check'
+            },
+            body: formData
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to add attachment ${filename} to Jira issue ${issueKey}: ${response.status} ${errorText}`);
+        }
+
+        const attachments: any[] = await response.json();
+        const attachment = attachments[0];
+
+        console.log(`Successfully added attachment ${filename} to Jira issue: ${issueKey}`);
+        return {
+            filename: attachment.filename,
+            mimeType: attachment.mimeType,
+            size: attachment.size,
+            contentUrl: attachment.content
+        };
+    }
+
+    async waitForComment(issueKey: string, message: string): Promise<JiraCommentBody> {
+        console.log(`Waiting for comment containing "${message}" in Jira issue ${issueKey}...`);
+
+        const pollIntervalMs = 30000;
+        const timeoutMs = 12 * 60 * 1000;
+        const end = Date.now() + timeoutMs;
+
+        while (Date.now() < end) {
+            const response = await fetch(`${this.jiraBaseUrl}/rest/api/3/issue/${issueKey}/comment`, {
+                headers: {
+                    'Authorization': this.getAuthHeader(),
+                    'Accept': 'application/json'
+                }
+            });
+
+            if (response.ok) {
+                const data: any = await response.json();
+                const comments: any[] = data.comments || [];
+                const comment = comments.find(c => extractTextFromADF(c.body).includes(message));
+
+                if (comment) {
+                    console.log(`Found comment with message: "${message}"`);
+                    return {text: extractTextFromADF(comment.body)};
+                }
+            } else {
+                console.log(`Failed to fetch Jira comments: ${response.status}`);
+            }
+
+            await new Promise(r => setTimeout(r, pollIntervalMs));
+        }
+
+        throw new Error(`Junie didn't post comment containing "${message}" in Jira issue ${issueKey}`);
+    }
+
+    async deleteIssue(issueKey: string): Promise<void> {
+        console.log(`Deleting Jira issue ${issueKey}...`);
+
+        const response = await fetch(`${this.jiraBaseUrl}/rest/api/3/issue/${issueKey}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': this.getAuthHeader(),
+                'Accept': 'application/json'
+            }
+        });
+
+        if (!response.ok && response.status !== 204) {
+            const errorText = await response.text();
+            throw new Error(`Failed to delete Jira issue ${issueKey}: ${response.status} ${errorText}`);
+        }
+
+        console.log(`Successfully deleted Jira issue: ${issueKey}`);
     }
 
     /**
