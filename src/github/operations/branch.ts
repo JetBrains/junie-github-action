@@ -100,9 +100,10 @@ export function generateWorkingBranchName(
     runId: string
 ): string {
     if (outputBranch) {
-        return outputBranch.startsWith(WORKING_BRANCH_PREFIX)
-            ? outputBranch
-            : `${WORKING_BRANCH_PREFIX}${outputBranch}`;
+        const normalizedOutputBranch = outputBranch.toLowerCase();
+        return normalizedOutputBranch.startsWith(WORKING_BRANCH_PREFIX)
+            ? normalizedOutputBranch
+            : `${WORKING_BRANCH_PREFIX}${normalizedOutputBranch}`;
     }
     const entityType = isPR ? "pr" : entityNumber ? "issue" : "run";
     return `${WORKING_BRANCH_PREFIX}${entityType}${entityNumber ? `-${entityNumber}` : ""}-${runId}`;

@@ -17,6 +17,16 @@ describe("generateWorkingBranchName", () => {
             const result = generateWorkingBranchName("custom-branch", true, 99, "67890");
             expect(result).toBe("junie/custom-branch");
         });
+
+        test("should lowercase outputBranch so external CI can trigger lowercase branches", () => {
+            const result = generateWorkingBranchName("JUNIE-2747", false, undefined, "12345");
+            expect(result).toBe("junie/junie-2747");
+        });
+
+        test("should lowercase already-prefixed outputBranch without double-prefixing", () => {
+            const result = generateWorkingBranchName("Junie/JUNIE-2747", false, undefined, "12345");
+            expect(result).toBe("junie/junie-2747");
+        });
     });
 
     describe("without outputBranch (auto-generated)", () => {
