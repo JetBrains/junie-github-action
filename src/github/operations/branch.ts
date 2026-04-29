@@ -108,13 +108,13 @@ export function generateWorkingBranchName(
     return `${WORKING_BRANCH_PREFIX}${entityType}${entityNumber ? `-${entityNumber}` : ""}-${runId}`;
 }
 
-async function createNewBranch(baseBranch: string, branchName: string, prBaseBranch: string | undefined, headSha?: string) {
+export async function createNewBranch(baseBranch: string, branchName: string, prBaseBranch: string | undefined, headSha?: string) {
     // Normalize branch name: lowercase and limit to 50 chars for git compatibility
     const newBranch = branchName.toLowerCase().substring(0, 50);
 
     try {
         console.log(`Creating new branch ${newBranch} from ${baseBranch}`);
-        await $`git checkout --no-track -b ${newBranch} origin/${baseBranch}`;
+        await $`git checkout --no-track -B ${newBranch} origin/${baseBranch}`;
 
         console.log(`✓ Successfully created and checked out new branch: ${newBranch}`);
 

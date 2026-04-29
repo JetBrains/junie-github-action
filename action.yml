@@ -341,7 +341,7 @@ runs:
       if: steps.prepare.outputs.SHOULD_SKIP != 'true' && inputs.silent_mode != 'true' && (steps.junie-run-results.outputs.ACTION_TO_DO == 'PUSH' || steps.junie-run-results.outputs.ACTION_TO_DO == 'CREATE_PR' || steps.junie-run-results.outputs.ACTION_TO_DO == 'COMMIT_AND_PUSH')
       shell: bash
       run: |
-        git push --set-upstream origin HEAD
+        git push --force --set-upstream origin HEAD
 
     - name: Make Pull Request for the changes
       if: steps.prepare.outputs.SHOULD_SKIP != 'true' && inputs.silent_mode != 'true' && steps.junie-run-results.outputs.ACTION_TO_DO == 'CREATE_PR'
