@@ -114,10 +114,20 @@ export async function createNewBranch(baseBranch: string, branchName: string, pr
     const newBranch = branchName.toLowerCase().substring(0, 50);
 
     try {
-        console.log(`Creating new branch ${newBranch} from ${baseBranch}`);
+        await $`git fetch origin ${baseBranch}:refs/remotes/origin/${baseBranch}`;
+
+        console.log(`Checking whether remote branch ${newBranch} already exists`);
+        const existingBranchFetch = await $`git fetch origin +${newBranch}:refs/remotes/origin/${newBranch}`.nothrow();
+
+        if (existingBranchFetch.exitCode === 0) {
+            console.log(`Remote branch ${newBranch} already exists, overwriting it from ${baseBranch}`);
+        } else {
+            console.log(`Creating new branch ${newBranch} from ${baseBranch}`);
+        }
+
         await $`git checkout --no-track -B ${newBranch} origin/${baseBranch}`;
 
-        console.log(`✓ Successfully created and checked out new branch: ${newBranch}`);
+        console.log(`✓ Successfully checked out branch ${newBranch} from ${baseBranch}`);
 
         return {
             baseBranch: baseBranch,
