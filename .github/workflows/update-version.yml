@@ -19,6 +19,7 @@ jobs:
         uses: JetBrains/junie-github-action@main
         with:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
+          custom_github_token: ${{ secrets.GH_PAT }}
           prompt: |
             Please update Junie CLI version to ${{ github.event.client_payload.version }} in the following files:
             
