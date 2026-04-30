@@ -31,6 +31,10 @@ inputs:
     description: "Silent mode - skip comments, branch creation, commits. Only prepare data and run Junie for output consumption."
     required: false
     default: "false"
+  skip_feedback:
+    description: "Skip final feedback comments and summary updates while still allowing commits and pushes."
+    required: false
+    default: "false"
   use_single_comment:
     description: "Use a single comment that gets updated instead of creating new comments for each run(per workflow)"
     required: false
@@ -359,7 +363,7 @@ runs:
         WORKING_BRANCH: ${{ steps.prepare.outputs.WORKING_BRANCH }}
 
     - name: Give feedback and update summary (success)
-      if: success() && steps.prepare.outputs.SHOULD_SKIP != 'true'
+      if: success() && steps.prepare.outputs.SHOULD_SKIP != 'true' && inputs.skip_feedback != 'true'
       shell: bash
       run: |
         bun run ${GITHUB_ACTION_PATH}/src/entrypoints/give-feedback.ts
@@ -384,7 +388,7 @@ runs:
         JIRA_INIT_COMMENT_ID: ${{ steps.prepare.outputs.JIRA_INIT_COMMENT_ID }}
 
     - name: Give feedback and update summary (failure)
-      if: failure() && steps.prepare.outputs.SHOULD_SKIP != 'true'
+      if: failure() && steps.prepare.outputs.SHOULD_SKIP != 'true' && inputs.skip_feedback != 'true'
       shell: bash
       run: |
         bun run ${GITHUB_ACTION_PATH}/src/entrypoints/give-feedback.ts
