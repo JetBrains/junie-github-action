@@ -70,41 +70,23 @@ class JiraClient {
         });
     }
 
-    private getAuthHeader(): string {
-        return 'Basic ' + Buffer.from(`${this.email}:${this.apiToken}`).toString('base64');
-    }
-
     async createIssue(projectKey: string, summary: string, description: string): Promise<string> {
         console.log(`Creating Jira issue in project ${projectKey}: "${summary}"`);
 
-        const response = await fetch(`${this.jiraBaseUrl}/rest/api/3/issue`, {
-            method: 'POST',
-            headers: {
-                'Authorization': this.getAuthHeader(),
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify({
-                fields: {
-                    project: {key: projectKey},
-                    summary,
-                    description: {
-                        type: "doc",
-                        version: 1,
-                        content: [{type: "paragraph", content: [{type: "text", text: description}]}]
-                    },
-                    issuetype: {name: "Task"}
-                }
-            })
+        const result = await this.client.issues.createIssue({
+            fields: {
+                project: {key: projectKey},
+                summary,
+                description: {
+                    type: "doc",
+                    version: 1,
+                    content: [{type: "paragraph", content: [{type: "text", text: description}]}]
+                },
+                issuetype: {name: "Task"}
+            }
         });
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Failed to create Jira issue: ${response.status} ${errorText}`);
-        }
-
-        const issue: any = await response.json();
-        const issueKey = issue.key;
+        const issueKey = result.key!;
         console.log(`Successfully created Jira issue: ${issueKey}`);
         return issueKey;
     }
@@ -134,30 +116,11 @@ class JiraClient {
     }
 
     async addTextComment(issueKey: string, text: string): Promise<void> {
-        console.log(`Adding comment to Jira issue ${issueKey}: "${text}"`);
-
-        const response = await fetch(`${this.jiraBaseUrl}/rest/api/3/issue/${issueKey}/comment`, {
-            method: 'POST',
-            headers: {
-                'Authorization': this.getAuthHeader(),
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify({
-                body: {
-                    type: "doc",
-                    version: 1,
-                    content: [{type: "paragraph", content: [{type: "text", text}]}]
-                }
-            })
+        await this.addComment(issueKey, {
+            type: "doc",
+            version: 1,
+            content: [{type: "paragraph", content: [{type: "text", text}]}]
         });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Failed to add comment to Jira issue ${issueKey}: ${response.status} ${errorText}`);
-        }
-
-        console.log(`Successfully added comment to Jira issue: ${issueKey}`);
     }
 
     /**
@@ -189,34 +152,22 @@ class JiraClient {
     async addAttachment(issueKey: string, filename: string, content: string): Promise<JiraAttachmentInfo> {
         console.log(`Adding attachment ${filename} to Jira issue ${issueKey}...`);
 
-        const formData = new FormData();
-        const blob = new Blob([content], {type: 'text/plain'});
-        formData.append('file', blob, filename);
-
-        const response = await fetch(`${this.jiraBaseUrl}/rest/api/3/issue/${issueKey}/attachments`, {
-            method: 'POST',
-            headers: {
-                'Authorization': this.getAuthHeader(),
-                'Accept': 'application/json',
-                'X-Atlassian-Token': 'no-check'
-            },
-            body: formData
+        const attachments = await this.client.issueAttachments.addAttachment({
+            issueIdOrKey: issueKey,
+            attachment: {
+                filename,
+                file: Buffer.from(content),
+                mimeType: 'text/plain'
+            }
         });
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Failed to add attachment ${filename} to Jira issue ${issueKey}: ${response.status} ${errorText}`);
-        }
-
-        const attachments: any[] = await response.json();
         const attachment = attachments[0];
-
         console.log(`Successfully added attachment ${filename} to Jira issue: ${issueKey}`);
         return {
-            filename: attachment.filename,
-            mimeType: attachment.mimeType,
-            size: attachment.size,
-            contentUrl: attachment.content
+            filename: attachment.filename!,
+            mimeType: attachment.mimeType!,
+            size: attachment.size!,
+            contentUrl: attachment.content!
         };
     }
 
@@ -228,24 +179,13 @@ class JiraClient {
         const end = Date.now() + timeoutMs;
 
         while (Date.now() < end) {
-            const response = await fetch(`${this.jiraBaseUrl}/rest/api/3/issue/${issueKey}/comment`, {
-                headers: {
-                    'Authorization': this.getAuthHeader(),
-                    'Accept': 'application/json'
-                }
-            });
+            const data = await this.client.issueComments.getComments({issueIdOrKey: issueKey});
+            const comments = data.comments || [];
+            const comment = comments.find(c => extractTextFromADF(c.body).includes(message));
 
-            if (response.ok) {
-                const data: any = await response.json();
-                const comments: any[] = data.comments || [];
-                const comment = comments.find(c => extractTextFromADF(c.body).includes(message));
-
-                if (comment) {
-                    console.log(`Found comment with message: "${message}"`);
-                    return {text: extractTextFromADF(comment.body)};
-                }
-            } else {
-                console.log(`Failed to fetch Jira comments: ${response.status}`);
+            if (comment) {
+                console.log(`Found comment with message: "${message}"`);
+                return {text: extractTextFromADF(comment.body)};
             }
 
             await new Promise(r => setTimeout(r, pollIntervalMs));
@@ -256,20 +196,7 @@ class JiraClient {
 
     async deleteIssue(issueKey: string): Promise<void> {
         console.log(`Deleting Jira issue ${issueKey}...`);
-
-        const response = await fetch(`${this.jiraBaseUrl}/rest/api/3/issue/${issueKey}`, {
-            method: 'DELETE',
-            headers: {
-                'Authorization': this.getAuthHeader(),
-                'Accept': 'application/json'
-            }
-        });
-
-        if (!response.ok && response.status !== 204) {
-            const errorText = await response.text();
-            throw new Error(`Failed to delete Jira issue ${issueKey}: ${response.status} ${errorText}`);
-        }
-
+        await this.client.issues.deleteIssue({issueIdOrKey: issueKey});
         console.log(`Successfully deleted Jira issue: ${issueKey}`);
     }
 
