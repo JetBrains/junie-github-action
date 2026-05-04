@@ -2,6 +2,44 @@
 
 import {Version3Client} from 'jira.js';
 
+export type JiraCommentBody = {
+    text: string;
+};
+
+export type JiraAttachmentInfo = {
+    filename: string;
+    mimeType: string;
+    size: number;
+    contentUrl: string;
+};
+
+function extractTextFromADF(node: any): string {
+    if (!node) return '';
+    if (typeof node === 'string') return node;
+
+    if (node.type === 'text') {
+        let text = node.text || '';
+        if (node.marks) {
+            for (const mark of node.marks) {
+                if (mark.type === 'link' && mark.attrs?.href) {
+                    text += ' ' + mark.attrs.href;
+                }
+            }
+        }
+        return text;
+    }
+
+    if (node.type === 'inlineCard') {
+        return node.attrs?.url || '';
+    }
+
+    if (node.content && Array.isArray(node.content)) {
+        return node.content.map(extractTextFromADF).join('');
+    }
+
+    return '';
+}
+
 /**
  * Jira API client wrapper
  */
@@ -10,20 +48,19 @@ class JiraClient {
     private readonly client: Version3Client;
     private readonly email = process.env.JIRA_EMAIL;
     private readonly apiToken = process.env.JIRA_API_TOKEN;
+    private readonly jiraBaseUrl = process.env.JIRA_BASE_URL;
 
     constructor() {
         this.client = this.createClient();
     }
 
     private createClient(): Version3Client {
-        const jiraBaseUrl = process.env.JIRA_BASE_URL;
-
-        if (!this.email || !this.apiToken || !jiraBaseUrl) {
+        if (!this.email || !this.apiToken || !this.jiraBaseUrl) {
             throw new Error('⚠️ Jira credentials not found. Set JIRA_EMAIL, JIRA_API_TOKEN, and JIRA_BASE_URL to enable Jira integration.');
         }
 
         return new Version3Client({
-            host: jiraBaseUrl,
+            host: this.jiraBaseUrl,
             authentication: {
                 basic: {
                     email: this.email,
@@ -31,6 +68,27 @@ class JiraClient {
                 },
             },
         });
+    }
+
+    async createIssue(projectKey: string, summary: string, description: string): Promise<string> {
+        console.log(`Creating Jira issue in project ${projectKey}: "${summary}"`);
+
+        const result = await this.client.issues.createIssue({
+            fields: {
+                project: {key: projectKey},
+                summary,
+                description: {
+                    type: "doc",
+                    version: 1,
+                    content: [{type: "paragraph", content: [{type: "text", text: description}]}]
+                },
+                issuetype: {name: "Task"}
+            }
+        });
+
+        const issueKey = result.key!;
+        console.log(`Successfully created Jira issue: ${issueKey}`);
+        return issueKey;
     }
 
     /**
@@ -57,6 +115,14 @@ class JiraClient {
         }
     }
 
+    async addTextComment(issueKey: string, text: string): Promise<void> {
+        await this.addComment(issueKey, {
+            type: "doc",
+            version: 1,
+            content: [{type: "paragraph", content: [{type: "text", text}]}]
+        });
+    }
+
     /**
      * Updates an existing comment on a Jira issue
      *
@@ -81,6 +147,57 @@ class JiraClient {
             console.error(`Error updating comment ${commentId} on Jira issue ${issueKey}:`, error);
             return false;
         }
+    }
+
+    async addAttachment(issueKey: string, filename: string, content: string): Promise<JiraAttachmentInfo> {
+        console.log(`Adding attachment ${filename} to Jira issue ${issueKey}...`);
+
+        const attachments = await this.client.issueAttachments.addAttachment({
+            issueIdOrKey: issueKey,
+            attachment: {
+                filename,
+                file: Buffer.from(content),
+                mimeType: 'text/plain'
+            }
+        });
+
+        const attachment = attachments[0];
+        console.log(`Successfully added attachment ${filename} to Jira issue: ${issueKey}`);
+        return {
+            filename: attachment.filename!,
+            mimeType: attachment.mimeType!,
+            size: attachment.size!,
+            contentUrl: attachment.content!
+        };
+    }
+
+    async waitForComment(issueKey: string, message: string): Promise<JiraCommentBody> {
+        console.log(`Waiting for comment containing "${message}" in Jira issue ${issueKey}...`);
+
+        const pollIntervalMs = 30000;
+        const timeoutMs = 12 * 60 * 1000;
+        const end = Date.now() + timeoutMs;
+
+        while (Date.now() < end) {
+            const data = await this.client.issueComments.getComments({issueIdOrKey: issueKey});
+            const comments = data.comments || [];
+            const comment = comments.find(c => extractTextFromADF(c.body).includes(message));
+
+            if (comment) {
+                console.log(`Found comment with message: "${message}"`);
+                return {text: extractTextFromADF(comment.body)};
+            }
+
+            await new Promise(r => setTimeout(r, pollIntervalMs));
+        }
+
+        throw new Error(`Junie didn't post comment containing "${message}" in Jira issue ${issueKey}`);
+    }
+
+    async deleteIssue(issueKey: string): Promise<void> {
+        console.log(`Deleting Jira issue ${issueKey}...`);
+        await this.client.issues.deleteIssue({issueIdOrKey: issueKey});
+        console.log(`Successfully deleted Jira issue: ${issueKey}`);
     }
 
     /**

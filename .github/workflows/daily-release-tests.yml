@@ -41,6 +41,9 @@ jobs:
           CURRENT_BRANCH: ${{ github.head_ref || github.ref_name }}
           JUNIE_VERSION: latest
           YOUTRACK_TOKEN: ${{ secrets.YOUTRACK_TOKEN }}
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
         run: |
           set -o pipefail
           mkdir -p test-results

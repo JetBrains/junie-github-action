@@ -4,6 +4,10 @@ interface E2EConfig {
     youtrackToken: string;
     youtrackBaseUrl: string;
     youtrackProjectId: string;
+    jiraEmail: string;
+    jiraApiToken: string;
+    jiraBaseUrl: string;
+    jiraProjectKey: string;
 }
 
 export const e2eConfig: E2EConfig = {
@@ -12,4 +16,8 @@ export const e2eConfig: E2EConfig = {
     youtrackToken: process.env.YOUTRACK_TOKEN || "",
     youtrackBaseUrl: process.env.YOUTRACK_BASE_URL || "https://nikitajunietest.youtrack.cloud",
     youtrackProjectId: process.env.YOUTRACK_PROJECT_ID || "TP",
+    jiraEmail: process.env.JIRA_EMAIL || "",
+    jiraApiToken: process.env.JIRA_API_TOKEN || "",
+    jiraBaseUrl: process.env.JIRA_BASE_URL || "https://junie-team-test.atlassian.net",
+    jiraProjectKey: process.env.JIRA_PROJECT_KEY || "TS",
 };
