@@ -9,7 +9,7 @@ on:
         required: true
         type: string
       issue_key:
-        description: 'Jira issue key (e.g., TS-1)'
+        description: 'Jira issue key (e.g., TEST-1)'
         required: true
         type: string
       issue_summary:
@@ -21,13 +21,11 @@ on:
         required: false
         type: string
       issue_comments:
-        description: 'Jira issue comments (JSON array)'
+        description: 'Jira issue comments'
         required: false
-        type: string
       issue_attachments:
-        description: 'Jira issue attachments (JSON array)'
+        description: 'Jira issue attachments'
         required: false
-        type: string
       trigger_comment:
         description: 'Comment that triggered Junie (used as user instruction)'
         required: false
