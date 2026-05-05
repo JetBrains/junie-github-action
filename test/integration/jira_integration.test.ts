@@ -12,6 +12,7 @@ describe("Jira Integration", () => {
     beforeAll(async () => {
         repoName = await testClient.createTestRepo("junie-jira-test");
         console.log(`Using repository: ${repoName}`);
+        await testClient.setupWorkflow(repoName, `.github/workflows/${workflowFileName}`, `test/workflows/${workflowFileName}`);
     }, 30000);
 
     test("trigger Junie via Jira workflow dispatch", async () => {

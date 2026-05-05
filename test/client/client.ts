@@ -7,6 +7,7 @@ import {
 } from "../utils/test-utils";
 
 import {RestEndpointMethodTypes} from "@octokit/rest";
+
 type PullRequest = RestEndpointMethodTypes["pulls"]["list"]["response"]["data"][number];
 type Comment = RestEndpointMethodTypes["issues"]["listComments"]["response"]["data"][number];
 type Reaction = RestEndpointMethodTypes["reactions"]["listForIssueComment"]["response"]["data"][number];
@@ -31,7 +32,7 @@ export class GitHubClient {
     };
 
     constructor() {
-        this.octokit = new Octokit({ auth: e2eConfig.githubToken });
+        this.octokit = new Octokit({auth: e2eConfig.githubToken});
         this.org = e2eConfig.org;
     }
 
@@ -79,7 +80,7 @@ export class GitHubClient {
             {pollIntervalMs: 2000, timeoutMs: 60000},
             async () => {
                 try {
-                    const { data } = await this.octokit.repos.getContent({
+                    const {data} = await this.octokit.repos.getContent({
                         owner: this.org,
                         repo: repoName,
                         path: 'README.md',
@@ -147,12 +148,31 @@ export class GitHubClient {
             );
         }
 
+        let existingFileSha: string | undefined;
+        try {
+            const { data: existingFile } = await this.octokit.repos.getContent({
+                owner: this.org,
+                repo: repoName,
+                path: workflowFilePathInRepo,
+                ref: branch
+            });
+
+            if ('sha' in existingFile) {
+                existingFileSha = existingFile.sha;
+            }
+        } catch (error: any) {
+            if (error.status !== 404) {
+                console.warn(`Warning: Could not get existing file SHA: ${error.message}`);
+            }
+        }
+
         await this.retryOnError(() => this.createOrUpdateFileContents(
             repoName,
             Buffer.from(workflowContent).toString("base64"),
             workflowFilePathInRepo,
             "Add Junie workflow",
-            branch
+            branch,
+            existingFileSha
         ));
 
         await new Promise(resolve => setTimeout(resolve, 6000));
@@ -163,7 +183,7 @@ export class GitHubClient {
         await this.deleteRepository(repoName);
     }
 
-    async getAllReposForOrg(){
+    async getAllReposForOrg() {
         return this.octokit.paginate(this.octokit.repos.listForOrg, {
             org: this.org,
             per_page: 100,
@@ -171,7 +191,7 @@ export class GitHubClient {
         });
     }
 
-    async deleteRepository(repoName: string){
+    async deleteRepository(repoName: string) {
         return this.octokit.repos.delete({
             owner: this.org,
             repo: repoName,
@@ -186,7 +206,7 @@ export class GitHubClient {
             {},
             async () => {
                 try {
-                    const { data: comments } = await this.getAllIssueOrPRComments(issueOrPRNumber);
+                    const {data: comments} = await this.getAllIssueOrPRComments(issueOrPRNumber);
                     const junieComment = comments.find(c => c.body?.includes(message));
 
                     if (junieComment) {
@@ -212,7 +232,7 @@ export class GitHubClient {
             {},
             async () => {
                 try {
-                    const { data: reactions } = await this.getAllCommentReactions(commentId);
+                    const {data: reactions} = await this.getAllCommentReactions(commentId);
 
                     const hasReaction = reactions.some(r => r.content === reactionType);
                     if (hasReaction) {
@@ -241,7 +261,7 @@ export class GitHubClient {
             {},
             async () => {
                 try {
-                    const { data: comments } = await this.getAllReviewComments(prNumber);
+                    const {data: comments} = await this.getAllReviewComments(prNumber);
                     return (condition(comments));
                 } catch (error) {
                     console.log(`Review comments not yet available for PR #${prNumber}, waiting...`);
@@ -262,7 +282,7 @@ export class GitHubClient {
             {},
             async () => {
                 try {
-                    const { data: pulls } = await this.getAllPRs();
+                    const {data: pulls} = await this.getAllPRs();
                     const relevantPRs = createdAfter
                         ? pulls.filter(pr => new Date(pr.created_at) > createdAfter)
                         : pulls;
@@ -315,7 +335,7 @@ export class GitHubClient {
             {},
             async () => {
                 try {
-                    const { data: issue } = await this.octokit.issues.get({
+                    const {data: issue} = await this.octokit.issues.get({
                         owner: this.org,
                         repo: this.currentRepo,
                         issue_number: issueNumber,
@@ -381,12 +401,10 @@ export class GitHubClient {
         condition: (comment: ReviewCommentCondition) => boolean
     ): Promise<ReviewComment[]> {
         console.log(`Getting inline comments on PR #${prNumber}...`);
-        const { data: comments } = await this.getAllReviewComments(prNumber);
-        const filteredComments = comments.filter(comment => condition({
+        const {data: comments} = await this.getAllReviewComments(prNumber);
+        return comments.filter(comment => condition({
             commentText: comment.body || ""
         }));
-
-        return filteredComments;
     }
 
     async getPullRequest(prNumber: number): Promise<PullRequestDetailed> {
@@ -407,7 +425,7 @@ export class GitHubClient {
     }
 
     async getListOfChecks(ref: string): Promise<CheckRunsResponse> {
-        const { data } = await this.octokit.checks.listForRef({
+        const {data} = await this.octokit.checks.listForRef({
             owner: this.org,
             repo: this.currentRepo,
             ref: ref,
@@ -428,7 +446,7 @@ export class GitHubClient {
         pr: PullRequest,
         condition: (files: GitHubFile[], pr: PullRequest) => boolean | Promise<boolean>
     ): Promise<boolean> {
-        const { data: files } = await this.getAllPRFiles(pr);
+        const {data: files} = await this.getAllPRFiles(pr);
         return condition(files, pr);
     }
 
@@ -657,7 +675,7 @@ export class GitHubClient {
         });
     }
 
-    private async getAllReviewComments(prNumber: number){
+    private async getAllReviewComments(prNumber: number) {
         return this.octokit.pulls.listReviewComments({
             owner: this.org,
             repo: this.currentRepo,

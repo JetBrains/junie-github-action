@@ -13,6 +13,7 @@ describe("YouTrack Integration", () => {
 
     beforeAll(async () => {
         repoName = await testClient.createTestRepo("junie-youtrack-test");
+        await testClient.setupWorkflow(repoName, ".github/workflows/junie-youtrack.yml", "test/workflows/junie-youtrack.yml");
         console.log(`Using repository: ${repoName}`);
     }, 30000);
 
