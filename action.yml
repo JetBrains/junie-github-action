@@ -55,7 +55,7 @@ inputs:
   junie_version:
     description: "Version of Junie to use"
     required: false
-    default: "1417.47"
+    default: "1543.13"
   model:
     description: "Model to use for the primary agent"
     required: false
