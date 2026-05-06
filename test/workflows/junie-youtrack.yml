@@ -3,10 +3,6 @@ name: Junie YouTrack Integration
 on:
   workflow_dispatch:
     inputs:
-      prompt:
-        description: 'Instructions for Junie'
-        required: false
-        type: string
       action:
         description: 'Action type'
         default: 'youtrack_event'
@@ -29,7 +25,7 @@ on:
         required: false
         type: string
       issue_comments:
-        description: 'Issue comments, formatted as "author at date:\ntext"'
+        description: 'YouTrack issue comments (plain text)'
         required: false
         type: string
       trigger_comment:
@@ -57,17 +53,7 @@ jobs:
           fetch-depth: 1
 
       - name: Run Junie
-        id: junie
         uses: JetBrains/junie-github-action@main
         with:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
           youtrack_token: ${{ secrets.YOUTRACK_TOKEN }}
-          prompt: ${{ inputs.prompt }}
-
-      - name: Upload YouTrack Attachments
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: youtrack-attachments-${{ inputs.issue_id }}
-          path: /tmp/youtrack-attachments/
-          if-no-files-found: ignore

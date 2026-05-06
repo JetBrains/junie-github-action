@@ -12,6 +12,8 @@ const defaultInputs = {
     resolveConflicts: false,
     createNewBranchForPR: false,
     silentMode: false,
+    skipPr: false,
+    outputBranch: undefined,
     useSingleComment: false,
     attachGithubContextToCustomPrompt: true,
     junieWorkingDir: "/tmp/junie-work",

@@ -93,6 +93,21 @@ function shouldUseExistingPRBranch(
  * @returns Branch information object with base, working branch names and isNewBranch flag
  * @throws {Error} if git operations fail (branch doesn't exist, network issues, etc.)
  */
+export function generateWorkingBranchName(
+    outputBranch: string | undefined,
+    isPR: boolean | undefined,
+    entityNumber: number | undefined,
+    runId: string
+): string {
+    if (outputBranch) {
+        return outputBranch.startsWith(WORKING_BRANCH_PREFIX)
+            ? outputBranch
+            : `${WORKING_BRANCH_PREFIX}${outputBranch}`;
+    }
+    const entityType = isPR ? "pr" : entityNumber ? "issue" : "run";
+    return `${WORKING_BRANCH_PREFIX}${entityType}${entityNumber ? `-${entityNumber}` : ""}-${runId}`;
+}
+
 async function createNewBranch(baseBranch: string, branchName: string, prBaseBranch: string | undefined, headSha?: string) {
     // Normalize branch name: lowercase and limit to 50 chars for git compatibility
     const newBranch = branchName.toLowerCase().substring(0, 50);
@@ -226,8 +241,7 @@ async function prepareWorkingBranchForJunie(context: JunieExecutionContext, octo
     }
 
     if (!context.inputs.silentMode) {
-        const entityType = isPR ? "pr" : entityNumber ? "issue" : "run";
-        const branchName = `${WORKING_BRANCH_PREFIX}${entityType}${entityNumber ? `-${entityNumber}` : ""}-${context.runId}`;
+        const branchName = generateWorkingBranchName(context.inputs.outputBranch, isPR, entityNumber, context.runId);
 
         return await createNewBranch(baseBranch, branchName, prBaseBranch, headSha)
     }

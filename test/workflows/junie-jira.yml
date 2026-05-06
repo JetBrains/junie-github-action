@@ -1,0 +1,56 @@
+name: Junie Jira Integration
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action type'
+        default: 'jira_event'
+        required: true
+        type: string
+      issue_key:
+        description: 'Jira issue key (e.g., TEST-1)'
+        required: true
+        type: string
+      issue_summary:
+        description: 'Jira issue summary/title'
+        required: true
+        type: string
+      issue_description:
+        description: 'Jira issue description'
+        required: false
+        type: string
+      issue_comments:
+        description: 'Jira issue comments'
+        required: false
+      issue_attachments:
+        description: 'Jira issue attachments'
+        required: false
+      trigger_comment:
+        description: 'Comment that triggered Junie (used as user instruction)'
+        required: false
+        type: string
+
+jobs:
+  junie:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    if: ${{ inputs.action == 'jira_event' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run Junie
+        id: junie
+        uses: JetBrains/junie-github-action@main
+        with:
+          junie_api_key: ${{ secrets.JUNIE_API_KEY }}
+          jira_base_url: ${{ secrets.JIRA_BASE_URL }}
+          jira_email: ${{ secrets.JIRA_EMAIL }}
+          jira_api_token: ${{ secrets.JIRA_API_TOKEN }}

@@ -216,4 +216,6 @@ export const MANUALLY_PR_CREATE_FEEDBACK_COMMENT_TEMPLATE = (createPRLink: strin
 
 export const COMMIT_PUSHED_FEEDBACK_COMMENT_TEMPLATE = (commitSHA: string, junieTitle: string, junieBody: string) => `${SUCCESS_FEEDBACK_COMMENT}\n\n ${junieTitle}\n${junieBody} Commit sha: ${commitSHA}`
 
+export const BRANCH_PUSHED_FEEDBACK_COMMENT_TEMPLATE = (branchName: string, junieTitle: string, junieBody: string) => `${SUCCESS_FEEDBACK_COMMENT}\n\n${junieTitle}\n${junieBody}\n\nChanges pushed to branch: \`${branchName}\``
+
 export const SUCCESS_FEEDBACK_COMMENT_WITH_RESULT = (junieTitle: string, junieBody: string) => `${SUCCESS_FEEDBACK_COMMENT}\n\n${junieTitle} \n ${junieBody}`
