@@ -8,6 +8,7 @@ import {
     isPullRequestReviewCommentEvent,
     isPullRequestReviewEvent,
     isPushEvent,
+    isCodeReviewEvent,
 } from "../context";
 import type {Octokits} from "../api/client";
 import {OUTPUT_VARS} from "../../constants/environment";
@@ -145,7 +146,11 @@ async function prepareWorkingBranchForJunie(context: JunieExecutionContext, octo
     const entityNumber = context.entityNumber;
     const isPR = context.isPR;
     const createNewBranchForPR = context.inputs.createNewBranchForPR;
-    const fetchDepth = context.inputs.resolveConflicts || isReviewOrCommentHasResolveConflictsTrigger(context) ? undefined : 20
+    const fetchDepth = context.inputs.resolveConflicts
+        || isReviewOrCommentHasResolveConflictsTrigger(context)
+        || isCodeReviewEvent(context)
+        ? undefined
+        : 20
 
     if (isPR && entityNumber) {
         let sourceBranch: string
