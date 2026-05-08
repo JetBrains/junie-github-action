@@ -31,6 +31,10 @@ inputs:
     description: "Silent mode - skip comments, branch creation, commits. Only prepare data and run Junie for output consumption."
     required: false
     default: "false"
+  skip_feedback:
+    description: "Skip final feedback comments and summary updates while still allowing commits and pushes."
+    required: false
+    default: "false"
   use_single_comment:
     description: "Use a single comment that gets updated instead of creating new comments for each run(per workflow)"
     required: false
@@ -335,13 +339,14 @@ runs:
         author_email: ${{ steps.prepare.outputs.JUNIE_AGENT_EMAIL }}
         message: ${{ steps.junie-run-results.outputs.COMMIT_MESSAGE }}
         new_branch: ${{ steps.prepare.outputs.WORKING_BRANCH }}
+        push: false
 
     - name: Push changes
       id: push
-      if: steps.prepare.outputs.SHOULD_SKIP != 'true' && inputs.silent_mode != 'true' && (steps.junie-run-results.outputs.ACTION_TO_DO == 'PUSH' || steps.junie-run-results.outputs.ACTION_TO_DO == 'CREATE_PR' || steps.junie-run-results.outputs.ACTION_TO_DO == 'COMMIT_AND_PUSH')
+      if: steps.prepare.outputs.SHOULD_SKIP != 'true' && inputs.silent_mode != 'true' && (steps.junie-run-results.outputs.ACTION_TO_DO == 'PUSH' || steps.junie-run-results.outputs.ACTION_TO_DO == 'COMMIT_CHANGES' || steps.junie-run-results.outputs.ACTION_TO_DO == 'CREATE_PR' || steps.junie-run-results.outputs.ACTION_TO_DO == 'COMMIT_AND_PUSH')
       shell: bash
       run: |
-        git push --set-upstream origin HEAD
+        git push --force --set-upstream origin HEAD
 
     - name: Make Pull Request for the changes
       if: steps.prepare.outputs.SHOULD_SKIP != 'true' && inputs.silent_mode != 'true' && steps.junie-run-results.outputs.ACTION_TO_DO == 'CREATE_PR'
@@ -359,7 +364,7 @@ runs:
         WORKING_BRANCH: ${{ steps.prepare.outputs.WORKING_BRANCH }}
 
     - name: Give feedback and update summary (success)
-      if: success() && steps.prepare.outputs.SHOULD_SKIP != 'true'
+      if: success() && steps.prepare.outputs.SHOULD_SKIP != 'true' && inputs.skip_feedback != 'true'
       shell: bash
       run: |
         bun run ${GITHUB_ACTION_PATH}/src/entrypoints/give-feedback.ts
@@ -384,7 +389,7 @@ runs:
         JIRA_INIT_COMMENT_ID: ${{ steps.prepare.outputs.JIRA_INIT_COMMENT_ID }}
 
     - name: Give feedback and update summary (failure)
-      if: failure() && steps.prepare.outputs.SHOULD_SKIP != 'true'
+      if: failure() && steps.prepare.outputs.SHOULD_SKIP != 'true' && inputs.skip_feedback != 'true'
       shell: bash
       run: |
         bun run ${GITHUB_ACTION_PATH}/src/entrypoints/give-feedback.ts
