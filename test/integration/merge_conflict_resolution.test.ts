@@ -144,4 +144,4 @@ async function testMergeConflictResolve(repoName: string, setupWorkflows: (repoN
     expect(result, "PR files check failed - required content not found in files").toBe(true);
     const hasNoConflicts = await testClient.checkPRHasNoConflicts(foundPR.number);
     expect(hasNoConflicts, "PR should not have conflicts").toBe(true);
-};
+}

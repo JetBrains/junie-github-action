@@ -80,4 +80,4 @@ async function testFixCi(repoName: string, fixCiInComment: (prNumber: number) =>
     console.log(`Waiting for CI to pass on PR #${foundPR.number}...`);
     await testClient.waitForSuccessfulCI(foundPR.number);
     await testClient.waitForJunieComment(pr.number, SUCCESS_FEEDBACK_COMMENT);
-};
+}
