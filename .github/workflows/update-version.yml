@@ -10,6 +10,9 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+    outputs:
+      pr_number: ${{ steps.update-version.outputs.pr_number }}
+      pr_url: ${{ steps.update-version.outputs.pr_url }}
 
     steps:
       - name: Checkout repository
@@ -33,6 +36,70 @@ jobs:
                - Locate the row for `junie_version` parameter
                - Update the default value in that row to `${{ github.event.client_payload.version }}`
 
+  wait-for-pr-tests:
+    runs-on: ubuntu-latest
+    needs: update-junie-version
+    if: needs.update-junie-version.outputs.pr_number != ''
+    permissions:
+      contents: read
+      pull-requests: read
+
+    steps:
+      - name: Wait for PR CI checks
+        id: wait-ci
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_PAT }}
+          script: |
+            const prNumber = ${{ needs.update-junie-version.outputs.pr_number }};
+            const maxAttempts = 60; // 30 минут максимум
+            const delayMs = 30000; // проверка каждые 30 секунд
+            
+            console.log(`Waiting for CI checks on PR #${prNumber}...`);
+            
+            for (let attempt = 0; attempt < maxAttempts; attempt++) {
+              const { data: pr } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber
+              });
+            
+              const { data: checkRuns } = await github.rest.checks.listForRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: pr.head.sha
+              });
+            
+              if (checkRuns.total_count === 0) {
+                console.log(`No CI checks found yet (attempt ${attempt + 1}/${maxAttempts})`);
+                await new Promise(resolve => setTimeout(resolve, delayMs));
+                continue;
+              }
+            
+              const allCompleted = checkRuns.check_runs.every(
+                check => check.status === 'completed'
+              );
+            
+              if (!allCompleted) {
+                console.log(`CI checks still running (attempt ${attempt + 1}/${maxAttempts})...`);
+                await new Promise(resolve => setTimeout(resolve, delayMs));
+                continue;
+              }
+            
+              const allSuccess = checkRuns.check_runs.every(
+                check => check.conclusion === 'success'
+              );
+            
+              core.setOutput('ci_status', allSuccess ? 'success' : 'failure');
+              core.setOutput('check_runs', JSON.stringify(checkRuns.check_runs));
+            
+              console.log(`All CI checks completed with status: ${allSuccess ? 'success' : 'failure'}`);
+              return allSuccess;
+            }
+            
+            core.setOutput('ci_status', 'timeout');
+            throw new Error('CI checks did not complete in time');
+
       - name: Send Slack Notification
         if: always()
         uses: slackapi/slack-github-action@v2.0.0
@@ -41,10 +108,10 @@ jobs:
           webhook-type: incoming-webhook
           payload: |
             {
-              "text": "Junie Version Update to ${{ github.event.client_payload.version }} completed with status: ${{ steps.update-version.outcome }}",
+              "text": "Junie Version Update to ${{ github.event.client_payload.version }} - PR Tests ${{ steps.wait-ci.outputs.ci_status }}",
               "attachments": [
                 {
-                  "color": "${{ steps.update-version.outcome == 'success' && 'good' || 'danger' }}",
+                  "color": "${{ steps.wait-ci.outputs.ci_status == 'success' && 'good' || 'danger' }}",
                   "fields": [
                     {
                       "title": "Workflow",
@@ -52,8 +119,8 @@ jobs:
                       "short": true
                     },
                     {
-                      "title": "Status",
-                      "value": "${{ steps.update-version.outcome }}",
+                      "title": "PR Tests Status",
+                      "value": "${{ steps.wait-ci.outputs.ci_status }}",
                       "short": true
                     },
                     {
@@ -62,8 +129,8 @@ jobs:
                       "short": true
                     },
                     {
-                      "title": "PR Created",
-                      "value": "${{ steps.update-version.outputs.pr_url || 'No PR created' }}",
+                      "title": "PR",
+                      "value": "<${{ needs.update-junie-version.outputs.pr_url }}|View PR #${{ needs.update-junie-version.outputs.pr_number }}>",
                       "short": true
                     }
                   ]
