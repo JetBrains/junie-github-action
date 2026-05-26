@@ -11,7 +11,7 @@ jobs:
       contents: write
       pull-requests: write
     outputs:
-      pr_number: ${{ steps.update-version.outputs.pr_number }}
+      pr_number: ${{ steps.extract-pr.outputs.pr_number }}
       pr_url: ${{ steps.update-version.outputs.pr_url }}
 
     steps:
@@ -35,6 +35,14 @@ jobs:
                - In the "Junie Configuration" section, find the table with input parameters
                - Locate the row for `junie_version` parameter
                - Update the default value in that row to `${{ github.event.client_payload.version }}`
+
+      - name: Extract PR number from URL
+        id: extract-pr
+        if: steps.update-version.outputs.pr_url != ''
+        shell: bash
+        env:
+          PR_URL: ${{ steps.update-version.outputs.pr_url }}
+        run: echo "pr_number=${PR_URL##*/}" >> "$GITHUB_OUTPUT"
 
   wait-for-pr-tests:
     runs-on: ubuntu-latest
