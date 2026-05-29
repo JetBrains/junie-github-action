@@ -5,6 +5,7 @@ export interface FinishFeedbackData {
     initCommentId?: string;
     youtrackInitCommentId?: string;
     jiraInitCommentId?: string;
+    linearInitCommentId?: string;
     isJobFailed: boolean;
     parsedContext: JunieExecutionContext;
     successData?: SuccessFeedbackData;

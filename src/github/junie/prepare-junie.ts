@@ -6,6 +6,7 @@ import {
     isJiraWorkflowDispatchEvent,
     isResolveConflictsWorkflowDispatchEvent, isWorkflowRunFailureEvent,
     isYouTrackWorkflowDispatchEvent,
+    isLinearWorkflowDispatchEvent,
 } from "../context";
 import {checkHumanActor} from "../validation/actor";
 import {postJunieWorkingStatusComment} from "../operations/comments/feedback";
@@ -22,7 +23,9 @@ import {INIT_COMMENT_BODY, RESOLVE_CONFLICTS_ACTION,} from "../../constants/gith
 import {getJiraClient} from "../jira/client";
 import {convertMarkdownToADF} from "../jira/markdown-to-jira";
 import {getYouTrackClient} from "../youtrack/client";
+import {getLinearClient} from "../linear/client";
 import {detectJunieTriggerPhrase} from "../validation/trigger";
+import {createJobRunLink} from "../operations/comments/common";
 
 /**
  * Initializes Junie execution by preparing environment, auth, and workflow context
@@ -75,6 +78,24 @@ export async function initializeJunieExecution({
         } catch (ytError) {
             console.warn('Failed to post starting comment to YouTrack:', ytError);
             // Don't fail the workflow if YouTrack update fails
+        }
+    }
+
+    // Post "started working" comment for Linear-triggered workflows and save the comment ID
+    if (isLinearWorkflowDispatchEvent(context)) {
+        try {
+            const client = getLinearClient();
+            const {owner, name} = context.payload.repository;
+            const jobRunLink = createJobRunLink(owner.login, name, context.runId);
+            const body = `${INIT_COMMENT_BODY}\n\n${jobRunLink}`;
+
+            const commentId = await client.addComment(context.payload.issueId, body);
+            if (commentId) {
+                core.setOutput(OUTPUT_VARS.LINEAR_INIT_COMMENT_ID, commentId);
+            }
+        } catch (linearError) {
+            console.warn('Failed to post starting comment to Linear:', linearError);
+            // Don't fail the workflow if Linear update fails
         }
     }
 
@@ -136,6 +157,10 @@ async function shouldHandle(context: JunieExecutionContext, octokit: Octokits): 
     }
 
     if (isYouTrackWorkflowDispatchEvent(context)) {
+        return true;
+    }
+
+    if (isLinearWorkflowDispatchEvent(context)) {
         return true;
     }
 
