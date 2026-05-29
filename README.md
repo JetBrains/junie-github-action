@@ -10,6 +10,7 @@ A powerful GitHub Action that integrates [Junie](https://www.jetbrains.com/junie
   - [Basic Setup](#basic-setup)
 - [Jira Integration](#jira-integration)
 - [YouTrack Integration](#youtrack-integration)
+- [Linear Integration](#linear-integration)
 - [Cookbook](#cookbook)
 - [Configuration](#configuration)
   - [Input Parameters](#input-parameters)
@@ -115,6 +116,10 @@ jobs:
 
 🔗 **Want to trigger Junie from YouTrack?** Check out the [YouTrack Integration Guide](docs/YOUTRACK_INTEGRATION.md) to automatically implement features and fixes based on YouTrack issues using the **Junie YouTrack App** from JetBrains Marketplace.
 
+## Linear Integration
+
+🔗 **Want to trigger Junie from Linear?** Check out the [Linear Integration Guide](docs/LINEAR_INTEGRATION.md) to automatically implement features and fixes based on Linear issues.
+
 ## Cookbook
 
 📚 **Looking for practical examples?** Check out the [Cookbook](COOKBOOK.md) for real-world recipes including:
@@ -203,6 +208,14 @@ For detailed setup instructions, see the [Jira Integration Guide](docs/JIRA_INTE
 | `youtrack_token` | YouTrack permanent token for posting comments and reading issue data | - |
 
 For detailed setup instructions, see the [YouTrack Integration Guide](docs/YOUTRACK_INTEGRATION.md).
+
+#### Linear Integration
+
+| Input | Description | Default |
+|-------|-------------|---------|
+| `linear_api_key` | Linear personal API key for posting comments | - |
+
+For detailed setup instructions, see the [Linear Integration Guide](docs/LINEAR_INTEGRATION.md).
 
 #### Authentication
 

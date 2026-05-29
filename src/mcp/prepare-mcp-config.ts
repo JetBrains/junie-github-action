@@ -5,7 +5,7 @@ import {mkdir, writeFile} from "fs/promises";
 import {join} from "path";
 import {homedir} from 'os';
 import {BranchInfo} from "../github/operations/branch";
-import {isFixCIEvent, isJiraWorkflowDispatchEvent, isYouTrackWorkflowDispatchEvent, JunieExecutionContext} from "../github/context";
+import {isFixCIEvent, isJiraWorkflowDispatchEvent, isYouTrackWorkflowDispatchEvent, isLinearWorkflowDispatchEvent, JunieExecutionContext} from "../github/context";
 
 type PrepareConfigParams = {
     context: JunieExecutionContext;
@@ -124,6 +124,29 @@ export async function prepareMcpConfig(
             },
         };
         enabledServers.push('youtrack');
+    }
+
+    // Add Linear MCP server when triggered by a Linear event
+    if (isLinearWorkflowDispatchEvent(context)) {
+        const linearApiKey = process.env.LINEAR_API_KEY;
+        if (linearApiKey) {
+            console.log(`Enabling Linear MCP Server`);
+            baseMcpConfig.mcpServers.linear = {
+                command: "npx",
+                args: [
+                    "mcp-remote",
+                    "https://mcp.linear.app/mcp",
+                    "--header",
+                    "Authorization:${AUTH_HEADER}",
+                ],
+                env: {
+                    AUTH_HEADER: linearApiKey,
+                },
+            };
+            enabledServers.push('linear');
+        } else {
+            console.warn('Linear MCP Server not enabled: missing LINEAR_API_KEY');
+        }
     }
 
     const configJsonString = JSON.stringify(baseMcpConfig, null, 2);

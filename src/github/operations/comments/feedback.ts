@@ -5,11 +5,13 @@ import {addJunieMarker, createCommentBody, createJobRunLink, hasJunieMarker} fro
 import {
     isIssueCommentEvent,
     isJiraWorkflowDispatchEvent,
+    isLinearWorkflowDispatchEvent,
     isPullRequestReviewCommentEvent,
     isPullRequestReviewEvent,
     isYouTrackWorkflowDispatchEvent,
     JiraIssuePayload,
     JunieExecutionContext,
+    LinearIssuePayload,
     YouTrackIssuePayload,
 } from "../../context";
 import type {Octokit} from "@octokit/rest";
@@ -27,6 +29,7 @@ import type {FailureFeedbackData, FinishFeedbackData, SuccessFeedbackData} from 
 import {getJiraClient} from "../../jira/client";
 import {convertMarkdownToADF} from "../../jira/markdown-to-jira";
 import {getYouTrackClient} from "../../youtrack/client";
+import {getLinearClient} from "../../linear/client";
 import {ActionType} from "../../../entrypoints/handle-results";
 
 /**
@@ -398,6 +401,18 @@ export async function postJunieCompletionComment(
         return;
     }
 
+    // Check if this is a Linear-triggered workflow
+    if (isLinearWorkflowDispatchEvent(data.parsedContext)) {
+        console.log('Linear workflow detected - posting feedback to Linear');
+        try {
+            await postLinearFeedback(data);
+        } catch (linearError) {
+            console.warn('Failed to post feedback to Linear:', linearError);
+            // Don't fail the workflow if Linear update fails
+        }
+        return;
+    }
+
     if (!data.initCommentId) {
         console.log('No initial comment ID - skipping feedback');
         return;
@@ -507,6 +522,40 @@ async function postYouTrackFeedback(data: FinishFeedbackData): Promise<void> {
             await client.addComment(ytPayload.issueId, comment);
         }
         console.log(`✓ Successfully updated YouTrack issue ${ytPayload.issueId}`);
+    }
+}
+
+/**
+ * Posts feedback to Linear issue instead of GitHub comment
+ */
+async function postLinearFeedback(data: FinishFeedbackData): Promise<void> {
+    const linearPayload = data.parsedContext.payload as LinearIssuePayload;
+    const client = getLinearClient();
+    const {owner, name} = data.parsedContext.payload.repository;
+    const ownerLogin = owner.login;
+    const linearInitCommentId = process.env[OUTPUT_VARS.LINEAR_INIT_COMMENT_ID];
+
+    console.log(`Updating Linear issue ${linearPayload.issueId}...`);
+
+    let comment: string;
+
+    if (data.isJobFailed) {
+        console.log(`Add failure comment to Linear issue ${linearPayload.issueId}`);
+        comment = getFailedBody(ownerLogin, name, data.parsedContext.runId, data.failureData!);
+    } else {
+        console.log(`Add success comment to Linear issue ${linearPayload.issueId}`);
+        comment = data.successData?.actionToDo === ActionType.CREATE_PR
+            ? getSuccessBody(`${ownerLogin}/${name}`, data.successData)
+            : data.successData?.junieSummary || '';
+    }
+
+    if (comment) {
+        if (linearInitCommentId) {
+            await client.updateComment(linearInitCommentId, comment);
+        } else {
+            await client.addComment(linearPayload.issueId, comment);
+        }
+        console.log(`✓ Successfully updated Linear issue ${linearPayload.issueId}`);
     }
 }
 

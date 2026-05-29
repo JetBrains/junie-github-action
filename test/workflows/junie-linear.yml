@@ -1,0 +1,64 @@
+name: Junie Linear Integration
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Action type (linear_event)"
+        required: true
+        default: "linear_event"
+      issue_id:
+        description: "Linear issue UUID"
+        required: true
+      issue_identifier:
+        description: "Linear issue identifier (e.g. ENG-123)"
+        required: false
+      issue_url:
+        description: "Link to Linear issue"
+        required: false
+      issue_title:
+        description: "Issue title"
+        required: true
+      issue_description:
+        description: "Issue description"
+        required: false
+      issue_comments:
+        description: "Issue comments as flat text"
+        required: false
+      trigger_comment:
+        description: "Comment that triggered Junie"
+        required: false
+      comment_body:
+        description: "Comment body (alternative for trigger_comment)"
+        required: false
+      event_type:
+        description: "Event type (e.g., comment)"
+        required: false
+
+jobs:
+  junie:
+    name: Junie Process Linear Issue
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.action == 'linear_event' }}
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Junie
+        uses: JetBrains/junie-github-action@v1
+        with:
+          junie_api_key: ${{ secrets.JUNIE_API_KEY }}
+          linear_api_key: ${{ secrets.LINEAR_API_KEY }}
+          # Explicitly mapping new inputs from workflow_dispatch to action inputs
+          action: ${{ github.event.inputs.action }}
+          issue_id: ${{ github.event.inputs.issue_id }}
+          issue_title: ${{ github.event.inputs.issue_title }}
+          issue_description: ${{ github.event.inputs.issue_description }}
+          comment_body: ${{ github.event.inputs.comment_body }}
+          event_type: ${{ github.event.inputs.event_type }}

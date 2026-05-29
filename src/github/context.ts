@@ -21,6 +21,7 @@ import {
     DEFAULT_TRIGGER_PHRASE,
     FIX_CI_ACTION,
     JIRA_EVENT_ACTION, JUNIE_AGENT,
+    LINEAR_EVENT_ACTION,
     MINOR_FIX_ACTION,
     RESOLVE_CONFLICTS_ACTION,
     YOUTRACK_EVENT_ACTION,
@@ -69,6 +70,19 @@ export type YouTrackIssuePayload = WorkflowDispatchEvent & {
     youtrackBaseUrl: string;
     youtrackToken: string;
     action: typeof YOUTRACK_EVENT_ACTION;
+};
+
+export type LinearIssuePayload = WorkflowDispatchEvent & {
+    issueId: string;          // UUID, for API
+    issueIdentifier: string;  // ENG-123, for display
+    issueUrl: string;
+    issueTitle: string;
+    issueDescription: string;
+    issueComments?: string;
+    triggerComment?: string;
+    commentBody?: string;     // Alternative for triggerComment
+    eventType?: string;       // Event type (e.g., 'comment')
+    action: typeof LINEAR_EVENT_ACTION;
 };
 
 // Jira integration types
@@ -163,6 +177,7 @@ export type AutomationEventContext = JunieWorkflowContext & {
         | WorkflowRunEvent
         | JiraIssuePayload
         | YouTrackIssuePayload
+        | LinearIssuePayload
         | ResolveConflictsEventPayload;
 };
 
@@ -314,6 +329,12 @@ export function extractJunieWorkflowContext(tokenOwner: TokenOwner): JunieExecut
             // Handle YouTrack integration event
             if (payload.inputs?.action == YOUTRACK_EVENT_ACTION) {
                 parsedContext = extractYouTrackEventData(payload, commonFields);
+                break;
+            }
+
+            // Handle Linear integration event
+            if (payload.inputs?.action == LINEAR_EVENT_ACTION) {
+                parsedContext = extractLinearEventData(payload, commonFields);
                 break;
             }
 
@@ -505,6 +526,53 @@ export function isYouTrackWorkflowDispatchEvent(context: JunieExecutionContext):
     payload: YouTrackIssuePayload
 } {
     return context.eventName === "workflow_dispatch" && 'action' in context.payload && context.payload.action === YOUTRACK_EVENT_ACTION;
+}
+
+function extractLinearEventData(workflowPayload: WorkflowDispatchEvent, context: JunieWorkflowContext): JunieExecutionContext {
+    const issueId = workflowPayload.inputs?.issue_id as string;
+    const issueIdentifier = (workflowPayload.inputs?.issue_identifier as string) || issueId;
+    const issueUrl = workflowPayload.inputs?.issue_url as string;
+    const issueTitle = workflowPayload.inputs?.issue_title as string;
+    const issueDescription = (workflowPayload.inputs?.issue_description as string) || '';
+    const issueComments = (workflowPayload.inputs?.issue_comments as string) || undefined;
+    const triggerComment = (workflowPayload.inputs?.trigger_comment as string) || undefined;
+    const commentBody = (workflowPayload.inputs?.comment_body as string) || undefined;
+    const eventType = (workflowPayload.inputs?.event_type as string) || undefined;
+
+    if (!issueId || !issueTitle) {
+        throw new Error(`Missing Linear issue data in workflow payload: ${JSON.stringify(workflowPayload)}`);
+    }
+
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(issueId)) {
+        console.warn(`⚠️ Warning: issue_id "${issueId}" is not a valid UUID. Linear API will likely fail to add comments. Ensure your bridge sends the issue UUID in the "issue_id" field.`);
+    }
+
+    console.log(`✓ Linear issue detected: ${issueIdentifier} - ${issueTitle}`);
+
+    return {
+        ...context,
+        eventName: "workflow_dispatch",
+        payload: {
+            ...workflowPayload,
+            issueId,
+            issueIdentifier,
+            issueUrl: issueUrl || '',
+            issueTitle,
+            issueDescription,
+            issueComments,
+            triggerComment,
+            commentBody,
+            eventType,
+            action: LINEAR_EVENT_ACTION,
+        },
+    };
+}
+
+export function isLinearWorkflowDispatchEvent(context: JunieExecutionContext): context is AutomationEventContext & {
+    payload: LinearIssuePayload
+} {
+    return context.eventName === "workflow_dispatch" && 'action' in context.payload && context.payload.action === LINEAR_EVENT_ACTION;
 }
 
 export function isResolveConflictsWorkflowDispatchEvent(context: JunieExecutionContext): context is AutomationEventContext & {

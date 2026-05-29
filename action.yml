@@ -86,6 +86,27 @@ inputs:
   youtrack_token:
     description: "YouTrack permanent token for API authentication (required for YouTrack integration)"
     required: false
+  # Internal / Automation inputs
+  action:
+    description: "Trigger action name"
+    required: false
+  issue_id:
+    description: "External issue ID"
+    required: false
+  issue_title:
+    description: "External issue title"
+    required: false
+  issue_description:
+    description: "External issue description"
+    required: false
+  comment_body:
+    description: "External comment body"
+    required: false
+
+  # Linear integration configuration
+  linear_api_key:
+    description: "Linear personal API key"
+    required: false
 
   # Auth configuration
   junie_api_key:
@@ -135,6 +156,42 @@ outputs:
   custom_junie_args:
     description: "Custom Junie arguments extracted from prompt/comment (e.g., --model=value)"
     value: ${{ steps.prepare.outputs.CUSTOM_JUNIE_ARGS }}
+  parsed_context:
+    description: "Parsed context of the event"
+    value: ${{ steps.prepare.outputs.PARSED_CONTEXT }}
+  linear_init_comment_id:
+    description: "ID of the initial comment in Linear"
+    value: ${{ steps.prepare.outputs.LINEAR_INIT_COMMENT_ID }}
+  youtrack_init_comment_id:
+    description: "ID of the initial comment in YouTrack"
+    value: ${{ steps.prepare.outputs.YOUTRACK_INIT_COMMENT_ID }}
+  jira_init_comment_id:
+    description: "ID of the initial comment in Jira"
+    value: ${{ steps.prepare.outputs.JIRA_INIT_COMMENT_ID }}
+  init_comment_id:
+    description: "ID of the initial comment in GitHub"
+    value: ${{ steps.prepare.outputs.INIT_COMMENT_ID }}
+  base_branch:
+    description: "The base branch for Junie changes"
+    value: ${{ steps.prepare.outputs.BASE_BRANCH }}
+  ej_cli_token:
+    description: "CLI token for Junie authentication"
+    value: ${{ steps.prepare.outputs.EJ_CLI_TOKEN }}
+  junie_input_file:
+    description: "Path to the Junie input file"
+    value: ${{ steps.prepare.outputs.JUNIE_INPUT_FILE }}
+  is_new_branch:
+    description: "Whether a new branch was created"
+    value: ${{ steps.prepare.outputs.IS_NEW_BRANCH }}
+  junie_agent_name:
+    description: "Name of the Junie agent for commits"
+    value: ${{ steps.prepare.outputs.JUNIE_AGENT_NAME }}
+  junie_agent_email:
+    description: "Email of the Junie agent for commits"
+    value: ${{ steps.prepare.outputs.JUNIE_AGENT_EMAIL }}
+  exception:
+    description: "Exception occurred during preparation"
+    value: ${{ steps.prepare.outputs.EXCEPTION }}
 
 runs:
   using: "composite"
@@ -218,6 +275,7 @@ runs:
         JIRA_EMAIL: ${{ inputs.jira_email }}
         JIRA_API_TOKEN: ${{ inputs.jira_api_token }}
         YOUTRACK_TOKEN: ${{ inputs.youtrack_token }}
+        LINEAR_API_KEY: ${{ inputs.linear_api_key }}
         ALL_INPUTS: ${{ toJson(inputs) }}
         OPENAI_API_KEY: ${{ inputs.openai_api_key }}
         ANTHROPIC_API_KEY: ${{ inputs.anthropic_api_key }}
@@ -380,8 +438,10 @@ runs:
         JIRA_EMAIL: ${{ inputs.jira_email }}
         JIRA_API_TOKEN: ${{ inputs.jira_api_token }}
         YOUTRACK_TOKEN: ${{ inputs.youtrack_token }}
+        LINEAR_API_KEY: ${{ inputs.linear_api_key }}
         YOUTRACK_INIT_COMMENT_ID: ${{ steps.prepare.outputs.YOUTRACK_INIT_COMMENT_ID }}
         JIRA_INIT_COMMENT_ID: ${{ steps.prepare.outputs.JIRA_INIT_COMMENT_ID }}
+        LINEAR_INIT_COMMENT_ID: ${{ steps.prepare.outputs.LINEAR_INIT_COMMENT_ID }}
 
     - name: Give feedback and update summary (failure)
       if: failure() && steps.prepare.outputs.SHOULD_SKIP != 'true'
@@ -405,6 +465,8 @@ runs:
         JIRA_EMAIL: ${{ inputs.jira_email }}
         JIRA_API_TOKEN: ${{ inputs.jira_api_token }}
         YOUTRACK_TOKEN: ${{ inputs.youtrack_token }}
+        LINEAR_API_KEY: ${{ inputs.linear_api_key }}
         YOUTRACK_INIT_COMMENT_ID: ${{ steps.prepare.outputs.YOUTRACK_INIT_COMMENT_ID }}
         JIRA_INIT_COMMENT_ID: ${{ steps.prepare.outputs.JIRA_INIT_COMMENT_ID }}
+        LINEAR_INIT_COMMENT_ID: ${{ steps.prepare.outputs.LINEAR_INIT_COMMENT_ID }}
         ERROR: ${{ steps.prepare.outputs.EXCEPTION || steps.junie-run-results.outputs.EXCEPTION }}
