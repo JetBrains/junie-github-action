@@ -251,8 +251,16 @@ runs:
       id: prepare
       shell: bash
       run: |
+        echo "Inputs for prepare:"
+        echo "ACTION: ${ACTION}"
+        echo "ISSUE_ID: ${ISSUE_ID}"
         bun run ${GITHUB_ACTION_PATH}/src/entrypoints/prepare.ts
       env:
+        ACTION: ${{ inputs.action }}
+        ISSUE_ID: ${{ inputs.issue_id }}
+        ISSUE_TITLE: ${{ inputs.issue_title }}
+        ISSUE_DESCRIPTION: ${{ inputs.issue_description }}
+        COMMENT_BODY: ${{ inputs.comment_body }}
         APP_TOKEN: ${{ inputs.junie_api_key }}
         PROMPT: ${{ inputs.prompt }}
         TRIGGER_PHRASE: ${{ inputs.trigger_phrase }}

@@ -90,6 +90,12 @@ jobs:
         with:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
           linear_api_key: ${{ secrets.LINEAR_API_KEY }} # КРИТИЧНО: Убедитесь, что этот секрет передан!
+
+> [!IMPORTANT]
+> **Не забудьте передать параметр `linear_api_key`!** Даже если вы создали секрет в настройках репозитория, вы должны явно пробросить его в экшен через блок `with` в вашем файле воркфлоу (как показано выше). Без этого экшен не будет иметь доступа к ключу, и вы увидите ошибку `⚠️ Linear API key not found`.
+
+> [!TIP]
+> Убедитесь, что название секрета в `secrets.LINEAR_API_KEY` в точности совпадает с тем, как вы назвали его в настройках GitHub (Settings -> Secrets and variables -> Actions).
 ```
 
 ### 4. Configure the Bridge

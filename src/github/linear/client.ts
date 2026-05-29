@@ -9,6 +9,7 @@ class LinearClient {
 
     constructor() {
         this.token = process.env.LINEAR_API_KEY || '';
+        console.log(`Debug: LINEAR_API_KEY from env is ${this.token ? 'present' : 'EMPTY'}`);
         if (this.token) {
             const masked = this.token.length > 8 
                 ? `${this.token.substring(0, 4)}...${this.token.substring(this.token.length - 4)}` 

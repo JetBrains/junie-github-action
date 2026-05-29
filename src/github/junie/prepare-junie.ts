@@ -39,7 +39,10 @@ export async function initializeJunieExecution({
     const handle = await shouldHandle(context, octokit)
 
     if (!handle) {
-        console.log("No need to run junie")
+        console.log("No need to run junie. Context eventName:", context.eventName);
+        if ('action' in context.payload) {
+            console.log("Context action:", context.payload.action);
+        }
         core.setOutput(OUTPUT_VARS.SHOULD_SKIP, 'true');
         return;
     }

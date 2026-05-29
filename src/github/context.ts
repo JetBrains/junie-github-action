@@ -306,6 +306,8 @@ export function extractJunieWorkflowContext(tokenOwner: TokenOwner): JunieExecut
         case "workflow_dispatch": {
             const payload = context.payload as WorkflowDispatchEvent;
 
+            console.log('Workflow dispatch inputs:', JSON.stringify(payload.inputs, null, 2));
+
             if (payload.inputs?.action == RESOLVE_CONFLICTS_ACTION) {
                 parsedContext = {
                     ...commonFields,
@@ -321,19 +323,23 @@ export function extractJunieWorkflowContext(tokenOwner: TokenOwner): JunieExecut
             }
 
             // Handle Jira integration event
-            if (payload.inputs?.action == JIRA_EVENT_ACTION) {
+            const jiraAction = payload.inputs?.action || process.env.ACTION;
+            if (jiraAction == JIRA_EVENT_ACTION) {
                 parsedContext = extractJiraEventData(payload, commonFields)
                 break;
             }
 
             // Handle YouTrack integration event
-            if (payload.inputs?.action == YOUTRACK_EVENT_ACTION) {
+            const ytAction = payload.inputs?.action || process.env.ACTION;
+            if (ytAction == YOUTRACK_EVENT_ACTION) {
                 parsedContext = extractYouTrackEventData(payload, commonFields);
                 break;
             }
 
             // Handle Linear integration event
-            if (payload.inputs?.action == LINEAR_EVENT_ACTION) {
+            const action = payload.inputs?.action || process.env.ACTION;
+            if (action == LINEAR_EVENT_ACTION) {
+                console.log('Detected Linear event action');
                 parsedContext = extractLinearEventData(payload, commonFields);
                 break;
             }
@@ -436,12 +442,13 @@ export function safeParseJiraJson<T>(rawJson: string, fieldName: string): T {
 }
 
 function extractJiraEventData(workflowPayload: WorkflowDispatchEvent, context: JunieWorkflowContext): JunieExecutionContext {
-    const issueKey = workflowPayload.inputs?.issue_key as string;
-    const issueSummary = workflowPayload.inputs?.issue_summary as string;
-    const issueDescription = workflowPayload.inputs?.issue_description as string;
-    const triggerComment = (workflowPayload.inputs?.trigger_comment as string) || undefined;
+    const issueKey = (workflowPayload.inputs?.issue_key as string) || process.env.ISSUE_ID; // Map issue_id to issue_key if needed
+    const issueSummary = (workflowPayload.inputs?.issue_summary as string) || process.env.ISSUE_TITLE;
+    const issueDescription = (workflowPayload.inputs?.issue_description as string) || process.env.ISSUE_DESCRIPTION || '';
+    const triggerComment = (workflowPayload.inputs?.trigger_comment as string) || process.env.COMMENT_BODY || undefined;
 
     if (!issueKey || !issueSummary) {
+        console.error('Missing Jira issue data. issueKey:', issueKey, 'issueSummary:', issueSummary);
         throw new Error(`Missing Jira issue data in workflow payload: ${JSON.stringify(workflowPayload)}`);
     }
 
@@ -489,16 +496,17 @@ export function isJiraWorkflowDispatchEvent(context: JunieExecutionContext): con
 }
 
 function extractYouTrackEventData(workflowPayload: WorkflowDispatchEvent, context: JunieWorkflowContext): JunieExecutionContext {
-    const issueId = workflowPayload.inputs?.issue_id as string;
-    const issueUrl = workflowPayload.inputs?.issue_url as string;
-    const issueTitle = workflowPayload.inputs?.issue_title as string;
-    const issueDescription = (workflowPayload.inputs?.issue_description as string) || '';
+    const issueId = (workflowPayload.inputs?.issue_id as string) || process.env.ISSUE_ID;
+    const issueUrl = (workflowPayload.inputs?.issue_url as string) || '';
+    const issueTitle = (workflowPayload.inputs?.issue_title as string) || process.env.ISSUE_TITLE;
+    const issueDescription = (workflowPayload.inputs?.issue_description as string) || process.env.ISSUE_DESCRIPTION || '';
     const issueComments = (workflowPayload.inputs?.issue_comments as string) || undefined;
-    const triggerComment = (workflowPayload.inputs?.trigger_comment as string) || undefined;
-    const youtrackBaseUrl = workflowPayload.inputs?.youtrack_base_url as string;
+    const triggerComment = (workflowPayload.inputs?.trigger_comment as string) || process.env.COMMENT_BODY || undefined;
+    const youtrackBaseUrl = (workflowPayload.inputs?.youtrack_base_url as string) || process.env.YOUTRACK_BASE_URL;
     const youtrackToken = process.env.YOUTRACK_TOKEN || '';
 
     if (!issueId || !issueTitle || !youtrackBaseUrl) {
+        console.error('Missing YouTrack issue data. issueId:', issueId, 'issueTitle:', issueTitle, 'youtrackBaseUrl:', youtrackBaseUrl);
         throw new Error(`Missing YouTrack issue data in workflow payload: ${JSON.stringify(workflowPayload)}`);
     }
 
@@ -529,17 +537,18 @@ export function isYouTrackWorkflowDispatchEvent(context: JunieExecutionContext):
 }
 
 function extractLinearEventData(workflowPayload: WorkflowDispatchEvent, context: JunieWorkflowContext): JunieExecutionContext {
-    const issueId = workflowPayload.inputs?.issue_id as string;
+    const issueId = (workflowPayload.inputs?.issue_id as string) || process.env.ISSUE_ID;
     const issueIdentifier = (workflowPayload.inputs?.issue_identifier as string) || issueId;
-    const issueUrl = workflowPayload.inputs?.issue_url as string;
-    const issueTitle = workflowPayload.inputs?.issue_title as string;
-    const issueDescription = (workflowPayload.inputs?.issue_description as string) || '';
+    const issueUrl = (workflowPayload.inputs?.issue_url as string) || '';
+    const issueTitle = (workflowPayload.inputs?.issue_title as string) || process.env.ISSUE_TITLE;
+    const issueDescription = (workflowPayload.inputs?.issue_description as string) || process.env.ISSUE_DESCRIPTION || '';
     const issueComments = (workflowPayload.inputs?.issue_comments as string) || undefined;
     const triggerComment = (workflowPayload.inputs?.trigger_comment as string) || undefined;
-    const commentBody = (workflowPayload.inputs?.comment_body as string) || undefined;
+    const commentBody = (workflowPayload.inputs?.comment_body as string) || process.env.COMMENT_BODY || undefined;
     const eventType = (workflowPayload.inputs?.event_type as string) || undefined;
 
     if (!issueId || !issueTitle) {
+        console.error('Missing Linear issue data. issueId:', issueId, 'issueTitle:', issueTitle);
         throw new Error(`Missing Linear issue data in workflow payload: ${JSON.stringify(workflowPayload)}`);
     }
 
