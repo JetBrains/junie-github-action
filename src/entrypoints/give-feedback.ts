@@ -30,7 +30,8 @@ async function writeFeedbackComment(isJobFailed: boolean, initCommentId?: string
             junieSummary: process.env[OUTPUT_VARS.JUNIE_SUMMARY],
             junieTitle: process.env[OUTPUT_VARS.JUNIE_TITLE],
             prLink: process.env[ENV_VARS.PR_LINK],
-            workingBranch: process.env[OUTPUT_VARS.WORKING_BRANCH]
+            workingBranch: process.env[OUTPUT_VARS.WORKING_BRANCH],
+            codeReviewFeedbackLink: process.env[OUTPUT_VARS.CODE_REVIEW_FEEDBACK_LINK],
         }
     }
 

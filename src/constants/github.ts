@@ -219,3 +219,6 @@ export const COMMIT_PUSHED_FEEDBACK_COMMENT_TEMPLATE = (commitSHA: string, junie
 export const BRANCH_PUSHED_FEEDBACK_COMMENT_TEMPLATE = (branchName: string, junieTitle: string, junieBody: string) => `${SUCCESS_FEEDBACK_COMMENT}\n\n${junieTitle}\n${junieBody}\n\nChanges pushed to branch: \`${branchName}\``
 
 export const SUCCESS_FEEDBACK_COMMENT_WITH_RESULT = (junieTitle: string, junieBody: string) => `${SUCCESS_FEEDBACK_COMMENT}\n\n${junieTitle} \n ${junieBody}`
+
+export const CODE_REVIEW_FEEDBACK_LINK_SECTION = (feedbackLink: string) =>
+    `\n\n---\n\n**Help us improve Junie code review (EAP):** [Share feedback](${feedbackLink})`
