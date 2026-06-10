@@ -102,6 +102,12 @@ export interface MockContextOverrides {
 }
 
 export const createMockContext = (overrides: MockContextOverrides = {}): JunieExecutionContext => {
+    const payload = overrides.payload || ({
+        action: "created",
+        repository: defaultRepository,
+        sender: mockSender,
+    } as any);
+
     return {
         runId: "1234567890",
         workflow: "Test Workflow",
@@ -110,17 +116,14 @@ export const createMockContext = (overrides: MockContextOverrides = {}): JunieEx
         actor: overrides.actor || "contributor-user",
         actorEmail: `67890+${overrides.actor || "contributor-user"}@users.noreply.github.com`,
         tokenOwner: {id: 123, login: "test-bot[bot]", type: "Bot"},
+        repository: payload.repository ?? defaultRepository,
         entityNumber: overrides.entityNumber ?? 55,
         isPR: overrides.isPR ?? false,
         inputs: {
             ...defaultInputs,
             ...overrides.inputs,
         },
-        payload: overrides.payload || ({
-            action: "created",
-            repository: defaultRepository,
-            sender: mockSender,
-        } as any),
+        payload,
     };
 };
 

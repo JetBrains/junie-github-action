@@ -112,6 +112,7 @@ type JunieWorkflowContext = {
     actor: string;
     actorEmail: string;
     tokenOwner: TokenOwner;
+    repository: Repository;
     entityNumber?: number;
     isPR?: boolean;
     inputs: {
@@ -176,6 +177,7 @@ export type JunieExecutionContext = UserInitiatedEventContext | AutomationEventC
  */
 export function extractJunieWorkflowContext(tokenOwner: TokenOwner): JunieExecutionContext {
     const context = github.context;
+    const repository = extractRepositoryFromPayload(context.payload);
     const commonFields = {
         runId: process.env.GITHUB_RUN_ID!,
         workflow: process.env.GITHUB_WORKFLOW || "Junie",
@@ -183,6 +185,7 @@ export function extractJunieWorkflowContext(tokenOwner: TokenOwner): JunieExecut
         actor: context.actor,
         actorEmail: getActorEmail(),
         tokenOwner,
+        repository,
         inputs: {
             resolveConflicts: process.env.RESOLVE_CONFLICTS == "true",
             createNewBranchForPR: process.env.CREATE_NEW_BRANCH_FOR_PR == "true",
@@ -614,4 +617,12 @@ function getActorEmail(): string {
     }
 
     return `${userId}+${actor}@users.noreply.github.com`;
+}
+
+function extractRepositoryFromPayload(payload: unknown): Repository {
+    if (payload && typeof payload === "object" && "repository" in payload && payload.repository) {
+        return payload.repository as Repository;
+    }
+
+    throw new Error("Repository information is missing from GitHub event payload");
 }
