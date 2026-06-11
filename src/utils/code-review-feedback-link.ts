@@ -1,5 +1,5 @@
-/** Production ingrazzio URL — same as Junie CLI ProductionEnvironment.ingrazzioUrl */
-export const INGRAZZIO_PRODUCTION_URL = 'https://ingrazzio-cloud-prod.labs.jb.gg';
+/** Production junie-cloud BFF URL for code review feedback */
+export const JUNIE_CLOUD_PUBLIC_API_URL = 'https://junie.jetbrains.com/api/public/no-auth';
 
 export interface FetchCodeReviewFeedbackLinkParams {
     sessionId: string;
@@ -18,7 +18,7 @@ function buildAuthorizationHeader(apiToken: string): string {
     return `Bearer ${trimmed}`;
 }
 
-export function shouldOfferCodeReviewFeedback(licenseType?: string): boolean {
+export function isJunieEap(licenseType?: string): boolean {
     return licenseType === 'JUNP';
 }
 
@@ -26,7 +26,7 @@ export async function fetchCodeReviewFeedbackLink(
     params: FetchCodeReviewFeedbackLinkParams,
 ): Promise<string | undefined> {
     try {
-        const response = await fetch(`${INGRAZZIO_PRODUCTION_URL}/api/code-review-feedback/create-link`, {
+        const response = await fetch(`${JUNIE_CLOUD_PUBLIC_API_URL}/code-review-feedback/create-link`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -41,7 +41,7 @@ export async function fetchCodeReviewFeedbackLink(
         });
 
         if (!response.ok) {
-            console.log(`Skipping code review feedback link: ingrazzio returned ${response.status}`);
+            console.log(`Skipping code review feedback link: junie-cloud returned ${response.status}`);
             return undefined;
         }
 

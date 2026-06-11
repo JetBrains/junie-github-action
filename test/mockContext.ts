@@ -116,7 +116,6 @@ export const createMockContext = (overrides: MockContextOverrides = {}): JunieEx
         actor: overrides.actor || "contributor-user",
         actorEmail: `67890+${overrides.actor || "contributor-user"}@users.noreply.github.com`,
         tokenOwner: {id: 123, login: "test-bot[bot]", type: "Bot"},
-        repository: payload.repository ?? defaultRepository,
         entityNumber: overrides.entityNumber ?? 55,
         isPR: overrides.isPR ?? false,
         inputs: {

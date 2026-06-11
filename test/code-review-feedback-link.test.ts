@@ -1,19 +1,19 @@
 import { describe, expect, mock, test } from 'bun:test';
 import {
     fetchCodeReviewFeedbackLink,
-    INGRAZZIO_PRODUCTION_URL,
-    shouldOfferCodeReviewFeedback,
+    JUNIE_CLOUD_PUBLIC_API_URL,
+    isJunieEap,
 } from '../src/utils/code-review-feedback-link';
 
 describe('code-review-feedback-link', () => {
-    test('shouldOfferCodeReviewFeedback accepts only JUNP', () => {
-        expect(shouldOfferCodeReviewFeedback('JUNP')).toBe(true);
-        expect(shouldOfferCodeReviewFeedback('TRIAL')).toBe(false);
-        expect(shouldOfferCodeReviewFeedback('AIP')).toBe(false);
-        expect(shouldOfferCodeReviewFeedback(undefined)).toBe(false);
+    test('isJunieEap accepts only JUNP', () => {
+        expect(isJunieEap('JUNP')).toBe(true);
+        expect(isJunieEap('TRIAL')).toBe(false);
+        expect(isJunieEap('AIP')).toBe(false);
+        expect(isJunieEap(undefined)).toBe(false);
     });
 
-    test('fetchCodeReviewFeedbackLink returns link from ingrazzio', async () => {
+    test('fetchCodeReviewFeedbackLink returns link from junie-cloud BFF', async () => {
         const fetchMock = mock(() =>
             Promise.resolve(
                 new Response(JSON.stringify({ link: 'https://junie.jetbrains.com/code-review-feedback?token=abc.def' }), {
@@ -37,7 +37,7 @@ describe('code-review-feedback-link', () => {
             expect(link).toBe('https://junie.jetbrains.com/code-review-feedback?token=abc.def');
             expect(fetchMock).toHaveBeenCalledTimes(1);
             const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-            expect(url).toBe(`${INGRAZZIO_PRODUCTION_URL}/api/code-review-feedback/create-link`);
+            expect(url).toBe(`${JUNIE_CLOUD_PUBLIC_API_URL}/code-review-feedback/create-link`);
             expect(init.method).toBe('POST');
             expect(init.headers).toMatchObject({
                 'Content-Type': 'application/json',

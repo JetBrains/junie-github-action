@@ -13,7 +13,7 @@ import * as fs from "node:fs";
 import type {CliOutput} from "../github/junie/types/junie";
 import {
     fetchCodeReviewFeedbackLink,
-    shouldOfferCodeReviewFeedback,
+    isJunieEap,
 } from "../utils/code-review-feedback-link";
 
 export enum ActionType {
@@ -87,7 +87,8 @@ export async function handleResults() {
             );
         }
         const actionToDo = await getActionToDo(context);
-        await exportCodeReviewFeedbackOutputs(context, sessionId, licenseType, actionToDo);
+        exportJunieSessionOutputs(sessionId, licenseType);
+        await exportCodeReviewFeedbackLink(context, sessionId, licenseType, actionToDo);
         // Sanitize Junie's output to prevent token leakage and self-triggering
         const rawTitle = junieJsonOutput.taskName || (isResolveConflict ? `Resolve conflicts for ${context.entityNumber} PR` : 'Junie finished task successfully')
         const rawBody = junieJsonOutput.result
@@ -240,24 +241,29 @@ async function checkForUnpushedCommits(isNewBranch: boolean, baseBranch: string)
     }
 }
 
-function exportCodeReviewFeedbackOutputs(
-    context: JunieExecutionContext,
+function exportJunieSessionOutputs(
     sessionId: string | undefined,
     licenseType: string | undefined,
-    actionToDo: ActionType,
-): Promise<void> {
+): void {
     if (sessionId) {
         core.setOutput(OUTPUT_VARS.JUNIE_SESSION_ID, sessionId);
     }
     if (licenseType) {
         core.setOutput(OUTPUT_VARS.JUNIE_LICENSE_TYPE, licenseType);
     }
+}
 
+function exportCodeReviewFeedbackLink(
+    context: JunieExecutionContext,
+    sessionId: string | undefined,
+    licenseType: string | undefined,
+    actionToDo: ActionType,
+): Promise<void> {
     if (
         actionToDo !== ActionType.WRITE_COMMENT ||
         !isCodeReviewEvent(context) ||
         !sessionId ||
-        !shouldOfferCodeReviewFeedback(licenseType)
+        !isJunieEap(licenseType)
     ) {
         return Promise.resolve();
     }
@@ -273,7 +279,7 @@ function exportCodeReviewFeedbackOutputs(
 
     return fetchCodeReviewFeedbackLink({
         sessionId,
-        repository: context.repository.full_name,
+        repository: context.payload.repository.full_name,
         prNumber,
         runId,
         apiToken,
