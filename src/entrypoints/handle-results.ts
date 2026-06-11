@@ -11,10 +11,7 @@ import {isReviewOrCommentHasResolveConflictsTrigger} from "../github/validation/
 import {sanitizeJunieOutput, truncateOutput, OUTPUT_SIZE_LIMITS} from "../utils/sanitizer";
 import * as fs from "node:fs";
 import type {CliOutput} from "../github/junie/types/junie";
-import {
-    fetchCodeReviewFeedbackLink,
-    isJunieEap,
-} from "../utils/code-review-feedback-link";
+import {fetchCodeReviewFeedbackLink} from "../utils/code-review-feedback-link";
 
 export enum ActionType {
     WRITE_COMMENT = 'WRITE_COMMENT',
@@ -88,7 +85,7 @@ export async function handleResults() {
         }
         const actionToDo = await getActionToDo(context);
         exportJunieSessionOutputs(sessionId, licenseType);
-        await exportCodeReviewFeedbackLink(context, sessionId, licenseType, actionToDo);
+        await exportCodeReviewFeedbackLink(context, sessionId, actionToDo);
         // Sanitize Junie's output to prevent token leakage and self-triggering
         const rawTitle = junieJsonOutput.taskName || (isResolveConflict ? `Resolve conflicts for ${context.entityNumber} PR` : 'Junie finished task successfully')
         const rawBody = junieJsonOutput.result
@@ -256,14 +253,13 @@ function exportJunieSessionOutputs(
 function exportCodeReviewFeedbackLink(
     context: JunieExecutionContext,
     sessionId: string | undefined,
-    licenseType: string | undefined,
     actionToDo: ActionType,
 ): Promise<void> {
+    // Early JUNP skip via licenseType + isJunieEap() disabled until CLI with licenseType is released.
     if (
         actionToDo !== ActionType.WRITE_COMMENT ||
         !isCodeReviewEvent(context) ||
-        !sessionId ||
-        !isJunieEap(licenseType)
+        !sessionId
     ) {
         return Promise.resolve();
     }
@@ -283,7 +279,7 @@ function exportCodeReviewFeedbackLink(
         prNumber,
         runId,
         apiToken,
-    }).then(feedbackLink => {
+    }, process.env[ENV_VARS.CODE_REVIEW_FEEDBACK_API_BASE_URL]).then(feedbackLink => {
         if (feedbackLink) {
             core.setOutput(OUTPUT_VARS.CODE_REVIEW_FEEDBACK_LINK, feedbackLink);
         }

@@ -1,11 +1,18 @@
 import { describe, expect, mock, test } from 'bun:test';
 import {
+    DEFAULT_CODE_REVIEW_FEEDBACK_API_BASE_URL,
     fetchCodeReviewFeedbackLink,
-    JUNIE_CLOUD_PUBLIC_API_URL,
     isJunieEap,
+    resolveCodeReviewFeedbackApiBaseUrl,
 } from '../src/utils/code-review-feedback-link';
 
 describe('code-review-feedback-link', () => {
+    test('resolveCodeReviewFeedbackApiBaseUrl uses default and strips trailing slash', () => {
+        expect(resolveCodeReviewFeedbackApiBaseUrl()).toBe(DEFAULT_CODE_REVIEW_FEEDBACK_API_BASE_URL);
+        expect(resolveCodeReviewFeedbackApiBaseUrl('https://junie-kitty.labs.jb.gg/api/public/no-auth/'))
+            .toBe('https://junie-kitty.labs.jb.gg/api/public/no-auth');
+    });
+
     test('isJunieEap accepts only JUNP', () => {
         expect(isJunieEap('JUNP')).toBe(true);
         expect(isJunieEap('TRIAL')).toBe(false);
@@ -37,7 +44,7 @@ describe('code-review-feedback-link', () => {
             expect(link).toBe('https://junie.jetbrains.com/code-review-feedback?token=abc.def');
             expect(fetchMock).toHaveBeenCalledTimes(1);
             const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-            expect(url).toBe(`${JUNIE_CLOUD_PUBLIC_API_URL}/code-review-feedback/create-link`);
+            expect(url).toBe(`${DEFAULT_CODE_REVIEW_FEEDBACK_API_BASE_URL}/code-review-feedback/create-link`);
             expect(init.method).toBe('POST');
             expect(init.headers).toMatchObject({
                 'Content-Type': 'application/json',

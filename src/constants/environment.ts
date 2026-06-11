@@ -42,6 +42,7 @@ export const ENV_VARS = {
     COMMIT_SHA: "COMMIT_SHA",
     PR_LINK: "PR_LINK",
     WORKING_DIR: "WORKING_DIR",
+    CODE_REVIEW_FEEDBACK_API_BASE_URL: "CODE_REVIEW_FEEDBACK_API_BASE_URL",
 } as const;
 
 // ============================================================================

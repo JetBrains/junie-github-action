@@ -60,6 +60,10 @@ inputs:
     description: "Version of Junie to use"
     required: false
     default: "1831.35"
+  code_review_feedback_api_base_url:
+    description: "junie-cloud BFF base URL for code review feedback create-link API"
+    required: false
+    default: "https://junie.jetbrains.com/api/public/no-auth"
   model:
     description: "Model to use for the primary agent"
     required: false
@@ -322,6 +326,7 @@ runs:
         IS_NEW_BRANCH: ${{ steps.prepare.outputs.IS_NEW_BRANCH }}
         WORKING_DIR: ${{ inputs.junie_work_dir }}
         APP_TOKEN: ${{ inputs.junie_api_key }}
+        CODE_REVIEW_FEEDBACK_API_BASE_URL: ${{ inputs.code_review_feedback_api_base_url }}
 
     - name: Upload Junie artifacts
       if: always() && steps.prepare.outputs.SHOULD_SKIP != 'true'

@@ -23,8 +23,8 @@ export interface CliOutput {
     errors?: string[];
     taskName?: string;
     result?: string;
-    licenseType?: string;
     duration_ms?: number;
+    licenseType?: string;
 }
 
 export interface CliInput {

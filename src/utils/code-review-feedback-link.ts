@@ -1,5 +1,16 @@
-/** Production junie-cloud BFF URL for code review feedback */
-export const JUNIE_CLOUD_PUBLIC_API_URL = 'https://junie.jetbrains.com/api/public/no-auth';
+/** Default junie-cloud BFF URL for code review feedback (production). */
+export const DEFAULT_CODE_REVIEW_FEEDBACK_API_BASE_URL =
+    'https://junie.jetbrains.com/api/public/no-auth';
+
+export function resolveCodeReviewFeedbackApiBaseUrl(
+    configuredBaseUrl?: string,
+): string {
+    const trimmed = configuredBaseUrl?.trim();
+    if (trimmed) {
+        return trimmed.replace(/\/+$/, '');
+    }
+    return DEFAULT_CODE_REVIEW_FEEDBACK_API_BASE_URL;
+}
 
 export interface FetchCodeReviewFeedbackLinkParams {
     sessionId: string;
@@ -24,9 +35,11 @@ export function isJunieEap(licenseType?: string): boolean {
 
 export async function fetchCodeReviewFeedbackLink(
     params: FetchCodeReviewFeedbackLinkParams,
+    apiBaseUrl?: string,
 ): Promise<string | undefined> {
+    const baseUrl = resolveCodeReviewFeedbackApiBaseUrl(apiBaseUrl);
     try {
-        const response = await fetch(`${JUNIE_CLOUD_PUBLIC_API_URL}/code-review-feedback/create-link`, {
+        const response = await fetch(`${baseUrl}/code-review-feedback/create-link`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
