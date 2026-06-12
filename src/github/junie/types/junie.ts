@@ -18,6 +18,14 @@ export interface CodeReview {
     diffCommand?: string;
 }
 
+export interface CliOutput {
+    sessionId?: string;
+    errors?: string[];
+    taskName?: string;
+    result?: string;
+    duration_ms?: number;
+}
+
 export interface CliInput {
     task?: string;
     mergeTask?: MergeTask;

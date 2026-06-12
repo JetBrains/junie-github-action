@@ -19,6 +19,7 @@ export interface SuccessFeedbackData {
     junieSummary?: string;
     workingBranch?: string;
     baseBranch?: string;
+    codeReviewFeedbackLink?: string;
 }
 
 export interface FailureFeedbackData {

@@ -60,6 +60,15 @@ inputs:
     description: "Version of Junie to use"
     required: false
     default: "1831.35"
+  code_review_feedback_api_base_url:
+    description: >
+      junie-cloud BFF base URL for the code-review feedback create-link API.
+      After a code review, the action POSTs here with the Junie API key; the BFF
+      checks JUNP (EAP) and returns a signed feedback URL for the PR comment, or 403 if not applicable.
+      Defaults to production — omit in prod workflows. Override only for staging (e.g.
+      https://junie-kitty-external.labs.jb.gg/api/public/no-auth).
+    required: false
+    default: "https://junie.jetbrains.com/api/public/no-auth"
   model:
     description: "Model to use for the primary agent"
     required: false
@@ -133,6 +142,12 @@ outputs:
   junie_summary:
     description: "Summary of the changes made by Junie"
     value: ${{ steps.junie-run-results.outputs.JUNIE_SUMMARY }}
+  junie_session_id:
+    description: "Junie session ID from CLI output (for analytics correlation)"
+    value: ${{ steps.junie-run-results.outputs.JUNIE_SESSION_ID }}
+  code_review_feedback_link:
+    description: "Signed feedback link for EAP code review runs (JUNP only)"
+    value: ${{ steps.junie-run-results.outputs.CODE_REVIEW_FEEDBACK_LINK }}
   github_token:
     description: "The GitHub token used by the action"
     value: ${{ steps.prepare.outputs.EJ_AUTH_GITHUB_TOKEN }}
@@ -315,6 +330,8 @@ runs:
         BASE_BRANCH: ${{ steps.prepare.outputs.BASE_BRANCH }}
         IS_NEW_BRANCH: ${{ steps.prepare.outputs.IS_NEW_BRANCH }}
         WORKING_DIR: ${{ inputs.junie_work_dir }}
+        APP_TOKEN: ${{ inputs.junie_api_key }}
+        CODE_REVIEW_FEEDBACK_API_BASE_URL: ${{ inputs.code_review_feedback_api_base_url }}
 
     - name: Upload Junie artifacts
       if: always() && steps.prepare.outputs.SHOULD_SKIP != 'true'
@@ -381,6 +398,7 @@ runs:
         JUNIE_TITLE: ${{ steps.junie-run-results.outputs.JUNIE_TITLE }}
         JUNIE_SUMMARY: ${{ steps.junie-run-results.outputs.JUNIE_SUMMARY }}
         JUNIE_DURATION_MS: ${{ steps.junie-run-results.outputs.JUNIE_DURATION_MS }}
+        CODE_REVIEW_FEEDBACK_LINK: ${{ steps.junie-run-results.outputs.CODE_REVIEW_FEEDBACK_LINK }}
         JIRA_BASE_URL: ${{ inputs.jira_base_url }}
         JIRA_EMAIL: ${{ inputs.jira_email }}
         JIRA_API_TOKEN: ${{ inputs.jira_api_token }}
@@ -406,6 +424,7 @@ runs:
         JUNIE_TITLE: ${{ steps.junie-run-results.outputs.JUNIE_TITLE }}
         JUNIE_SUMMARY: ${{ steps.junie-run-results.outputs.JUNIE_SUMMARY }}
         JUNIE_DURATION_MS: ${{ steps.junie-run-results.outputs.JUNIE_DURATION_MS }}
+        CODE_REVIEW_FEEDBACK_LINK: ${{ steps.junie-run-results.outputs.CODE_REVIEW_FEEDBACK_LINK }}
         JIRA_BASE_URL: ${{ inputs.jira_base_url }}
         JIRA_EMAIL: ${{ inputs.jira_email }}
         JIRA_API_TOKEN: ${{ inputs.jira_api_token }}

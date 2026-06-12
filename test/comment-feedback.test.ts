@@ -477,6 +477,28 @@ describe("Comment Feedback Operations", () => {
       });
     });
 
+    test("should append EAP feedback link for WRITE_COMMENT when provided", async () => {
+      const data: FinishFeedbackData = {
+        ...baseFinishData,
+        isJobFailed: false,
+        successData: {
+          actionToDo: "WRITE_COMMENT",
+          junieTitle: "Analysis complete",
+          junieSummary: "Here are my findings...",
+          codeReviewFeedbackLink: "https://junie.example.com/code-review-feedback?token=abc",
+        },
+      };
+
+      await postJunieCompletionComment(mockOctokit, data);
+
+      expect(updateCommentSpy).toHaveBeenCalledWith({
+        owner: "test-owner",
+        repo: "test-repo",
+        comment_id: 12345,
+        body: expect.stringContaining("https://junie.example.com/code-review-feedback?token=abc"),
+      });
+    });
+
     test("should update comment with failure message", async () => {
       const data: FinishFeedbackData = {
         ...baseFinishData,

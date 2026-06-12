@@ -102,6 +102,12 @@ export interface MockContextOverrides {
 }
 
 export const createMockContext = (overrides: MockContextOverrides = {}): JunieExecutionContext => {
+    const payload = overrides.payload || ({
+        action: "created",
+        repository: defaultRepository,
+        sender: mockSender,
+    } as any);
+
     return {
         runId: "1234567890",
         workflow: "Test Workflow",
@@ -116,11 +122,7 @@ export const createMockContext = (overrides: MockContextOverrides = {}): JunieEx
             ...defaultInputs,
             ...overrides.inputs,
         },
-        payload: overrides.payload || ({
-            action: "created",
-            repository: defaultRepository,
-            sender: mockSender,
-        } as any),
+        payload,
     };
 };
 

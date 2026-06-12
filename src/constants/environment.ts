@@ -42,6 +42,7 @@ export const ENV_VARS = {
     COMMIT_SHA: "COMMIT_SHA",
     PR_LINK: "PR_LINK",
     WORKING_DIR: "WORKING_DIR",
+    CODE_REVIEW_FEEDBACK_API_BASE_URL: "CODE_REVIEW_FEEDBACK_API_BASE_URL",
 } as const;
 
 // ============================================================================
@@ -87,6 +88,8 @@ export const OUTPUT_VARS = {
     JUNIE_TITLE: "JUNIE_TITLE",
     JUNIE_SUMMARY: "JUNIE_SUMMARY",
     JUNIE_DURATION_MS: "JUNIE_DURATION_MS",
+    JUNIE_SESSION_ID: "JUNIE_SESSION_ID",
+    CODE_REVIEW_FEEDBACK_LINK: "CODE_REVIEW_FEEDBACK_LINK",
 
     // Commit and PR information
     COMMIT_MESSAGE: "COMMIT_MESSAGE",

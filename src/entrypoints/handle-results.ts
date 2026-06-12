@@ -10,6 +10,8 @@ import {handleStepError} from "../utils/error-handler";
 import {isReviewOrCommentHasResolveConflictsTrigger} from "../github/validation/trigger";
 import {sanitizeJunieOutput, truncateOutput, OUTPUT_SIZE_LIMITS} from "../utils/sanitizer";
 import * as fs from "node:fs";
+import type {CliOutput} from "../github/junie/types/junie";
+import {fetchCodeReviewFeedbackLink} from "../utils/code-review-feedback-link";
 
 export enum ActionType {
     WRITE_COMMENT = 'WRITE_COMMENT',
@@ -58,8 +60,9 @@ export async function handleResults() {
                 `Please check the Junie execution logs above for details.`
             );
         }
-        const junieJsonOutput = JSON.parse(stringJunieJsonOutput) as any
+        const junieJsonOutput = JSON.parse(stringJunieJsonOutput) as CliOutput
         const durationMs = junieJsonOutput.duration_ms;
+        const sessionId = junieJsonOutput.sessionId;
         const context = JSON.parse(process.env[OUTPUT_VARS.PARSED_CONTEXT]!) as JunieExecutionContext
         const isResolveConflict = context.inputs.resolveConflicts || isReviewOrCommentHasResolveConflictsTrigger(context)
         const junieErrors = junieJsonOutput.errors
@@ -80,6 +83,8 @@ export async function handleResults() {
             );
         }
         const actionToDo = await getActionToDo(context);
+        exportJunieSessionOutputs(sessionId);
+        await exportCodeReviewFeedbackLink(context, sessionId, actionToDo);
         // Sanitize Junie's output to prevent token leakage and self-triggering
         const rawTitle = junieJsonOutput.taskName || (isResolveConflict ? `Resolve conflicts for ${context.entityNumber} PR` : 'Junie finished task successfully')
         const rawBody = junieJsonOutput.result
@@ -230,6 +235,47 @@ async function checkForUnpushedCommits(isNewBranch: boolean, baseBranch: string)
         // If we can't check at all, assume there are no unpushed commits
         return false;
     }
+}
+
+function exportJunieSessionOutputs(sessionId: string | undefined): void {
+    if (sessionId) {
+        core.setOutput(OUTPUT_VARS.JUNIE_SESSION_ID, sessionId);
+    }
+}
+
+function exportCodeReviewFeedbackLink(
+    context: JunieExecutionContext,
+    sessionId: string | undefined,
+    actionToDo: ActionType,
+): Promise<void> {
+    if (
+        actionToDo !== ActionType.WRITE_COMMENT ||
+        !isCodeReviewEvent(context) ||
+        !sessionId
+    ) {
+        return Promise.resolve();
+    }
+
+    const apiToken = process.env[ENV_VARS.APP_TOKEN];
+    const prNumber = context.entityNumber;
+    const runId = Number(process.env[ENV_VARS.GITHUB_RUN_ID]);
+
+    if (!apiToken || !prNumber || !Number.isFinite(runId)) {
+        console.log('Skipping code review feedback link: missing API token, PR number, or run id');
+        return Promise.resolve();
+    }
+
+    return fetchCodeReviewFeedbackLink({
+        sessionId,
+        repository: context.payload.repository.full_name,
+        prNumber,
+        runId,
+        apiToken,
+    }, process.env[ENV_VARS.CODE_REVIEW_FEEDBACK_API_BASE_URL]).then(feedbackLink => {
+        if (feedbackLink) {
+            core.setOutput(OUTPUT_VARS.CODE_REVIEW_FEEDBACK_LINK, feedbackLink);
+        }
+    });
 }
 
 function exportResultsOutputs(junieTitle: string,
