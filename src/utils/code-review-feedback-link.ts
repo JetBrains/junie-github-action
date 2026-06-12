@@ -1,4 +1,4 @@
-/** Default junie-cloud BFF URL for code review feedback (production). */
+/** Production junie-cloud BFF URL for code-review feedback create-link. Used when the workflow input / env is unset. */
 export const DEFAULT_CODE_REVIEW_FEEDBACK_API_BASE_URL =
     'https://junie.jetbrains.com/api/public/no-auth';
 

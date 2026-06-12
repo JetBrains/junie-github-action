@@ -61,12 +61,14 @@ inputs:
     required: false
     default: "1831.35"
   code_review_feedback_api_base_url:
-    description: "junie-cloud BFF base URL for code review feedback create-link API"
+    description: >
+      junie-cloud BFF base URL for the code-review feedback create-link API.
+      After a code review, the action POSTs here with the Junie API key; the BFF
+      checks JUNP (EAP) and returns a signed feedback URL for the PR comment, or 403 if not applicable.
+      Defaults to production — omit in prod workflows. Override only for staging (e.g.
+      https://junie-kitty-external.labs.jb.gg/api/public/no-auth).
     required: false
     default: "https://junie.jetbrains.com/api/public/no-auth"
-  code_review_feedback_api_token:
-    description: "Optional separate Junie API key for create-link only (e.g. staging JUNP token when CLI uses prod)"
-    required: false
   model:
     description: "Model to use for the primary agent"
     required: false
@@ -330,7 +332,6 @@ runs:
         WORKING_DIR: ${{ inputs.junie_work_dir }}
         APP_TOKEN: ${{ inputs.junie_api_key }}
         CODE_REVIEW_FEEDBACK_API_BASE_URL: ${{ inputs.code_review_feedback_api_base_url }}
-        CODE_REVIEW_FEEDBACK_API_TOKEN: ${{ inputs.code_review_feedback_api_token }}
 
     - name: Upload Junie artifacts
       if: always() && steps.prepare.outputs.SHOULD_SKIP != 'true'
