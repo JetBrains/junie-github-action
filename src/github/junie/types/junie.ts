@@ -24,7 +24,6 @@ export interface CliOutput {
     taskName?: string;
     result?: string;
     duration_ms?: number;
-    licenseType?: string;
 }
 
 export interface CliInput {

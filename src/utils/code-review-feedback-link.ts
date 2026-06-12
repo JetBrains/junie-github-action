@@ -29,10 +29,6 @@ function buildAuthorizationHeader(apiToken: string): string {
     return `Bearer ${trimmed}`;
 }
 
-export function isJunieEap(licenseType?: string): boolean {
-    return licenseType === 'JUNP';
-}
-
 export async function fetchCodeReviewFeedbackLink(
     params: FetchCodeReviewFeedbackLinkParams,
     apiBaseUrl?: string,
@@ -54,7 +50,14 @@ export async function fetchCodeReviewFeedbackLink(
         });
 
         if (!response.ok) {
-            console.log(`Skipping code review feedback link: junie-cloud returned ${response.status}`);
+            if (response.status === 403) {
+                console.log(
+                    `Skipping code review feedback link: not available for this license (junie-cloud returned ${response.status}). ` +
+                    'This is expected for non-EAP (non-JUNP) licenses and is not a backend error.',
+                );
+            } else {
+                console.log(`Skipping code review feedback link: junie-cloud returned ${response.status}`);
+            }
             return undefined;
         }
 

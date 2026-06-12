@@ -63,7 +63,6 @@ export async function handleResults() {
         const junieJsonOutput = JSON.parse(stringJunieJsonOutput) as CliOutput
         const durationMs = junieJsonOutput.duration_ms;
         const sessionId = junieJsonOutput.sessionId;
-        const licenseType = junieJsonOutput.licenseType;
         const context = JSON.parse(process.env[OUTPUT_VARS.PARSED_CONTEXT]!) as JunieExecutionContext
         const isResolveConflict = context.inputs.resolveConflicts || isReviewOrCommentHasResolveConflictsTrigger(context)
         const junieErrors = junieJsonOutput.errors
@@ -84,7 +83,7 @@ export async function handleResults() {
             );
         }
         const actionToDo = await getActionToDo(context);
-        exportJunieSessionOutputs(sessionId, licenseType);
+        exportJunieSessionOutputs(sessionId);
         await exportCodeReviewFeedbackLink(context, sessionId, actionToDo);
         // Sanitize Junie's output to prevent token leakage and self-triggering
         const rawTitle = junieJsonOutput.taskName || (isResolveConflict ? `Resolve conflicts for ${context.entityNumber} PR` : 'Junie finished task successfully')
@@ -238,15 +237,9 @@ async function checkForUnpushedCommits(isNewBranch: boolean, baseBranch: string)
     }
 }
 
-function exportJunieSessionOutputs(
-    sessionId: string | undefined,
-    licenseType: string | undefined,
-): void {
+function exportJunieSessionOutputs(sessionId: string | undefined): void {
     if (sessionId) {
         core.setOutput(OUTPUT_VARS.JUNIE_SESSION_ID, sessionId);
-    }
-    if (licenseType) {
-        core.setOutput(OUTPUT_VARS.JUNIE_LICENSE_TYPE, licenseType);
     }
 }
 
@@ -255,7 +248,6 @@ function exportCodeReviewFeedbackLink(
     sessionId: string | undefined,
     actionToDo: ActionType,
 ): Promise<void> {
-    // Early JUNP skip via licenseType + isJunieEap() disabled until CLI with licenseType is released.
     if (
         actionToDo !== ActionType.WRITE_COMMENT ||
         !isCodeReviewEvent(context) ||

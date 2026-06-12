@@ -2,7 +2,6 @@ import { describe, expect, mock, test } from 'bun:test';
 import {
     DEFAULT_CODE_REVIEW_FEEDBACK_API_BASE_URL,
     fetchCodeReviewFeedbackLink,
-    isJunieEap,
     resolveCodeReviewFeedbackApiBaseUrl,
 } from '../src/utils/code-review-feedback-link';
 
@@ -11,13 +10,6 @@ describe('code-review-feedback-link', () => {
         expect(resolveCodeReviewFeedbackApiBaseUrl()).toBe(DEFAULT_CODE_REVIEW_FEEDBACK_API_BASE_URL);
         expect(resolveCodeReviewFeedbackApiBaseUrl('https://junie-kitty.labs.jb.gg/api/public/no-auth/'))
             .toBe('https://junie-kitty.labs.jb.gg/api/public/no-auth');
-    });
-
-    test('isJunieEap accepts only JUNP', () => {
-        expect(isJunieEap('JUNP')).toBe(true);
-        expect(isJunieEap('TRIAL')).toBe(false);
-        expect(isJunieEap('AIP')).toBe(false);
-        expect(isJunieEap(undefined)).toBe(false);
     });
 
     test('fetchCodeReviewFeedbackLink returns link from junie-cloud BFF', async () => {
