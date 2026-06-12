@@ -83,8 +83,7 @@ export async function prepareJunieTask(
             const diffCommand = `git diff origin/${diffPoint}...`;
             junieCLITask.codeReviewTask = {
                 description: promptText,
-                diffCommand,
-                generateSummary: true
+                diffCommand
             }
         } else {
             junieCLITask.task = promptText;

@@ -16,7 +16,6 @@ export interface MergeTask {
 export interface CodeReview {
     description?: string;
     diffCommand?: string;
-    generateSummary?: boolean;
 }
 
 export interface CliInput {
