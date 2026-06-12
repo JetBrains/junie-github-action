@@ -256,11 +256,13 @@ function exportCodeReviewFeedbackLink(
         return Promise.resolve();
     }
 
-    const apiToken = process.env[ENV_VARS.APP_TOKEN];
+    const feedbackApiToken =
+        process.env[ENV_VARS.CODE_REVIEW_FEEDBACK_API_TOKEN]?.trim()
+        || process.env[ENV_VARS.APP_TOKEN];
     const prNumber = context.entityNumber;
     const runId = Number(process.env[ENV_VARS.GITHUB_RUN_ID]);
 
-    if (!apiToken || !prNumber || !Number.isFinite(runId)) {
+    if (!feedbackApiToken || !prNumber || !Number.isFinite(runId)) {
         console.log('Skipping code review feedback link: missing API token, PR number, or run id');
         return Promise.resolve();
     }
@@ -270,7 +272,7 @@ function exportCodeReviewFeedbackLink(
         repository: context.payload.repository.full_name,
         prNumber,
         runId,
-        apiToken,
+        apiToken: feedbackApiToken,
     }, process.env[ENV_VARS.CODE_REVIEW_FEEDBACK_API_BASE_URL]).then(feedbackLink => {
         if (feedbackLink) {
             core.setOutput(OUTPUT_VARS.CODE_REVIEW_FEEDBACK_LINK, feedbackLink);
