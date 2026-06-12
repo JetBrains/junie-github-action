@@ -203,10 +203,20 @@ export function truncateOutput(content: string | undefined, maxLength: number): 
 }
 
 /**
+ * Strips XML tags from Junie's output
+ * Removes tags like <review>, <summary>, </review>, etc.
+ * while preserving the text content inside them
+ */
+function stripXmlTags(content: string): string {
+    return content.replace(/<\/?[a-zA-Z][a-zA-Z0-9_-]*(?:\s[^>]*)?\/?>\n?/g, "");
+}
+
+/**
  * Lightweight sanitization for Junie's output before posting to GitHub
  * Prevents:
  * - Token leakage (Junie accidentally exposing GitHub tokens)
  * - Self-triggering (Junie mentioning trigger phrase in output)
+ * Also strips XML tags from the output
  */
 export function sanitizeJunieOutput(
     content: string | undefined,
@@ -216,7 +226,8 @@ export function sanitizeJunieOutput(
         return "";
     }
 
-    let sanitized =  redactGitHubTokens(content);
+    let sanitized = stripXmlTags(content);
+    sanitized = redactGitHubTokens(sanitized);
 
     // Replace trigger phrase with neutral term to prevent self-triggering
     // Uses the same word-boundary pattern as trigger detection to avoid replacing inside words
