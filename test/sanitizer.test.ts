@@ -303,6 +303,54 @@ Thanks!
             });
         });
 
+        describe("XML tag stripping", () => {
+            test("removes opening XML tags", () => {
+                const input = "<review>\nThis is the review content.\n</review>";
+                const output = sanitizeJunieOutput(input, "@junie-agent");
+                expect(output).toBe("This is the review content.\n");
+                expect(output).not.toContain("<review>");
+                expect(output).not.toContain("</review>");
+            });
+
+            test("removes self-closing XML tags", () => {
+                const input = "Content before <br/> content after";
+                const output = sanitizeJunieOutput(input, "@junie-agent");
+                expect(output).not.toContain("<br/>");
+                expect(output).toContain("Content before");
+                expect(output).toContain("content after");
+            });
+
+            test("removes XML tags with attributes", () => {
+                const input = '<summary type="brief">This is a summary.</summary>';
+                const output = sanitizeJunieOutput(input, "@junie-agent");
+                expect(output).not.toContain("<summary");
+                expect(output).not.toContain("</summary>");
+                expect(output).toContain("This is a summary.");
+            });
+
+            test("removes multiple different XML tags", () => {
+                const input = "<review>\n<summary>Overview here.</summary>\n<details>More details.</details>\n</review>";
+                const output = sanitizeJunieOutput(input, "@junie-agent");
+                expect(output).not.toContain("<review>");
+                expect(output).not.toContain("<summary>");
+                expect(output).not.toContain("<details>");
+                expect(output).toContain("Overview here.");
+                expect(output).toContain("More details.");
+            });
+
+            test("preserves content between XML tags", () => {
+                const input = "<code_review>\nGreat changes! The code looks clean.\n</code_review>";
+                const output = sanitizeJunieOutput(input, "@junie-agent");
+                expect(output).toContain("Great changes! The code looks clean.");
+            });
+
+            test("preserves content without XML tags unchanged", () => {
+                const input = "This is plain text without any tags.";
+                const output = sanitizeJunieOutput(input, "@junie-agent");
+                expect(output).toBe(input);
+            });
+        });
+
         describe("Edge cases", () => {
             test("handles undefined input", () => {
                 const output = sanitizeJunieOutput(undefined, "@junie-agent");
