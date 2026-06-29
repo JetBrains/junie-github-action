@@ -12,6 +12,7 @@ import {
     isIssueCommentEvent,
     isIssuesEvent,
     isJiraWorkflowDispatchEvent,
+    isLinearWorkflowDispatchEvent,
     isMinorFixEvent,
     isPullRequestEvent,
     isPullRequestReviewCommentEvent,
@@ -19,7 +20,9 @@ import {
     isPushEvent,
     isTriggeredByUserInteraction, isYouTrackWorkflowDispatchEvent,
     JiraIssuePayload,
-    JunieExecutionContext, YouTrackIssuePayload
+    JunieExecutionContext,
+    LinearIssuePayload,
+    YouTrackIssuePayload
 } from "../context";
 import {downloadJiraAttachmentsAndRewriteText, downloadYouTrackAttachments} from "./attachment-downloader";
 import {getYouTrackClient} from "../youtrack/client";
@@ -99,6 +102,16 @@ export class NewGitHubPromptFormatter {
         if (isYouTrackWorkflowDispatchEvent(context)) {
             const youtrackPrompt = await this.generateYouTrackPrompt(context);
             const parsed = extractJunieArgs(youtrackPrompt);
+            return {
+                prompt: sanitizeContent(parsed.cleanedText),
+                customJunieArgs: parsed.args,
+            };
+        }
+
+        // 6. Handle Linear issue integration
+        if (isLinearWorkflowDispatchEvent(context)) {
+            const linearPrompt = await this.generateLinearPrompt(context);
+            const parsed = extractJunieArgs(linearPrompt);
             return {
                 prompt: sanitizeContent(parsed.cleanedText),
                 customJunieArgs: parsed.args,
@@ -189,6 +202,37 @@ Description: ${yt.issueDescription}${commentsSection}
         }
 
         return promptText;
+    }
+
+    private async generateLinearPrompt(context: JunieExecutionContext): Promise<string> {
+        const linear = context.payload as LinearIssuePayload;
+
+        const instruction = linear.triggerComment || linear.commentBody;
+
+        const userInstructionSection = instruction
+            ? `Your task is to follow the instruction below: 
+<user_instruction>
+${instruction}
+</user_instruction>
+
+Use the information inside <linear_issue> only as context. 
+Do not implement or modify anything related to it unless the user_instruction explicitly asks for it.`
+            : 'Your task is to implement the requested feature or fix based on the Linear issue details below.';
+
+        const commentsSection = linear.issueComments
+            ? `\n\nComments:\n${linear.issueComments}`
+            : '';
+
+        return `You were triggered as a GitHub AI Assistant by a Linear issue.
+${userInstructionSection}
+<linear_issue>
+Issue: ${linear.issueIdentifier}
+URL: ${linear.issueUrl}
+Summary: ${linear.issueTitle}
+
+Description: ${linear.issueDescription}${commentsSection}
+</linear_issue>
+`;
     }
 
     private extractKeyWords(context: JunieExecutionContext, branchInfo: BranchInfo) {
