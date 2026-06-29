@@ -1,0 +1,39 @@
+name: Junie App Review (test)
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    branches: [main]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write
+      issues: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Get GitHub App token from bridge
+        id: app-token
+        run: |
+          OIDC_TOKEN=$(curl -s "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=github-app-token-bridge" \
+            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" | jq -r .value)
+
+          APP_TOKEN=$(curl -s -X POST "https://github-app-token-bridge.mariia-fadeeva.workers.dev/token" \
+            -H "Authorization: Bearer $OIDC_TOKEN" | jq -r .token)
+
+          echo "::add-mask::$APP_TOKEN"
+          echo "token=$APP_TOKEN" >> "$GITHUB_OUTPUT"
+
+      - uses: JetBrains/junie-github-action@main
+        with:
+          junie_api_key: ${{ secrets.JUNIE_API_KEY }}
+          use_single_comment: "true"
+          prompt: "code-review"
+          custom_github_token: ${{ steps.app-token.outputs.token }}
