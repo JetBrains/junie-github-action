@@ -59,7 +59,7 @@ inputs:
   junie_version:
     description: "Version of Junie to use"
     required: false
-    default: "2206.3"
+    default: "2144.8"
   code_review_feedback_api_base_url:
     description: >
       junie-cloud BFF base URL for the code-review feedback create-link API.
