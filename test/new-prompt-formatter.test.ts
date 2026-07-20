@@ -558,6 +558,253 @@ describe("NewGitHubPromptFormatter", () => {
         expect(firstThreadReplyPos).toBeLessThan(secondThreadRootPos);
     });
 
+    test("generatePrompt annotates resolved review threads", async () => {
+        const context = createMockContext();
+        const fetchedData: FetchedData = {
+            pullRequest: {
+                ...createMockPR(),
+                reviews: {
+                    nodes: [
+                        {
+                            id: "review1",
+                            databaseId: 1,
+                            author: {login: "reviewer"},
+                            body: "",
+                            bodyHTML: "",
+                            state: "COMMENTED",
+                            submittedAt: "2024-01-03T00:00:00Z",
+                            lastEditedAt: null,
+                            url: "https://github.com/test/test/pull/1#pullrequestreview-1",
+                            comments: {
+                                nodes: [
+                                    {
+                                        id: "comment1",
+                                        databaseId: 100,
+                                        body: "This should be fixed",
+                                        bodyHTML: "<p>This should be fixed</p>",
+                                        path: "src/resolved-file.ts",
+                                        position: 5,
+                                        diffHunk: "@@ -1,3 +1,5 @@",
+                                        author: {login: "reviewer"},
+                                        createdAt: "2024-01-03T10:00:00Z",
+                                        lastEditedAt: null,
+                                        url: "https://github.com/test/test/pull/1#discussion_r100",
+                                        replyTo: null
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                },
+                reviewThreads: {
+                    nodes: [
+                        {
+                            id: "thread1",
+                            isResolved: true,
+                            isCollapsed: false,
+                            isOutdated: false,
+                            resolvedBy: {login: "author"},
+                            comments: {
+                                nodes: [{id: "comment1", databaseId: 100}]
+                            }
+                        }
+                    ]
+                }
+            }
+        };
+
+        const result = await formatter.generatePrompt(context, fetchedData, createMockBranchInfo());
+
+        expect(result.prompt).toContain("[RESOLVED by @author]");
+        expect(result.prompt).toContain("src/resolved-file.ts");
+        expect(result.prompt).not.toContain("[OUTDATED]");
+    });
+
+    test("generatePrompt annotates outdated review threads", async () => {
+        const context = createMockContext();
+        const fetchedData: FetchedData = {
+            pullRequest: {
+                ...createMockPR(),
+                reviews: {
+                    nodes: [
+                        {
+                            id: "review1",
+                            databaseId: 1,
+                            author: {login: "reviewer"},
+                            body: "",
+                            bodyHTML: "",
+                            state: "COMMENTED",
+                            submittedAt: "2024-01-03T00:00:00Z",
+                            lastEditedAt: null,
+                            url: "https://github.com/test/test/pull/1#pullrequestreview-1",
+                            comments: {
+                                nodes: [
+                                    {
+                                        id: "comment1",
+                                        databaseId: 200,
+                                        body: "Old comment on changed code",
+                                        bodyHTML: "<p>Old comment on changed code</p>",
+                                        path: "src/outdated-file.ts",
+                                        position: 3,
+                                        diffHunk: "@@ -1,3 +1,5 @@",
+                                        author: {login: "reviewer"},
+                                        createdAt: "2024-01-03T10:00:00Z",
+                                        lastEditedAt: null,
+                                        url: "https://github.com/test/test/pull/1#discussion_r200",
+                                        replyTo: null
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                },
+                reviewThreads: {
+                    nodes: [
+                        {
+                            id: "thread1",
+                            isResolved: false,
+                            isCollapsed: false,
+                            isOutdated: true,
+                            resolvedBy: null,
+                            comments: {
+                                nodes: [{id: "comment1", databaseId: 200}]
+                            }
+                        }
+                    ]
+                }
+            }
+        };
+
+        const result = await formatter.generatePrompt(context, fetchedData, createMockBranchInfo());
+
+        expect(result.prompt).toContain("[OUTDATED]");
+        expect(result.prompt).toContain("src/outdated-file.ts");
+        expect(result.prompt).not.toContain("[RESOLVED");
+    });
+
+    test("generatePrompt annotates resolved and outdated review threads together", async () => {
+        const context = createMockContext();
+        const fetchedData: FetchedData = {
+            pullRequest: {
+                ...createMockPR(),
+                reviews: {
+                    nodes: [
+                        {
+                            id: "review1",
+                            databaseId: 1,
+                            author: {login: "reviewer"},
+                            body: "",
+                            bodyHTML: "",
+                            state: "COMMENTED",
+                            submittedAt: "2024-01-03T00:00:00Z",
+                            lastEditedAt: null,
+                            url: "https://github.com/test/test/pull/1#pullrequestreview-1",
+                            comments: {
+                                nodes: [
+                                    {
+                                        id: "comment1",
+                                        databaseId: 300,
+                                        body: "Resolved and outdated comment",
+                                        bodyHTML: "<p>Resolved and outdated comment</p>",
+                                        path: "src/both-file.ts",
+                                        position: 7,
+                                        diffHunk: "@@ -1,3 +1,5 @@",
+                                        author: {login: "reviewer"},
+                                        createdAt: "2024-01-03T10:00:00Z",
+                                        lastEditedAt: null,
+                                        url: "https://github.com/test/test/pull/1#discussion_r300",
+                                        replyTo: null
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                },
+                reviewThreads: {
+                    nodes: [
+                        {
+                            id: "thread1",
+                            isResolved: true,
+                            isCollapsed: false,
+                            isOutdated: true,
+                            resolvedBy: {login: "resolver"},
+                            comments: {
+                                nodes: [{id: "comment1", databaseId: 300}]
+                            }
+                        }
+                    ]
+                }
+            }
+        };
+
+        const result = await formatter.generatePrompt(context, fetchedData, createMockBranchInfo());
+
+        expect(result.prompt).toContain("[RESOLVED by @resolver]");
+        expect(result.prompt).toContain("[OUTDATED]");
+    });
+
+    test("generatePrompt does not annotate unresolved active threads", async () => {
+        const context = createMockContext();
+        const fetchedData: FetchedData = {
+            pullRequest: {
+                ...createMockPR(),
+                reviews: {
+                    nodes: [
+                        {
+                            id: "review1",
+                            databaseId: 1,
+                            author: {login: "reviewer"},
+                            body: "",
+                            bodyHTML: "",
+                            state: "COMMENTED",
+                            submittedAt: "2024-01-03T00:00:00Z",
+                            lastEditedAt: null,
+                            url: "https://github.com/test/test/pull/1#pullrequestreview-1",
+                            comments: {
+                                nodes: [
+                                    {
+                                        id: "comment1",
+                                        databaseId: 400,
+                                        body: "Active unresolved comment",
+                                        bodyHTML: "<p>Active unresolved comment</p>",
+                                        path: "src/active-file.ts",
+                                        position: 1,
+                                        diffHunk: "@@ -1,3 +1,5 @@",
+                                        author: {login: "reviewer"},
+                                        createdAt: "2024-01-03T10:00:00Z",
+                                        lastEditedAt: null,
+                                        url: "https://github.com/test/test/pull/1#discussion_r400",
+                                        replyTo: null
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                },
+                reviewThreads: {
+                    nodes: [
+                        {
+                            id: "thread1",
+                            isResolved: false,
+                            isCollapsed: false,
+                            isOutdated: false,
+                            resolvedBy: null,
+                            comments: {
+                                nodes: [{id: "comment1", databaseId: 400}]
+                            }
+                        }
+                    ]
+                }
+            }
+        };
+
+        const result = await formatter.generatePrompt(context, fetchedData, createMockBranchInfo());
+
+        expect(result.prompt).not.toContain("[RESOLVED");
+        expect(result.prompt).not.toContain("[OUTDATED]");
+        expect(result.prompt).toContain("Active unresolved comment");
+    });
+
     describe("junie-args extraction", () => {
         test("should extract junie-args from custom prompt", async () => {
             const context = createMockContext({
