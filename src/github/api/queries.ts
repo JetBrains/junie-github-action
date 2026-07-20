@@ -104,6 +104,25 @@ export const PULL_REQUEST_QUERY = `
             }
           }
         }
+
+        # Review threads with resolution status
+        reviewThreads(first: 100) {
+          nodes {
+            id
+            isResolved
+            isCollapsed
+            isOutdated
+            resolvedBy {
+              login
+            }
+            comments(first: 10) {
+              nodes {
+                id
+                databaseId
+              }
+            }
+          }
+        }
       }
     }
   }
@@ -236,6 +255,21 @@ export interface GraphQLReviews {
     nodes: GraphQLReviewNode[];
 }
 
+export interface GraphQLReviewThreadNode {
+    id: string;
+    isResolved: boolean;
+    isCollapsed: boolean;
+    isOutdated: boolean;
+    resolvedBy: GraphQLUser | null;
+    comments: {
+        nodes: { id: string; databaseId: number }[];
+    };
+}
+
+export interface GraphQLReviewThreads {
+    nodes: GraphQLReviewThreadNode[];
+}
+
 export interface GraphQLPullRequest {
     number: number;
     title: string;
@@ -258,6 +292,7 @@ export interface GraphQLPullRequest {
     files: GraphQLFiles;
     timelineItems: GraphQLTimelineItems;
     reviews: GraphQLReviews;
+    reviewThreads?: GraphQLReviewThreads;
 }
 
 export interface GraphQLIssue {

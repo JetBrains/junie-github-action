@@ -4,6 +4,7 @@ import {
     GraphQLFileNode,
     GraphQLReviewCommentNode,
     GraphQLReviewNode,
+    GraphQLReviewThreadNode,
     GraphQLTimelineItemNode
 } from "../api/queries";
 import {
@@ -468,15 +469,16 @@ ${body}`;
             return undefined;
         }
 
-        const reviewsInfo = this.formatReviews(reviews);
+        const reviewThreads = fetchedData.pullRequest?.reviewThreads?.nodes;
+        const reviewsInfo = this.formatReviews(reviews, reviewThreads);
         return reviewsInfo ? `<reviews>${reviewsInfo}</reviews>` : undefined
     }
 
-    private formatReviews(reviews: GraphQLReviewNode[]): string {
+    private formatReviews(reviews: GraphQLReviewNode[], reviewThreads?: GraphQLReviewThreadNode[]): string {
         const reviewTexts: string[] = [];
 
         for (const review of reviews) {
-            const reviewText = this.formatReview(review);
+            const reviewText = this.formatReview(review, reviewThreads);
             if (reviewText.trim()) {
                 reviewTexts.push(reviewText);
             }
@@ -489,7 +491,7 @@ ${body}`;
         return reviewTexts.join('\n\n---\n\n');
     }
 
-    private formatReview(review: GraphQLReviewNode): string {
+    private formatReview(review: GraphQLReviewNode, reviewThreads?: GraphQLReviewThreadNode[]): string {
         const author = review.author?.login;
         const state = review.state;
         const submittedAt = review.submittedAt;
@@ -503,7 +505,7 @@ ${body}`;
 
         if (review.comments.nodes.length > 0) {
             reviewText += '\n\nReview Comments:';
-            reviewText += this.formatReviewCommentsWithThreads(review.comments.nodes);
+            reviewText += this.formatReviewCommentsWithThreads(review.comments.nodes, reviewThreads);
         }
 
         return reviewText;
@@ -512,7 +514,7 @@ ${body}`;
     /**
      * Formats review comments as a tree structure, showing reply threads
      */
-    private formatReviewCommentsWithThreads(comments: GraphQLReviewCommentNode[]): string {
+    private formatReviewCommentsWithThreads(comments: GraphQLReviewCommentNode[], reviewThreads?: GraphQLReviewThreadNode[]): string {
         // Find root comments (those that are not replies)
         const rootComments = comments.filter(c => !c.replyTo);
 
@@ -523,7 +525,7 @@ ${body}`;
 
         let result = '';
         for (const rootComment of sortedRoots) {
-            result += this.formatCommentThread(rootComment, comments, 0);
+            result += this.formatCommentThread(rootComment, comments, 0, reviewThreads);
         }
 
         return result;
@@ -535,7 +537,8 @@ ${body}`;
     private formatCommentThread(
         comment: GraphQLReviewCommentNode,
         allComments: GraphQLReviewCommentNode[],
-        depth: number
+        depth: number,
+        reviewThreads?: GraphQLReviewThreadNode[]
     ): string {
         const indent = '  '.repeat(depth);
         const commentAuthor = comment.author?.login;
@@ -551,6 +554,17 @@ ${body}`;
             if (position !== null) {
                 result += ` (position: ${position})`;
             }
+
+            // Annotate thread resolution status
+            const threadInfo = this.findReviewThreadForComment(comment, reviewThreads);
+            if (threadInfo?.isResolved) {
+                const resolvedBy = threadInfo.resolvedBy?.login;
+                result += resolvedBy ? ` [RESOLVED by @${resolvedBy}]` : ` [RESOLVED]`;
+            }
+            if (threadInfo?.isOutdated) {
+                result += ` [OUTDATED]`;
+            }
+
             result += ':';
         }
 
@@ -565,10 +579,26 @@ ${body}`;
         );
 
         for (const reply of sortedReplies) {
-            result += this.formatCommentThread(reply, allComments, depth + 1);
+            result += this.formatCommentThread(reply, allComments, depth + 1, reviewThreads);
         }
 
         return result;
+    }
+
+    /**
+     * Finds the review thread that contains the given comment by matching databaseId
+     */
+    private findReviewThreadForComment(
+        comment: GraphQLReviewCommentNode,
+        reviewThreads?: GraphQLReviewThreadNode[]
+    ): GraphQLReviewThreadNode | undefined {
+        if (!reviewThreads) {
+            return undefined;
+        }
+
+        return reviewThreads.find(thread =>
+            thread.comments.nodes.some(c => c.databaseId === comment.databaseId)
+        );
     }
 
     private getChangedFilesInfo(fetchedData: FetchedData): string | undefined {
