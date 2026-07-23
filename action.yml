@@ -99,6 +99,10 @@ inputs:
   youtrack_token:
     description: "YouTrack permanent token for API authentication (required for YouTrack integration)"
     required: false
+  # Linear integration configuration
+  linear_api_key:
+    description: "Linear personal API key"
+    required: false
 
   # Auth configuration
   junie_api_key:
@@ -237,6 +241,7 @@ runs:
         JIRA_EMAIL: ${{ inputs.jira_email }}
         JIRA_API_TOKEN: ${{ inputs.jira_api_token }}
         YOUTRACK_TOKEN: ${{ inputs.youtrack_token }}
+        LINEAR_API_KEY: ${{ inputs.linear_api_key }}
         ALL_INPUTS: ${{ toJson(inputs) }}
         OPENAI_API_KEY: ${{ inputs.openai_api_key }}
         ANTHROPIC_API_KEY: ${{ inputs.anthropic_api_key }}
@@ -403,8 +408,10 @@ runs:
         JIRA_EMAIL: ${{ inputs.jira_email }}
         JIRA_API_TOKEN: ${{ inputs.jira_api_token }}
         YOUTRACK_TOKEN: ${{ inputs.youtrack_token }}
+        LINEAR_API_KEY: ${{ inputs.linear_api_key }}
         YOUTRACK_INIT_COMMENT_ID: ${{ steps.prepare.outputs.YOUTRACK_INIT_COMMENT_ID }}
         JIRA_INIT_COMMENT_ID: ${{ steps.prepare.outputs.JIRA_INIT_COMMENT_ID }}
+        LINEAR_INIT_COMMENT_ID: ${{ steps.prepare.outputs.LINEAR_INIT_COMMENT_ID }}
 
     - name: Give feedback and update summary (failure)
       if: failure() && steps.prepare.outputs.SHOULD_SKIP != 'true' && inputs.skip_feedback != 'true'
@@ -429,6 +436,8 @@ runs:
         JIRA_EMAIL: ${{ inputs.jira_email }}
         JIRA_API_TOKEN: ${{ inputs.jira_api_token }}
         YOUTRACK_TOKEN: ${{ inputs.youtrack_token }}
+        LINEAR_API_KEY: ${{ inputs.linear_api_key }}
         YOUTRACK_INIT_COMMENT_ID: ${{ steps.prepare.outputs.YOUTRACK_INIT_COMMENT_ID }}
         JIRA_INIT_COMMENT_ID: ${{ steps.prepare.outputs.JIRA_INIT_COMMENT_ID }}
+        LINEAR_INIT_COMMENT_ID: ${{ steps.prepare.outputs.LINEAR_INIT_COMMENT_ID }}
         ERROR: ${{ steps.prepare.outputs.EXCEPTION || steps.junie-run-results.outputs.EXCEPTION }}
