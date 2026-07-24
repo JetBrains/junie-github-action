@@ -68,7 +68,8 @@ export async function initializeJunieExecution({
         try {
             console.log('Youtrack Payload: ', JSON.stringify(context.payload, null, 2));
             const client = getYouTrackClient(context.payload.youtrackBaseUrl);
-            const commentId = await client.addComment(context.payload.issueId, INIT_COMMENT_BODY);
+            // Restricted to jetbrains-team only: this is an internal status update, not meant for external reporters
+            const commentId = await client.addComment(context.payload.issueId, INIT_COMMENT_BODY, true);
             if (commentId) {
                 core.setOutput(OUTPUT_VARS.YOUTRACK_INIT_COMMENT_ID, commentId);
             }
