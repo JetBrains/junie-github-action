@@ -100,39 +100,53 @@ function stripHiddenAttributes(content: string): string {
 }
 
 /**
- * Normalize HTML entities to prevent obfuscation
- * Decodes &#72; (decimal) and &#x48; (hex) to actual characters
- * Only keeps printable ASCII characters (32-126)
+ * Normalize HTML entities to prevent obfuscation.
+ * Decodes:
+ * - numeric decimal entities (&#72; = 'H')
+ * - numeric hex entities, lowercase or uppercase (&#x48; / &#X48; = 'H')
+ * - common named entities (&lt; &gt; &amp; &quot; &apos;)
+ * Only printable ASCII (32-126) plus tab/LF/CR are kept for numeric entities, so
+ * legitimate formatting survives while non-printable obfuscation is dropped.
  */
 function normalizeHtmlEntities(content: string): string {
-    // Decode repeatedly until a fixed point is reached so that
-    // double-encoded payloads (e.g. &#38;#60; -> &#60; -> <) are fully resolved.
+    // Keep printable ASCII plus common whitespace (tab, LF, CR); drop the rest.
+    // Mirrors the characters preserved by stripInvisibleCharacters so that
+    // decoding entities never strips legitimate formatting.
+    const decodeCodePoint = (num: number): string =>
+        (num >= 32 && num <= 126) || num === 9 || num === 10 || num === 13
+            ? String.fromCharCode(num)
+            : "";
+
+    // Cap the number of decoding passes to avoid excessive work (denial of
+    // service) on pathological, deeply nested entity payloads.
+    const MAX_ITERATIONS = 10;
+
+    // Decode repeatedly until a fixed point (or the iteration cap) is reached so
+    // that double-encoded payloads (e.g. &#38;#60; -> &#60; -> <) are fully resolved.
     let previous: string;
+    let iterations = 0;
     do {
         previous = content;
 
         // Decode numeric decimal entities (&#72; = 'H')
-        content = content.replace(/&#(\d+);/g, (_, dec) => {
-            const num = parseInt(dec, 10);
-            // Only decode printable ASCII range
-            if (num >= 32 && num <= 126) {
-                return String.fromCharCode(num);
-            }
-            // Remove non-printable entities
-            return "";
-        });
+        content = content.replace(/&#(\d+);/g, (_, dec) => decodeCodePoint(parseInt(dec, 10)));
 
-        // Decode hex entities (&#x48; = 'H')
-        content = content.replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => {
-            const num = parseInt(hex, 16);
-            // Only decode printable ASCII range
-            if (num >= 32 && num <= 126) {
-                return String.fromCharCode(num);
-            }
-            // Remove non-printable entities
-            return "";
-        });
-    } while (content !== previous);
+        // Decode hex entities, allowing both lowercase 'x' and uppercase 'X'
+        // (&#x48; or &#X48; = 'H'), as permitted by the HTML specification.
+        content = content.replace(/&#[xX]([0-9a-fA-F]+);/g, (_, hex) => decodeCodePoint(parseInt(hex, 16)));
+
+        // Decode common named entities so obfuscation via &lt; / &gt; / ... is
+        // canonicalized before the content-based filters run. &amp; is decoded
+        // last so sequences like &amp;lt; collapse over subsequent iterations.
+        content = content
+            .replace(/&lt;/gi, "<")
+            .replace(/&gt;/gi, ">")
+            .replace(/&quot;/gi, "\"")
+            .replace(/&apos;/gi, "'")
+            .replace(/&amp;/gi, "&");
+
+        iterations++;
+    } while (content !== previous && iterations < MAX_ITERATIONS);
 
     return content;
 }
