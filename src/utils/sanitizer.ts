@@ -105,27 +105,34 @@ function stripHiddenAttributes(content: string): string {
  * Only keeps printable ASCII characters (32-126)
  */
 function normalizeHtmlEntities(content: string): string {
-    // Decode numeric decimal entities (&#72; = 'H')
-    content = content.replace(/&#(\d+);/g, (_, dec) => {
-        const num = parseInt(dec, 10);
-        // Only decode printable ASCII range
-        if (num >= 32 && num <= 126) {
-            return String.fromCharCode(num);
-        }
-        // Remove non-printable entities
-        return "";
-    });
+    // Decode repeatedly until a fixed point is reached so that
+    // double-encoded payloads (e.g. &#38;#60; -> &#60; -> <) are fully resolved.
+    let previous: string;
+    do {
+        previous = content;
 
-    // Decode hex entities (&#x48; = 'H')
-    content = content.replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => {
-        const num = parseInt(hex, 16);
-        // Only decode printable ASCII range
-        if (num >= 32 && num <= 126) {
-            return String.fromCharCode(num);
-        }
-        // Remove non-printable entities
-        return "";
-    });
+        // Decode numeric decimal entities (&#72; = 'H')
+        content = content.replace(/&#(\d+);/g, (_, dec) => {
+            const num = parseInt(dec, 10);
+            // Only decode printable ASCII range
+            if (num >= 32 && num <= 126) {
+                return String.fromCharCode(num);
+            }
+            // Remove non-printable entities
+            return "";
+        });
+
+        // Decode hex entities (&#x48; = 'H')
+        content = content.replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => {
+            const num = parseInt(hex, 16);
+            // Only decode printable ASCII range
+            if (num >= 32 && num <= 126) {
+                return String.fromCharCode(num);
+            }
+            // Remove non-printable entities
+            return "";
+        });
+    } while (content !== previous);
 
     return content;
 }
@@ -163,13 +170,18 @@ export function sanitizeContent(content: string | null | undefined): string {
 
     let sanitized = content;
 
-    // Apply all sanitization steps in sequence
-    sanitized = stripHtmlComments(sanitized);
+    // 1) Canonicalize the content BEFORE any content-based filtering.
+    //    Decoding entities and removing invisible characters first prevents
+    //    obfuscated payloads (e.g. &#60;!&#45;&#45; ... or zero-width chars
+    //    inside "<!--") from slipping past the filters below.
+    sanitized = normalizeHtmlEntities(sanitized);
     sanitized = stripInvisibleCharacters(sanitized);
+
+    // 2) Now filter the already-canonicalized text.
+    sanitized = stripHtmlComments(sanitized);
     sanitized = stripMarkdownImageAltText(sanitized);
     sanitized = stripMarkdownLinkTitles(sanitized);
     sanitized = stripHiddenAttributes(sanitized);
-    sanitized = normalizeHtmlEntities(sanitized);
     sanitized = redactGitHubTokens(sanitized);
 
     return sanitized;
