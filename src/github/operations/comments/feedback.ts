@@ -23,6 +23,7 @@ import {
     PR_CREATED_FEEDBACK_COMMENT_TEMPLATE, SUCCESS_FEEDBACK_COMMENT,
     SUCCESS_FEEDBACK_COMMENT_WITH_RESULT,
     CODE_REVIEW_FEEDBACK_LINK_SECTION,
+    CODE_REVIEW_FEEDBACK_SECTION_WITH_MARKER,
 } from "../../../constants/github";
 import type {FailureFeedbackData, FinishFeedbackData, SuccessFeedbackData} from "./types";
 import {getJiraClient} from "../../jira/client";
@@ -550,7 +551,15 @@ function getSuccessBody(repoFullName: string, successData: SuccessFeedbackData) 
             console.log('No PR or commit - using Junie result');
             result = SUCCESS_FEEDBACK_COMMENT_WITH_RESULT(successData.junieTitle || 'Task completed', successData.junieSummary || 'No additional details');
             if (successData.codeReviewFeedbackLink) {
-                result += CODE_REVIEW_FEEDBACK_LINK_SECTION(successData.codeReviewFeedbackLink);
+                if (successData.junieSessionId && successData.githubRunId) {
+                    result += CODE_REVIEW_FEEDBACK_SECTION_WITH_MARKER(
+                        successData.codeReviewFeedbackLink,
+                        successData.junieSessionId,
+                        successData.githubRunId,
+                    );
+                } else {
+                    result += CODE_REVIEW_FEEDBACK_LINK_SECTION(successData.codeReviewFeedbackLink);
+                }
             }
             break;
     }

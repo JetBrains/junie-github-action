@@ -43,6 +43,9 @@ export const ENV_VARS = {
     PR_LINK: "PR_LINK",
     WORKING_DIR: "WORKING_DIR",
     CODE_REVIEW_FEEDBACK_API_BASE_URL: "CODE_REVIEW_FEEDBACK_API_BASE_URL",
+    AUTO_COLLECT_FEEDBACK: "AUTO_COLLECT_FEEDBACK",
+    AUTO_COLLECT_FEEDBACK_DRY_RUN: "AUTO_COLLECT_FEEDBACK_DRY_RUN",
+    AUTO_COLLECT_ENABLE_AGENT: "AUTO_COLLECT_ENABLE_AGENT",
 } as const;
 
 // ============================================================================
@@ -98,4 +101,7 @@ export const OUTPUT_VARS = {
 
     // Skip flag
     SHOULD_SKIP: "SHOULD_SKIP",
+
+    /** When true, run auto-collect feedback path instead of normal Junie execution */
+    AUTO_COLLECT_FEEDBACK: "AUTO_COLLECT_FEEDBACK",
 } as const;

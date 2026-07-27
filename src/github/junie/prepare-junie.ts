@@ -22,7 +22,7 @@ import {INIT_COMMENT_BODY, RESOLVE_CONFLICTS_ACTION,} from "../../constants/gith
 import {getJiraClient} from "../jira/client";
 import {convertMarkdownToADF} from "../jira/markdown-to-jira";
 import {getYouTrackClient} from "../youtrack/client";
-import {detectJunieTriggerPhrase} from "../validation/trigger";
+import {detectJunieTriggerPhrase, shouldAutoCollectFeedback} from "../validation/trigger";
 
 /**
  * Initializes Junie execution by preparing environment, auth, and workflow context
@@ -32,6 +32,35 @@ export async function initializeJunieExecution({
                                   octokit,
                                   tokenConfig,
                               }: PrepareJunieOptions) {
+
+    if (shouldAutoCollectFeedback(context)) {
+        if (isTriggeredByUserInteraction(context)) {
+            const hasWritePermissions = await verifyRepositoryAccess(octokit.rest, context);
+            if (!hasWritePermissions) {
+                console.log("No write permissions, skipping auto-collect feedback");
+                core.setOutput(OUTPUT_VARS.SHOULD_SKIP, 'true');
+                core.setOutput(OUTPUT_VARS.AUTO_COLLECT_FEEDBACK, 'false');
+                return;
+            }
+        }
+
+        console.log("Running in auto-collect feedback mode");
+        core.setOutput(OUTPUT_VARS.AUTO_COLLECT_FEEDBACK, 'true');
+        // Skip the normal Junie code-review / task path; auto-collect step runs instead.
+        core.setOutput(OUTPUT_VARS.SHOULD_SKIP, 'true');
+        try {
+            await prepareJunieCLIToken(context);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            console.warn(
+                `Junie API key not available for agent enrichment (${message}). ` +
+                'Obvious reaction-based verdicts can still be submitted.',
+            );
+        }
+        return;
+    }
+
+    core.setOutput(OUTPUT_VARS.AUTO_COLLECT_FEEDBACK, 'false');
 
     const handle = await shouldHandle(context, octokit)
 

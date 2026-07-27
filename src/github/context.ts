@@ -137,6 +137,7 @@ type JunieWorkflowContext = {
         labelTrigger: string;
         workingBranch?: string;
         allowedMcpServers?: string;
+        autoCollectFeedback: boolean;
     };
 };
 
@@ -206,6 +207,7 @@ export function extractJunieWorkflowContext(tokenOwner: TokenOwner): JunieExecut
             baseBranch: process.env.BASE_BRANCH,
             targetBranch: process.env.TARGET_BRANCH,
             allowedMcpServers: process.env.ALLOWED_MCP_SERVERS,
+            autoCollectFeedback: process.env.AUTO_COLLECT_FEEDBACK === "true",
         },
     };
 

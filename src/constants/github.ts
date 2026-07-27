@@ -36,6 +36,14 @@ export const MINOR_FIX_ACTION = "minor-fix";
 
 export const MINOR_FIX_TRIGGER_PHRASE_REGEXP = new RegExp(MINOR_FIX_ACTION, 'i');
 
+/** Manual / test trigger to auto-collect code-review feedback without closing the PR. */
+export const COLLECT_REVIEW_FEEDBACK_TRIGGER_PHRASE = "Collect review feedback";
+
+export const COLLECT_REVIEW_FEEDBACK_TRIGGER_PHRASE_REGEXP = new RegExp(
+    COLLECT_REVIEW_FEEDBACK_TRIGGER_PHRASE,
+    "i",
+);
+
 export const JIRA_EVENT_ACTION = "jira_event";
 
 export const YOUTRACK_EVENT_ACTION = "youtrack_event";
@@ -222,3 +230,23 @@ export const SUCCESS_FEEDBACK_COMMENT_WITH_RESULT = (junieTitle: string, junieBo
 
 export const CODE_REVIEW_FEEDBACK_LINK_SECTION = (feedbackLink: string) =>
     `\n\n---\n\n**Help us improve Junie code review (EAP):** [Share feedback](${feedbackLink})`
+
+/**
+ * Hidden machine-readable marker for auto-collect on PR close / comment trigger.
+ * Token is recovered from the Share feedback URL; session+run link summary ↔ inline comments.
+ */
+export function createCodeReviewFeedbackMarker(sessionId: string, runId: string | number): string {
+    return `<!-- junie-feedback:session=${sessionId};run=${runId} -->`;
+}
+
+/** Hidden marker appended to inline review comments so auto-collect can group by GITHUB_RUN_ID. */
+export function createInlineFeedbackMarker(runId: string | number): string {
+    return `<!-- junie-inline-feedback:run=${runId} -->`;
+}
+
+export const CODE_REVIEW_FEEDBACK_SECTION_WITH_MARKER = (
+    feedbackLink: string,
+    sessionId: string,
+    runId: string | number,
+) =>
+    `\n\n${createCodeReviewFeedbackMarker(sessionId, runId)}${CODE_REVIEW_FEEDBACK_LINK_SECTION(feedbackLink)}`

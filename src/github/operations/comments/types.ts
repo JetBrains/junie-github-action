@@ -20,6 +20,8 @@ export interface SuccessFeedbackData {
     workingBranch?: string;
     baseBranch?: string;
     codeReviewFeedbackLink?: string;
+    junieSessionId?: string;
+    githubRunId?: string;
 }
 
 export interface FailureFeedbackData {

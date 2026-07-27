@@ -3,6 +3,8 @@ import {
     DEFAULT_CODE_REVIEW_FEEDBACK_API_BASE_URL,
     fetchCodeReviewFeedbackLink,
     resolveCodeReviewFeedbackApiBaseUrl,
+    submitCodeReviewFeedback,
+    verifyCodeReviewFeedbackToken,
 } from '../src/utils/code-review-feedback-link';
 
 describe('code-review-feedback-link', () => {
@@ -67,6 +69,60 @@ describe('code-review-feedback-link', () => {
                 apiToken: 'perm-test-token',
             });
             expect(link).toBeUndefined();
+        } finally {
+            globalThis.fetch = originalFetch;
+        }
+    });
+
+    test('verifyCodeReviewFeedbackToken calls verify endpoint', async () => {
+        const fetchMock = mock(() =>
+            Promise.resolve(
+                new Response(JSON.stringify({ valid: true, alreadySubmitted: false, sessionId: 's1' }), {
+                    status: 200,
+                    headers: { 'Content-Type': 'application/json' },
+                }),
+            ),
+        );
+        const originalFetch = globalThis.fetch;
+        globalThis.fetch = fetchMock as typeof fetch;
+
+        try {
+            const result = await verifyCodeReviewFeedbackToken('tok.en');
+            expect(result.valid).toBe(true);
+            expect(result.alreadySubmitted).toBe(false);
+            const [url] = fetchMock.mock.calls[0] as [string];
+            expect(url).toContain('/code-review-feedback/verify?token=tok.en');
+        } finally {
+            globalThis.fetch = originalFetch;
+        }
+    });
+
+    test('submitCodeReviewFeedback posts rating and comment', async () => {
+        const fetchMock = mock(() =>
+            Promise.resolve(
+                new Response(JSON.stringify({ success: true }), {
+                    status: 200,
+                    headers: { 'Content-Type': 'application/json' },
+                }),
+            ),
+        );
+        const originalFetch = globalThis.fetch;
+        globalThis.fetch = fetchMock as typeof fetch;
+
+        try {
+            const result = await submitCodeReviewFeedback({
+                token: 'tok.en',
+                rating: 4,
+                comment: 'auto',
+            });
+            expect(result.success).toBe(true);
+            const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+            expect(url).toBe(`${DEFAULT_CODE_REVIEW_FEEDBACK_API_BASE_URL}/code-review-feedback/submit`);
+            expect(JSON.parse(String(init.body))).toEqual({
+                token: 'tok.en',
+                rating: 4,
+                comment: 'auto',
+            });
         } finally {
             globalThis.fetch = originalFetch;
         }

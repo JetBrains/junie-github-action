@@ -69,6 +69,21 @@ inputs:
       https://junie-kitty-external.labs.jb.gg/api/public/no-auth).
     required: false
     default: "https://junie.jetbrains.com/api/public/no-auth"
+  auto_collect_feedback:
+    description: >
+      When true, on pull_request closed (merged or closed manually) or when a PR comment
+      contains "Collect review feedback", collect reactions/replies on Junie review comments
+      and submit feedback via the existing code-review feedback BFF. Useful for EAP and testing
+      without closing many PRs.
+    required: false
+    default: "false"
+  auto_collect_feedback_dry_run:
+    description: >
+      When true (with auto_collect_feedback), collect and resolve feedback but do NOT call
+      BFF submit. Posts a PR comment with the rating/comment that would have been sent.
+      Use while testing so you do not flip alreadySubmitted.
+    required: false
+    default: "false"
   model:
     description: "Model to use for the primary agent"
     required: false
@@ -243,10 +258,11 @@ runs:
         GROK_API_KEY: ${{ inputs.grok_api_key }}
         OPENROUTER_API_KEY: ${{ inputs.openrouter_api_key }}
         GOOGLE_API_KEY: ${{ inputs.google_api_key }}
+        AUTO_COLLECT_FEEDBACK: ${{ inputs.auto_collect_feedback }}
 
 
     - name: Install Junie
-      if: steps.prepare.outputs.SHOULD_SKIP != 'true'
+      if: steps.prepare.outputs.SHOULD_SKIP != 'true' || steps.prepare.outputs.AUTO_COLLECT_FEEDBACK == 'true'
       shell: bash
       run: |
         if [ "${{ inputs.junie_version }}" == "latest" ]; then
@@ -254,6 +270,31 @@ runs:
         else
           curl -fsSL https://junie.jetbrains.com/install.sh | JUNIE_VERSION=${{ inputs.junie_version }} bash
         fi
+
+    - name: Auto-collect code review feedback
+      if: steps.prepare.outputs.AUTO_COLLECT_FEEDBACK == 'true'
+      shell: bash
+      id: auto-collect-feedback
+      run: |
+        JUNIE_FLAGS="$(bash "${GITHUB_ACTION_PATH}/src/scripts/build-junie-flags.sh")"
+        export JUNIE_FLAGS
+        echo "Using Junie flags for auto-collect agent: ${JUNIE_FLAGS}"
+        bun run ${GITHUB_ACTION_PATH}/src/entrypoints/auto-collect-feedback.ts
+      env:
+        PARSED_CONTEXT: ${{ steps.prepare.outputs.PARSED_CONTEXT }}
+        EJ_AUTH_GITHUB_TOKEN: ${{ steps.prepare.outputs.EJ_AUTH_GITHUB_TOKEN }}
+        EJ_CLI_TOKEN: ${{ steps.prepare.outputs.EJ_CLI_TOKEN }}
+        APP_TOKEN: ${{ inputs.junie_api_key }}
+        WORKING_DIR: ${{ inputs.junie_work_dir }}
+        CODE_REVIEW_FEEDBACK_API_BASE_URL: ${{ inputs.code_review_feedback_api_base_url }}
+        AUTO_COLLECT_FEEDBACK_DRY_RUN: ${{ inputs.auto_collect_feedback_dry_run }}
+        CUSTOM_JUNIE_ARGS: ${{ steps.prepare.outputs.CUSTOM_JUNIE_ARGS }}
+        MODEL: ${{ inputs.model }}
+        OPENAI_API_KEY: ${{ inputs.openai_api_key }}
+        ANTHROPIC_API_KEY: ${{ inputs.anthropic_api_key }}
+        GROK_API_KEY: ${{ inputs.grok_api_key }}
+        OPENROUTER_API_KEY: ${{ inputs.openrouter_api_key }}
+        GOOGLE_API_KEY: ${{ inputs.google_api_key }}
 
     - name: Run Junie
       if: steps.prepare.outputs.SHOULD_SKIP != 'true'
@@ -277,20 +318,7 @@ runs:
         OPENROUTER_API_KEY: ${{ inputs.openrouter_api_key }}
         GOOGLE_API_KEY: ${{ inputs.google_api_key }}
       run: |
-        # Start with custom junie args if provided (highest priority)
-        JUNIE_FLAGS="${CUSTOM_JUNIE_ARGS}"
-
-        # If no custom --model flag in CUSTOM_JUNIE_ARGS, use MODEL input
-        if [ -n "${MODEL}" ] && ! echo "${CUSTOM_JUNIE_ARGS}" | grep -q -- "--model="; then
-          JUNIE_FLAGS="${JUNIE_FLAGS} --model=${MODEL}"
-        fi
-
-        # Add BYOK API key flags if provided
-        [ -n "${OPENAI_API_KEY}" ] && JUNIE_FLAGS="${JUNIE_FLAGS} --openai-api-key=${OPENAI_API_KEY}"
-        [ -n "${ANTHROPIC_API_KEY}" ] && JUNIE_FLAGS="${JUNIE_FLAGS} --anthropic-api-key=${ANTHROPIC_API_KEY}"
-        [ -n "${GROK_API_KEY}" ] && JUNIE_FLAGS="${JUNIE_FLAGS} --grok-api-key=${GROK_API_KEY}"
-        [ -n "${OPENROUTER_API_KEY}" ] && JUNIE_FLAGS="${JUNIE_FLAGS} --openrouter-api-key=${OPENROUTER_API_KEY}"
-        [ -n "${GOOGLE_API_KEY}" ] && JUNIE_FLAGS="${JUNIE_FLAGS} --google-api-key=${GOOGLE_API_KEY}"
+        JUNIE_FLAGS="$(bash "${GITHUB_ACTION_PATH}/src/scripts/build-junie-flags.sh")"
 
         JUNIE_OUTPUT_FILE="${WORKING_DIR}/junie_output.json"
         echo "Using Junie flags: ${JUNIE_FLAGS}"

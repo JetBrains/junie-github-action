@@ -32,6 +32,8 @@ async function writeFeedbackComment(isJobFailed: boolean, initCommentId?: string
             prLink: process.env[ENV_VARS.PR_LINK],
             workingBranch: process.env[OUTPUT_VARS.WORKING_BRANCH],
             codeReviewFeedbackLink: process.env[OUTPUT_VARS.CODE_REVIEW_FEEDBACK_LINK],
+            junieSessionId: process.env[OUTPUT_VARS.JUNIE_SESSION_ID],
+            githubRunId: process.env[ENV_VARS.GITHUB_RUN_ID],
         }
     }
 
