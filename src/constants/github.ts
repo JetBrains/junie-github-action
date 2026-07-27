@@ -236,10 +236,15 @@ export const CODE_REVIEW_FEEDBACK_LINK_SECTION = (feedbackLink: string) =>
 
 /**
  * Hidden machine-readable marker for auto-collect on PR close / comment trigger.
- * Token is recovered from the Share feedback URL; session+run link summary ↔ inline comments.
+ * Includes token when Share feedback link is omitted (auto-collect mode).
  */
-export function createCodeReviewFeedbackMarker(sessionId: string, runId: string | number): string {
-    return `<!-- junie-feedback:session=${sessionId};run=${runId} -->`;
+export function createCodeReviewFeedbackMarker(
+    sessionId: string,
+    runId: string | number,
+    token?: string,
+): string {
+    const tokenPart = token ? `;token=${token}` : '';
+    return `<!-- junie-feedback:session=${sessionId};run=${runId}${tokenPart} -->`;
 }
 
 /** Hidden marker appended to inline review comments so auto-collect can group by GITHUB_RUN_ID. */
@@ -251,5 +256,21 @@ export const CODE_REVIEW_FEEDBACK_SECTION_WITH_MARKER = (
     feedbackLink: string,
     sessionId: string,
     runId: string | number,
-) =>
-    `\n\n${createCodeReviewFeedbackMarker(sessionId, runId)}${CODE_REVIEW_FEEDBACK_LINK_SECTION(feedbackLink)}`
+) => {
+    const token = feedbackLink.includes('token=')
+        ? feedbackLink.split('token=')[1]?.split(/[\s)&]/)[0]
+        : undefined;
+    return `\n\n${createCodeReviewFeedbackMarker(sessionId, runId, token)}${CODE_REVIEW_FEEDBACK_LINK_SECTION(feedbackLink)}`;
+};
+
+/** Auto-collect mode: keep machine-readable session/token, hide the manual Share feedback CTA. */
+export const CODE_REVIEW_FEEDBACK_AUTO_COLLECT_MARKER_ONLY = (
+    feedbackLink: string,
+    sessionId: string,
+    runId: string | number,
+) => {
+    const token = feedbackLink.includes('token=')
+        ? feedbackLink.split('token=')[1]?.split(/[\s)&]/)[0]
+        : undefined;
+    return `\n\n${createCodeReviewFeedbackMarker(sessionId, runId, token)}`;
+};

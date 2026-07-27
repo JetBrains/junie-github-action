@@ -71,17 +71,14 @@ inputs:
     default: "https://junie.jetbrains.com/api/public/no-auth"
   auto_collect_feedback:
     description: >
-      When true, on pull_request closed (merged or closed manually) or when a PR comment
-      contains "Collect review feedback", collect reactions/replies on Junie review comments
-      and submit feedback via the existing code-review feedback BFF. Useful for EAP and testing
-      without closing many PRs.
+      When true, enable auto-collect of code-review feedback (reactions/replies) on PR close
+      or "Collect review feedback" comments, and hide the manual Share feedback link after review.
     required: false
     default: "false"
   auto_collect_feedback_dry_run:
     description: >
-      When true (with auto_collect_feedback), collect and resolve feedback but do NOT call
-      BFF submit. Posts a PR comment with the rating/comment that would have been sent.
-      Use while testing so you do not flip alreadySubmitted.
+      When true (with auto_collect_feedback), collect and resolve feedback but do NOT call BFF submit.
+      Posts a PR comment with the rating/comment that would have been sent.
     required: false
     default: "false"
   model:
@@ -426,7 +423,9 @@ runs:
         JUNIE_TITLE: ${{ steps.junie-run-results.outputs.JUNIE_TITLE }}
         JUNIE_SUMMARY: ${{ steps.junie-run-results.outputs.JUNIE_SUMMARY }}
         JUNIE_DURATION_MS: ${{ steps.junie-run-results.outputs.JUNIE_DURATION_MS }}
+        JUNIE_SESSION_ID: ${{ steps.junie-run-results.outputs.JUNIE_SESSION_ID }}
         CODE_REVIEW_FEEDBACK_LINK: ${{ steps.junie-run-results.outputs.CODE_REVIEW_FEEDBACK_LINK }}
+        AUTO_COLLECT_FEEDBACK: ${{ inputs.auto_collect_feedback }}
         JIRA_BASE_URL: ${{ inputs.jira_base_url }}
         JIRA_EMAIL: ${{ inputs.jira_email }}
         JIRA_API_TOKEN: ${{ inputs.jira_api_token }}
@@ -452,7 +451,9 @@ runs:
         JUNIE_TITLE: ${{ steps.junie-run-results.outputs.JUNIE_TITLE }}
         JUNIE_SUMMARY: ${{ steps.junie-run-results.outputs.JUNIE_SUMMARY }}
         JUNIE_DURATION_MS: ${{ steps.junie-run-results.outputs.JUNIE_DURATION_MS }}
+        JUNIE_SESSION_ID: ${{ steps.junie-run-results.outputs.JUNIE_SESSION_ID }}
         CODE_REVIEW_FEEDBACK_LINK: ${{ steps.junie-run-results.outputs.CODE_REVIEW_FEEDBACK_LINK }}
+        AUTO_COLLECT_FEEDBACK: ${{ inputs.auto_collect_feedback }}
         JIRA_BASE_URL: ${{ inputs.jira_base_url }}
         JIRA_EMAIL: ${{ inputs.jira_email }}
         JIRA_API_TOKEN: ${{ inputs.jira_api_token }}

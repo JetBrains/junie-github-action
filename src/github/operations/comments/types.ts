@@ -22,6 +22,8 @@ export interface SuccessFeedbackData {
     codeReviewFeedbackLink?: string;
     junieSessionId?: string;
     githubRunId?: string;
+    /** When true, write hidden marker/token only — no visible Share feedback CTA. */
+    hideManualFeedbackLink?: boolean;
 }
 
 export interface FailureFeedbackData {

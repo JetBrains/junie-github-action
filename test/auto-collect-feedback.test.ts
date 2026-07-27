@@ -7,6 +7,7 @@ import {
 import {
     extractFeedbackTokenFromBody,
     parseFeedbackMarker,
+    parseFeedbackTokenClaims,
     parseInlineFeedbackRunId,
 } from '../src/utils/code-review-feedback-markers';
 import {
@@ -20,17 +21,83 @@ import type { SessionFeedbackSignals } from '../src/github/operations/feedback/a
 
 describe('feedback markers', () => {
     test('parses summary marker and token from body', () => {
-        const body = `${createCodeReviewFeedbackMarker('session-1', 42)}
+        const body = `${createCodeReviewFeedbackMarker('session-1', 42, 'abc.def')}
 ---
 **Help us improve Junie code review (EAP):** [Share feedback](https://junie.jetbrains.com/code-review-feedback?token=abc.def)`;
 
-        expect(parseFeedbackMarker(body)).toEqual({ sessionId: 'session-1', runId: '42' });
+        expect(parseFeedbackMarker(body)).toEqual({
+            sessionId: 'session-1',
+            runId: '42',
+            token: 'abc.def',
+        });
         expect(extractFeedbackTokenFromBody(body)).toBe('abc.def');
     });
 
     test('parses inline marker', () => {
         const body = `Looks good\n\n${createInlineFeedbackMarker(99)}`;
         expect(parseInlineFeedbackRunId(body)).toBe('99');
+    });
+
+    test('recovers sid/rid from feedback token JWT payload', () => {
+        const payload = Buffer.from(JSON.stringify({
+            sid: 'session-260727-151332-1bxm',
+            repo: 'JetBrains/junie-agent',
+            pr: 7435,
+            rid: 30278879175,
+            exp: 1785770192,
+        })).toString('base64url');
+        const token = `${payload}.sig`;
+
+        expect(parseFeedbackTokenClaims(token)).toEqual({
+            sessionId: 'session-260727-151332-1bxm',
+            runId: '30278879175',
+            repository: 'JetBrains/junie-agent',
+            prNumber: 7435,
+        });
+    });
+
+    test('collects inline reactions when only Share feedback URL is present (no HTML marker)', async () => {
+        const payload = Buffer.from(JSON.stringify({
+            sid: 'session-from-token',
+            rid: 777,
+        })).toString('base64url');
+        const token = `${payload}.sig`;
+
+        const sessions = await collectSessionFeedbackSignalsWithFetchers(
+            [{
+                id: 10,
+                body: `[Share feedback](https://x/code-review-feedback?token=${token})`,
+                userLogin: 'junie-agent',
+            }],
+            [
+                {
+                    id: 20,
+                    body: `issue here\n${createInlineFeedbackMarker(777)}`,
+                    userLogin: 'junie-agent',
+                    path: 'a.ts',
+                },
+                {
+                    id: 21,
+                    body: 'I disagree with this',
+                    userLogin: 'alice',
+                    inReplyToId: 20,
+                },
+            ],
+            async (commentId, kind) => {
+                if (kind === 'review' && commentId === 20) {
+                    return [{ content: '+1', userLogin: 'alice', userType: 'User' }];
+                }
+                return [];
+            },
+        );
+
+        expect(sessions).toHaveLength(1);
+        expect(sessions[0].sessionId).toBe('session-from-token');
+        expect(sessions[0].runId).toBe('777');
+        expect(sessions[0].comments.map((c) => c.kind)).toEqual(['summary', 'inline', 'reply']);
+        expect(sessions[0].comments[1].reactions).toEqual([
+            { content: '+1', userLogin: 'alice', userType: 'User' },
+        ]);
     });
 });
 

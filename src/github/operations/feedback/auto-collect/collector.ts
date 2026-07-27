@@ -2,6 +2,7 @@ import type {Octokit} from '@octokit/rest';
 import {
     extractFeedbackTokenFromBody,
     parseFeedbackMarker,
+    parseFeedbackTokenClaims,
     parseInlineFeedbackRunId,
 } from '../../../../utils/code-review-feedback-markers';
 import type {
@@ -78,9 +79,34 @@ async function paginateReviewComments(
     });
 }
 
+function resolveSessionIdentity(body: string): {
+    sessionId: string;
+    runId: string;
+    token?: string;
+} | undefined {
+    const marker = parseFeedbackMarker(body);
+    const token = extractFeedbackTokenFromBody(body) || marker?.token;
+    const claims = token ? parseFeedbackTokenClaims(token) : undefined;
+
+    const sessionId = marker?.sessionId || claims?.sessionId;
+    const runId = marker?.runId || claims?.runId;
+    if (!sessionId || !runId) {
+        if (token) {
+            return {
+                sessionId: `token-${token.slice(0, 16)}`,
+                runId: 'unknown',
+                token,
+            };
+        }
+        return undefined;
+    }
+
+    return { sessionId, runId, token };
+}
+
 /**
  * Discover Junie feedback sessions on a PR and gather reactions/replies.
- * Sessions come from summary markers / feedback URLs; inline comments are linked by run id.
+ * Sessions come from summary markers / feedback URLs / token claims; inline comments are linked by run id.
  */
 export async function collectSessionFeedbackSignals(
     octokit: Octokit,
@@ -94,25 +120,22 @@ export async function collectSessionFeedbackSignals(
     const sessionsByKey = new Map<string, SessionFeedbackSignals>();
 
     for (const comment of issueComments) {
-        const marker = parseFeedbackMarker(comment.body || '');
-        const token = extractFeedbackTokenFromBody(comment.body || '');
-        if (!marker && !token) {
+        const identity = resolveSessionIdentity(comment.body || '');
+        if (!identity) {
             continue;
         }
 
-        const sessionId = marker?.sessionId || `token-${token!.slice(0, 16)}`;
-        const runId = marker?.runId || 'unknown';
-        const key = `${sessionId}::${runId}`;
+        const key = `${identity.sessionId}::${identity.runId}`;
 
         const existing = sessionsByKey.get(key) || {
-            sessionId,
-            runId,
-            token,
+            sessionId: identity.sessionId,
+            runId: identity.runId,
+            token: identity.token,
             summaryCommentId: comment.id,
             comments: [] as CollectedComment[],
         };
 
-        existing.token = existing.token || token;
+        existing.token = existing.token || identity.token;
         existing.summaryCommentId = comment.id;
 
         const reactions = await listIssueCommentReactions(octokit, owner, repo, comment.id);
@@ -128,10 +151,11 @@ export async function collectSessionFeedbackSignals(
         sessionsByKey.set(key, existing);
     }
 
-    // Fallback: junie-bot summary without new marker but with Share feedback URL already handled above.
-    // Attach inline comments + thread replies by run id.
     for (const session of sessionsByKey.values()) {
         if (session.runId === 'unknown') {
+            console.warn(
+                `Session ${session.sessionId}: runId unknown — cannot correlate inline comments`,
+            );
             continue;
         }
 
@@ -151,7 +175,6 @@ export async function collectSessionFeedbackSignals(
                 reactions,
             });
 
-            // Thread replies: review comments with in_reply_to pointing at this inline comment
             const replies = reviewComments.filter((c) => c.in_reply_to_id === inline.id);
             for (const reply of replies) {
                 session.comments.push({
@@ -165,10 +188,6 @@ export async function collectSessionFeedbackSignals(
                 });
             }
         }
-
-        // Issue-comment replies that quote/mention the summary are hard to detect reliably;
-        // include non-Junie issue comments after the summary as weak replies only if they
-        // reference "junie" / "review" lightly — skip for MVP to avoid noise.
     }
 
     return Array.from(sessionsByKey.values());
@@ -190,22 +209,19 @@ export async function collectSessionFeedbackSignalsWithFetchers(
     const sessionsByKey = new Map<string, SessionFeedbackSignals>();
 
     for (const comment of issueComments) {
-        const marker = parseFeedbackMarker(comment.body);
-        const token = extractFeedbackTokenFromBody(comment.body);
-        if (!marker && !token) {
+        const identity = resolveSessionIdentity(comment.body);
+        if (!identity) {
             continue;
         }
-        const sessionId = marker?.sessionId || `token-${token!.slice(0, 16)}`;
-        const runId = marker?.runId || 'unknown';
-        const key = `${sessionId}::${runId}`;
+        const key = `${identity.sessionId}::${identity.runId}`;
         const existing = sessionsByKey.get(key) || {
-            sessionId,
-            runId,
-            token,
+            sessionId: identity.sessionId,
+            runId: identity.runId,
+            token: identity.token,
             summaryCommentId: comment.id,
             comments: [] as CollectedComment[],
         };
-        existing.token = existing.token || token;
+        existing.token = existing.token || identity.token;
         existing.summaryCommentId = comment.id;
         existing.comments.push({
             id: comment.id,
