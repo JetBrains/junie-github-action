@@ -1,16 +1,28 @@
 /**
- * Sanitizer for preventing prompt injection attacks in user-submitted content.
+ * Sanitizer for preventing prompt-injection attacks in user-submitted content.
  *
- * Protects against:
+ * Design — two phases (see sanitizeContent):
+ *   A) canonicalize(): decode HTML/XML entities and strip invisible characters,
+ *      repeatedly, until a plain-text fixed point is reached. This dissolves the
+ *      obfuscation an attacker would use to smuggle payloads past the filters.
+ *   B) content filters: with the text canonical, strip the now-visible hidden
+ *      channels (comments, markdown alt/title, hidden attributes, tokens).
+ *
+ * Protects against hidden channels:
  * - Hidden HTML comments with malicious instructions
- * - Invisible Unicode characters (zero-width, control chars)
- * - Text direction manipulation (right-to-left override)
- * - Hidden attributes (alt, title, aria-label, data-*)
- * - HTML entity obfuscation
+ * - Invisible Unicode characters (zero-width, control, bidi/direction marks)
+ * - Hidden attributes (alt, title, aria-label, data-*, placeholder)
+ * - HTML entity obfuscation (named + numeric, including double/nested encoding)
  * - GitHub token exposure
+ *
+ * Non-goal: this does NOT detect *visible* prompt injection written in plain
+ * text (e.g. "Ignore all previous instructions"). Such text is preserved on
+ * purpose; defending against it belongs to the surrounding system (least-
+ * privilege tokens, human approval, isolation), not to a text sanitizer.
  */
 
 import {escapeRegExp} from "../github/validation/trigger";
+import {decodeHTMLStrict} from "entities";
 
 // Size limits for outputs to prevent ARG_MAX issues (2MB Linux limit)
 export const OUTPUT_SIZE_LIMITS = {
@@ -33,7 +45,8 @@ function stripHtmlComments(content: string): string {
  * - Zero-width characters (U+200B, U+200C, U+200D, U+FEFF)
  * - Control characters (U+0000-U+001F, U+007F-U+009F)
  * - Soft hyphens (U+00AD)
- * - Unicode direction marks (U+202A-U+202E, U+2066-U+2069)
+ * - Unicode direction marks, incl. LRM/RLM (U+200E, U+200F, U+202A-U+202E, U+2066-U+2069)
+ * - Replacement character (U+FFFD) emitted by the entity decoder for invalid refs
  */
 function stripInvisibleCharacters(content: string): string {
     // Zero-width characters
@@ -45,8 +58,13 @@ function stripInvisibleCharacters(content: string): string {
     // Soft hyphens
     content = content.replace(/\u00AD/g, "");
 
-    // Unicode direction marks (can be used to reverse text visually)
-    content = content.replace(/[\u202A-\u202E\u2066-\u2069]/g, "");
+    // Unicode direction marks, including left-to-right / right-to-left marks
+    // (can be used to reverse or disguise text visually)
+    content = content.replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, "");
+
+    // Replacement character: the entity decoder emits U+FFFD for invalid numeric
+    // references (e.g. &#0;); it carries no legitimate content, so drop it.
+    content = content.replace(/\uFFFD/g, "");
 
     return content;
 }
@@ -100,55 +118,57 @@ function stripHiddenAttributes(content: string): string {
 }
 
 /**
- * Normalize HTML entities to prevent obfuscation.
- * Decodes:
- * - numeric decimal entities (&#72; = 'H')
- * - numeric hex entities, lowercase or uppercase (&#x48; / &#X48; = 'H')
- * - common named entities (&lt; &gt; &amp; &quot; &apos;)
- * Only printable ASCII (32-126) plus tab/LF/CR are kept for numeric entities, so
- * legitimate formatting survives while non-printable obfuscation is dropped.
+ * Maximum number of passes for the canonicalization fixed-point loop.
+ *
+ * Bounds worst-case work on pathological, deeply nested entity payloads (a
+ * denial-of-service guard) while still resolving realistic multi-layer
+ * encodings such as &amp;lt; -> &lt; -> <.
  */
-function normalizeHtmlEntities(content: string): string {
-    // Keep printable ASCII plus common whitespace (tab, LF, CR); drop the rest.
-    // Mirrors the characters preserved by stripInvisibleCharacters so that
-    // decoding entities never strips legitimate formatting.
-    const decodeCodePoint = (num: number): string =>
-        (num >= 32 && num <= 126) || num === 9 || num === 10 || num === 13
-            ? String.fromCharCode(num)
-            : "";
+const MAX_CANONICALIZATION_PASSES = 10;
 
-    // Cap the number of decoding passes to avoid excessive work (denial of
-    // service) on pathological, deeply nested entity payloads.
-    const MAX_ITERATIONS = 10;
+/**
+ * Decode HTML/XML character references using a spec-compliant decoder.
+ *
+ * Delegates to the `entities` library instead of hand-written regexes: it knows
+ * the full HTML5 named entity set (&lt; &excl; &commat; &lpar; ...) plus both
+ * numeric forms (decimal &#60; and hex &#x3c; / &#X3C;), so obfuscation via any
+ * entity form is canonicalized. Strict mode requires a trailing ';', which
+ * avoids mangling legitimate bare ampersands (e.g. "AT&T"). Non-printable or
+ * invalid references are handled by stripInvisibleCharacters after decoding, so
+ * legitimate non-ASCII text (e.g. "&#233;" -> "é") is preserved.
+ */
+function decodeHtmlEntities(content: string): string {
+    return decodeHTMLStrict(content);
+}
 
-    // Decode repeatedly until a fixed point (or the iteration cap) is reached so
-    // that double-encoded payloads (e.g. &#38;#60; -> &#60; -> <) are fully resolved.
+/**
+ * Phase A — canonicalization.
+ *
+ * Collapse every layer of obfuscation into a single, plain-text form BEFORE any
+ * content-based filter runs. This is the crux of the design: once the text is
+ * canonical, the Phase B filters in sanitizeContent have nothing left to slip
+ * past, which structurally closes the class of "decode-after-filter" bypasses.
+ *
+ * Each pass first strips invisible characters (which can break up entities or
+ * delimiters, e.g. "&l\u200Bt;" or "<\u200B!--") and then decodes entities
+ * (which can themselves hide invisible characters or delimiters, e.g. "&#8203;"
+ * or "&#60;!--"). Repeating the pair to a fixed point resolves multi- and
+ * double-encoded payloads; a pass cap bounds worst-case work on adversarial
+ * deeply nested input.
+ */
+function canonicalize(content: string): string {
     let previous: string;
-    let iterations = 0;
+    let passes = 0;
     do {
         previous = content;
+        content = stripInvisibleCharacters(content);
+        content = decodeHtmlEntities(content);
+        passes++;
+    } while (content !== previous && passes < MAX_CANONICALIZATION_PASSES);
 
-        // Decode numeric decimal entities (&#72; = 'H')
-        content = content.replace(/&#(\d+);/g, (_, dec) => decodeCodePoint(parseInt(dec, 10)));
-
-        // Decode hex entities, allowing both lowercase 'x' and uppercase 'X'
-        // (&#x48; or &#X48; = 'H'), as permitted by the HTML specification.
-        content = content.replace(/&#[xX]([0-9a-fA-F]+);/g, (_, hex) => decodeCodePoint(parseInt(hex, 16)));
-
-        // Decode common named entities so obfuscation via &lt; / &gt; / ... is
-        // canonicalized before the content-based filters run. &amp; is decoded
-        // last so sequences like &amp;lt; collapse over subsequent iterations.
-        content = content
-            .replace(/&lt;/gi, "<")
-            .replace(/&gt;/gi, ">")
-            .replace(/&quot;/gi, "\"")
-            .replace(/&apos;/gi, "'")
-            .replace(/&amp;/gi, "&");
-
-        iterations++;
-    } while (content !== previous && iterations < MAX_ITERATIONS);
-
-    return content;
+    // Final strip so any invisible characters revealed by the last decode pass
+    // (e.g. a decoded zero-width character) are removed before filtering.
+    return stripInvisibleCharacters(content);
 }
 
 /**
@@ -174,24 +194,28 @@ function redactGitHubTokens(content: string): string {
 }
 
 /**
- * Master sanitization function that applies all security measures
- * Use this function to sanitize any user-submitted content before including in prompts
+ * Master sanitization function that applies all security measures.
+ * Use this to sanitize any user-submitted content before including it in prompts.
+ *
+ * Two phases:
+ *   A) canonicalize() — decode entities and strip invisible characters to a
+ *      plain-text fixed point, dissolving obfuscation;
+ *   B) content filters — strip the now-visible hidden channels (comments,
+ *      markdown alt/title, hidden attributes, GitHub tokens).
+ *
+ * Non-goal: visible, plain-text prompt injection is intentionally preserved
+ * (see the file header). This function removes hidden channels, not intent.
  */
 export function sanitizeContent(content: string | null | undefined): string {
     if (!content) {
         return "";
     }
 
-    let sanitized = content;
+    // Phase A: canonicalize away obfuscation (entities + invisible characters)
+    // so the Phase B filters cannot be bypassed by encoding or hidden characters.
+    let sanitized = canonicalize(content);
 
-    // 1) Canonicalize the content BEFORE any content-based filtering.
-    //    Decoding entities and removing invisible characters first prevents
-    //    obfuscated payloads (e.g. &#60;!&#45;&#45; ... or zero-width chars
-    //    inside "<!--") from slipping past the filters below.
-    sanitized = normalizeHtmlEntities(sanitized);
-    sanitized = stripInvisibleCharacters(sanitized);
-
-    // 2) Now filter the already-canonicalized text.
+    // Phase B: strip hidden channels from the now-canonical text.
     sanitized = stripHtmlComments(sanitized);
     sanitized = stripMarkdownImageAltText(sanitized);
     sanitized = stripMarkdownLinkTitles(sanitized);

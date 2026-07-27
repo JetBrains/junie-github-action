@@ -211,6 +211,67 @@ World`;
         });
     });
 
+    describe("Library-based canonicalization (JUNIE-3424 maximum hardening)", () => {
+        test("strips comments hidden by a literal invisible char inside a named entity", () => {
+            // Zero-width space inside "&lt;" breaks the entity; it must be removed
+            // and the entity decoded so the comment can be stripped.
+            const input = "&l\u200Bt;!-- evil --&gt;";
+            const output = sanitizeContent(input);
+            expect(output).not.toContain("<!--");
+            expect(output).not.toContain("evil");
+        });
+
+        test("strips comments hidden by an entity-encoded invisible char inside a named entity", () => {
+            // The zero-width space is itself entity-encoded (&#8203;) inside "&lt;".
+            const input = "&l&#8203;t;!-- evil --&gt;";
+            const output = sanitizeContent(input);
+            expect(output).not.toContain("<!--");
+            expect(output).not.toContain("evil");
+        });
+
+        test("preserves non-ASCII text decoded from numeric entities (i18n)", () => {
+            expect(sanitizeContent("caf&#233;")).toBe("café");
+            // Cyrillic "Привет" encoded as decimal entities must survive decoding.
+            expect(sanitizeContent("&#1055;&#1088;&#1080;&#1074;&#1077;&#1090;")).toBe("Привет");
+        });
+
+        test("preserves literal non-ASCII content unchanged", () => {
+            const input = "Привет, café — déjà vu!";
+            expect(sanitizeContent(input)).toBe(input);
+        });
+
+        test("decodes extended HTML5 named entities beyond the basic five", () => {
+            // These are covered by the `entities` library but not by the old
+            // hand-written decoder (which only knew &lt; &gt; &amp; &quot; &apos;).
+            expect(sanitizeContent("Warning&excl;")).toBe("Warning!");
+            expect(sanitizeContent("&lpar;test&rpar;")).toBe("(test)");
+        });
+
+        test("strips a comment built from mixed named and numeric entities", () => {
+            // <!-- evil --> where "<" and "!" are named and the dashes are numeric.
+            const input = "&lt;&excl;&#45;&#45; evil &#45;&#45;&gt;";
+            const output = sanitizeContent(input);
+            expect(output).not.toContain("<!--");
+            expect(output).not.toContain("evil");
+        });
+
+        test("drops the replacement char emitted for invalid numeric references", () => {
+            // &#0; decodes to U+FFFD; it must be stripped, not left as an artifact.
+            expect(sanitizeContent("Hello&#0;World")).toBe("HelloWorld");
+        });
+
+        test("removes bidirectional LRM/RLM marks", () => {
+            expect(sanitizeContent("Hello\u200EWorld")).toBe("HelloWorld"); // LRM
+            expect(sanitizeContent("Hello\u200FWorld")).toBe("HelloWorld"); // RLM
+        });
+
+        test("does not over-decode bare ampersands in legitimate text", () => {
+            // Strict decoding requires a trailing ';', so "AT&T"/"R&D" stay intact.
+            const input = "AT&T and R&D budgets";
+            expect(sanitizeContent(input)).toBe(input);
+        });
+    });
+
     describe("GitHub token redaction", () => {
         test("redacts classic PAT tokens (ghp_)", () => {
             // ghp_ + 36 chars = 40 total
