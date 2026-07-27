@@ -24,6 +24,9 @@ export const RESOLVE_CONFLICTS_TRIGGER_PHRASE = "resolve conflicts"
 
 export const RESOLVE_CONFLICTS_TRIGGER_PHRASE_REGEXP = new RegExp(RESOLVE_CONFLICTS_TRIGGER_PHRASE, 'i')
 
+/** workflow_dispatch action input for manual/test auto-collect runs from a feature branch. */
+export const AUTO_COLLECT_FEEDBACK_ACTION = "auto-collect-feedback";
+
 export const CODE_REVIEW_ACTION = "code-review";
 
 export const CODE_REVIEW_TRIGGER_PHRASE_REGEXP = new RegExp(CODE_REVIEW_ACTION, 'i')
