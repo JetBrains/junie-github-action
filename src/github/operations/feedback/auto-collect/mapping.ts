@@ -14,6 +14,10 @@ function isBotActor(reaction: CollectedReaction): boolean {
     return BOT_LOGINS.has(login) || login.endsWith('[bot]');
 }
 
+/**
+ * Positive: 👍 (+1), ❤️ (heart). Negative: 👎 (-1), 😕 (confused).
+ * GitHub has no dedicated "sad" reaction; confused is the closest negative face.
+ */
 export function countHumanThumbs(comments: CollectedComment[]): { thumbsUp: number; thumbsDown: number } {
     let thumbsUp = 0;
     let thumbsDown = 0;
@@ -23,9 +27,9 @@ export function countHumanThumbs(comments: CollectedComment[]): { thumbsUp: numb
             if (isBotActor(reaction)) {
                 continue;
             }
-            if (reaction.content === '+1') {
+            if (reaction.content === '+1' || reaction.content === 'heart') {
                 thumbsUp += 1;
-            } else if (reaction.content === '-1') {
+            } else if (reaction.content === '-1' || reaction.content === 'confused') {
                 thumbsDown += 1;
             }
         }
@@ -51,6 +55,54 @@ export function collectReplyTexts(comments: CollectedComment[], maxChars = 4000)
         used += slice.length;
     }
     return result;
+}
+
+/**
+ * Short extractive summary for BFF submit when the agent is not used
+ * (obvious thumbs-up/down). Avoids dumping full reply bodies into the DB.
+ */
+export function summarizeReplyTexts(replyTexts: string[], maxChars = 400): string | undefined {
+    if (replyTexts.length === 0) {
+        return undefined;
+    }
+
+    const maxSnippets = Math.min(replyTexts.length, 3);
+    const omittedEstimate = Math.max(0, replyTexts.length - maxSnippets);
+    const suffixReserve = omittedEstimate > 0 ? ` (+${omittedEstimate} more)`.length : 0;
+    const budget = Math.max(40, maxChars - suffixReserve);
+
+    const snippets: string[] = [];
+    let used = 0;
+    const perReplyBudget = Math.max(60, Math.floor(budget / maxSnippets));
+
+    for (const reply of replyTexts) {
+        if (used >= budget || snippets.length >= maxSnippets) {
+            break;
+        }
+        const normalized = reply.replace(/\s+/g, ' ').trim();
+        if (!normalized) {
+            continue;
+        }
+        // Account for "; " separators between snippets.
+        const separatorCost = snippets.length > 0 ? 2 : 0;
+        const room = Math.min(perReplyBudget, budget - used - separatorCost);
+        if (room <= 1) {
+            break;
+        }
+        const snippet = normalized.length > room
+            ? `${normalized.slice(0, room - 1).trimEnd()}…`
+            : normalized;
+        snippets.push(snippet);
+        used += separatorCost + snippet.length;
+    }
+
+    if (snippets.length === 0) {
+        return undefined;
+    }
+
+    const omitted = replyTexts.length - snippets.length;
+    const suffix = omitted > 0 ? ` (+${omitted} more)` : '';
+    return `${snippets.join('; ')}${suffix}`;
 }
 
 /**
@@ -117,16 +169,19 @@ export function buildAutoCollectedComment(
     verdict: CollectorVerdict,
     agentComment?: string,
 ): string {
-    const evidence = `👍×${verdict.thumbsUp} 👎×${verdict.thumbsDown}, replies: ${verdict.replyTexts.length}`;
+    const evidence = `👍❤️×${verdict.thumbsUp} 👎😕×${verdict.thumbsDown}, replies: ${verdict.replyTexts.length}`;
     const parts = [
         `[auto-collected from PR reactions/replies] (${evidence})`,
     ];
 
     if (agentComment?.trim()) {
         parts.push(agentComment.trim());
-    } else if (verdict.replyTexts.length > 0) {
-        parts.push(verdict.replyTexts.join('\n---\n'));
+    } else {
+        const summary = summarizeReplyTexts(verdict.replyTexts);
+        if (summary) {
+            parts.push(summary);
+        }
     }
 
-    return parts.join('\n\n').slice(0, 4000);
+    return parts.join('\n\n').slice(0, 800);
 }

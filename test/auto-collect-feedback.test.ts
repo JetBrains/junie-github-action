@@ -174,6 +174,57 @@ describe('evaluateCollectorVerdict', () => {
         expect(verdict.rating).toBe(2);
     });
 
+    test('heart counts as positive', () => {
+        const verdict = evaluateCollectorVerdict(signals({
+            comments: [{
+                id: 1,
+                kind: 'summary',
+                body: 'x',
+                userLogin: 'junie',
+                reactions: [
+                    { content: 'heart', userLogin: 'alice', userType: 'User' },
+                ],
+            }],
+        }));
+        expect(verdict.kind).toBe('obvious_positive');
+        expect(verdict.rating).toBe(4);
+        expect(verdict.thumbsUp).toBe(1);
+    });
+
+    test('confused counts as negative', () => {
+        const verdict = evaluateCollectorVerdict(signals({
+            comments: [{
+                id: 1,
+                kind: 'inline',
+                body: 'x',
+                userLogin: 'junie',
+                reactions: [
+                    { content: 'confused', userLogin: 'alice', userType: 'User' },
+                ],
+            }],
+        }));
+        expect(verdict.kind).toBe('obvious_negative');
+        expect(verdict.rating).toBe(2);
+        expect(verdict.thumbsDown).toBe(1);
+    });
+
+    test('heart and thumbs-up together can reach rating 5', () => {
+        const verdict = evaluateCollectorVerdict(signals({
+            comments: [{
+                id: 1,
+                kind: 'summary',
+                body: 'x',
+                userLogin: 'junie',
+                reactions: [
+                    { content: '+1', userLogin: 'alice', userType: 'User' },
+                    { content: 'heart', userLogin: 'bob', userType: 'User' },
+                ],
+            }],
+        }));
+        expect(verdict.kind).toBe('obvious_positive');
+        expect(verdict.rating).toBe(5);
+    });
+
     test('ambiguous when both thumbs', () => {
         const verdict = evaluateCollectorVerdict(signals({
             comments: [{
@@ -217,7 +268,7 @@ describe('evaluateCollectorVerdict', () => {
 });
 
 describe('buildAutoCollectedComment', () => {
-    test('includes evidence prefix', () => {
+    test('includes evidence prefix and short reply summary', () => {
         const comment = buildAutoCollectedComment({
             kind: 'obvious_positive',
             rating: 4,
@@ -227,8 +278,24 @@ describe('buildAutoCollectedComment', () => {
             needsAgent: false,
         });
         expect(comment).toContain('[auto-collected from PR reactions/replies]');
-        expect(comment).toContain('👍×1');
+        expect(comment).toContain('👍❤️×1');
         expect(comment).toContain('nice catch');
+    });
+
+    test('does not dump full long replies into submitted comment', () => {
+        const longReply = 'x'.repeat(2000);
+        const comment = buildAutoCollectedComment({
+            kind: 'obvious_negative',
+            rating: 2,
+            thumbsUp: 0,
+            thumbsDown: 1,
+            replyTexts: [longReply, longReply, longReply, longReply],
+            needsAgent: false,
+        });
+        expect(comment.length).toBeLessThanOrEqual(800);
+        expect(comment).toContain('…');
+        expect(comment).toContain('(+1 more)');
+        expect(comment).not.toContain(longReply);
     });
 });
 

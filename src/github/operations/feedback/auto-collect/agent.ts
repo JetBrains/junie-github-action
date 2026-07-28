@@ -17,8 +17,8 @@ export function buildAgentPrompt(signals: SessionFeedbackSignals, verdict: Colle
     return `You are extracting structured feedback about a Junie code review on a GitHub PR.
 
 Collector already found mixed or text-only signals:
-- thumbsUp: ${verdict.thumbsUp}
-- thumbsDown: ${verdict.thumbsDown}
+- positive reactions (👍/❤️): ${verdict.thumbsUp}
+- negative reactions (👎/😕): ${verdict.thumbsDown}
 - reply count: ${verdict.replyTexts.length}
 
 Your job: rate the QUALITY of Junie's code review (not the PR code itself) from 1 (bad) to 5 (excellent).
