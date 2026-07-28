@@ -2,7 +2,7 @@ import {mkdir, writeFile, readFile} from 'fs/promises';
 import {join} from 'path';
 import type {AgentFeedbackResult, CollectorVerdict, SessionFeedbackSignals} from './types';
 
-const AGENT_JSON_RE = /\{[\s\S]*"rating"[\s\S]*}/;
+const AGENT_JSON_RE = /\{[\s\S]*?"rating"[\s\S]*?\}/;
 
 export function buildAgentPrompt(signals: SessionFeedbackSignals, verdict: CollectorVerdict): string {
     const junieComments = signals.comments
