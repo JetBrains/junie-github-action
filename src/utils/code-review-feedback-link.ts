@@ -96,11 +96,18 @@ export async function verifyCodeReviewFeedbackToken(
 ): Promise<VerifyCodeReviewFeedbackResponse> {
     const baseUrl = resolveCodeReviewFeedbackApiBaseUrl(apiBaseUrl);
     const url = `${baseUrl}/code-review-feedback/verify?token=${encodeURIComponent(token)}`;
-    const response = await fetch(url, { method: 'GET' });
-    if (!response.ok) {
-        throw new Error(`Feedback verify failed with status ${response.status}`);
+    try {
+        const response = await fetch(url, { method: 'GET' });
+        if (!response.ok) {
+            console.warn(`Feedback verify failed with status ${response.status}`);
+            return { valid: false };
+        }
+        return (await response.json()) as VerifyCodeReviewFeedbackResponse;
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn(`Feedback verify failed: ${message}`);
+        return { valid: false };
     }
-    return (await response.json()) as VerifyCodeReviewFeedbackResponse;
 }
 
 export async function submitCodeReviewFeedback(
@@ -108,23 +115,31 @@ export async function submitCodeReviewFeedback(
     apiBaseUrl?: string,
 ): Promise<SubmitCodeReviewFeedbackResponse> {
     const baseUrl = resolveCodeReviewFeedbackApiBaseUrl(apiBaseUrl);
-    const response = await fetch(`${baseUrl}/code-review-feedback/submit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            token: params.token,
-            rating: params.rating,
-            comment: params.comment,
-        }),
-    });
+    try {
+        const response = await fetch(`${baseUrl}/code-review-feedback/submit`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                token: params.token,
+                rating: params.rating,
+                comment: params.comment,
+            }),
+        });
 
-    if (!response.ok) {
-        const text = await response.text().catch(() => '');
+        if (!response.ok) {
+            const text = await response.text().catch(() => '');
+            return {
+                success: false,
+                error: `submit failed with status ${response.status}${text ? `: ${text}` : ''}`,
+            };
+        }
+
+        return (await response.json()) as SubmitCodeReviewFeedbackResponse;
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
         return {
             success: false,
-            error: `submit failed with status ${response.status}${text ? `: ${text}` : ''}`,
+            error: message,
         };
     }
-
-    return (await response.json()) as SubmitCodeReviewFeedbackResponse;
 }

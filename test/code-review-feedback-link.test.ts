@@ -127,4 +127,32 @@ describe('code-review-feedback-link', () => {
             globalThis.fetch = originalFetch;
         }
     });
+
+    test('submitCodeReviewFeedback returns success false on network error', async () => {
+        const originalFetch = globalThis.fetch;
+        globalThis.fetch = mock(() => Promise.reject(new Error('network down'))) as typeof fetch;
+
+        try {
+            const result = await submitCodeReviewFeedback({
+                token: 'tok.en',
+                rating: 4,
+            });
+            expect(result.success).toBe(false);
+            expect(result.error).toContain('network down');
+        } finally {
+            globalThis.fetch = originalFetch;
+        }
+    });
+
+    test('verifyCodeReviewFeedbackToken returns invalid on network error', async () => {
+        const originalFetch = globalThis.fetch;
+        globalThis.fetch = mock(() => Promise.reject(new Error('network down'))) as typeof fetch;
+
+        try {
+            const result = await verifyCodeReviewFeedbackToken('tok.en');
+            expect(result.valid).toBe(false);
+        } finally {
+            globalThis.fetch = originalFetch;
+        }
+    });
 });

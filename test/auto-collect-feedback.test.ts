@@ -260,6 +260,7 @@ describe('evaluateCollectorVerdict', () => {
                     kind: 'reply',
                     body: 'This review missed the null check',
                     userLogin: 'alice',
+                    userType: 'User',
                     reactions: [],
                 },
             ],
@@ -267,6 +268,31 @@ describe('evaluateCollectorVerdict', () => {
         expect(verdict.kind).toBe('text_only');
         expect(verdict.needsAgent).toBe(true);
         expect(verdict.replyTexts[0]).toContain('null check');
+    });
+
+    test('ignores bot replies when collecting text signals', () => {
+        const verdict = evaluateCollectorVerdict(signals({
+            comments: [
+                {
+                    id: 1,
+                    kind: 'summary',
+                    body: 'review',
+                    userLogin: 'junie-agent',
+                    userType: 'Bot',
+                    reactions: [],
+                },
+                {
+                    id: 2,
+                    kind: 'reply',
+                    body: 'automated follow-up',
+                    userLogin: 'github-actions[bot]',
+                    userType: 'Bot',
+                    reactions: [],
+                },
+            ],
+        }));
+        expect(verdict.kind).toBe('empty');
+        expect(verdict.replyTexts).toEqual([]);
     });
 });
 

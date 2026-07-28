@@ -19,6 +19,7 @@ export interface CollectedComment {
     kind: 'summary' | 'inline' | 'reply';
     body: string;
     userLogin: string;
+    userType?: string;
     htmlUrl?: string;
     path?: string;
     reactions: CollectedReaction[];

@@ -144,6 +144,7 @@ export async function collectSessionFeedbackSignals(
             kind: 'summary',
             body: comment.body || '',
             userLogin: comment.user?.login || 'unknown',
+            userType: comment.user?.type,
             htmlUrl: comment.html_url,
             reactions,
         });
@@ -170,6 +171,7 @@ export async function collectSessionFeedbackSignals(
                 kind: 'inline',
                 body: inline.body || '',
                 userLogin: inline.user?.login || 'unknown',
+                userType: inline.user?.type,
                 htmlUrl: inline.html_url,
                 path: inline.path,
                 reactions,
@@ -182,6 +184,7 @@ export async function collectSessionFeedbackSignals(
                     kind: 'reply',
                     body: reply.body || '',
                     userLogin: reply.user?.login || 'unknown',
+                    userType: reply.user?.type,
                     htmlUrl: reply.html_url,
                     path: reply.path,
                     reactions: [],
@@ -195,11 +198,12 @@ export async function collectSessionFeedbackSignals(
 
 /** Test helper: build reactions fetcher overrides without hitting GitHub. */
 export async function collectSessionFeedbackSignalsWithFetchers(
-    issueComments: Array<{ id: number; body: string; userLogin: string; htmlUrl?: string }>,
+    issueComments: Array<{ id: number; body: string; userLogin: string; userType?: string; htmlUrl?: string }>,
     reviewComments: Array<{
         id: number;
         body: string;
         userLogin: string;
+        userType?: string;
         htmlUrl?: string;
         path?: string;
         inReplyToId?: number;
@@ -228,6 +232,7 @@ export async function collectSessionFeedbackSignalsWithFetchers(
             kind: 'summary',
             body: comment.body,
             userLogin: comment.userLogin,
+            userType: comment.userType,
             htmlUrl: comment.htmlUrl,
             reactions: await listReactions(comment.id, 'issue'),
         });
@@ -245,6 +250,7 @@ export async function collectSessionFeedbackSignalsWithFetchers(
                 kind: 'inline',
                 body: inline.body,
                 userLogin: inline.userLogin,
+                userType: inline.userType,
                 htmlUrl: inline.htmlUrl,
                 path: inline.path,
                 reactions: await listReactions(inline.id, 'review'),
@@ -255,6 +261,7 @@ export async function collectSessionFeedbackSignalsWithFetchers(
                     kind: 'reply',
                     body: reply.body,
                     userLogin: reply.userLogin,
+                    userType: reply.userType,
                     htmlUrl: reply.htmlUrl,
                     path: reply.path,
                     reactions: [],

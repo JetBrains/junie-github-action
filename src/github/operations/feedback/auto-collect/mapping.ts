@@ -7,12 +7,20 @@ const BOT_LOGINS = new Set([
     'junie[bot]',
 ]);
 
-function isBotActor(reaction: CollectedReaction): boolean {
-    if (reaction.userType === 'Bot') {
+function isBotActor(userLogin: string, userType?: string): boolean {
+    if (userType === 'Bot') {
         return true;
     }
-    const login = reaction.userLogin.toLowerCase();
+    const login = userLogin.toLowerCase();
     return BOT_LOGINS.has(login) || login.endsWith('[bot]');
+}
+
+function isBotReaction(reaction: CollectedReaction): boolean {
+    return isBotActor(reaction.userLogin, reaction.userType);
+}
+
+function isBotComment(comment: CollectedComment): boolean {
+    return isBotActor(comment.userLogin, comment.userType);
 }
 
 /**
@@ -25,7 +33,7 @@ export function countHumanThumbs(comments: CollectedComment[]): { thumbsUp: numb
 
     for (const comment of comments) {
         for (const reaction of comment.reactions) {
-            if (isBotActor(reaction)) {
+            if (isBotReaction(reaction)) {
                 continue;
             }
             if (reaction.content === '+1' || reaction.content === 'heart') {
@@ -41,7 +49,7 @@ export function countHumanThumbs(comments: CollectedComment[]): { thumbsUp: numb
 
 export function collectReplyTexts(comments: CollectedComment[], maxChars = 4000): string[] {
     const replies = comments
-        .filter((c) => c.kind === 'reply')
+        .filter((c) => c.kind === 'reply' && !isBotComment(c))
         .map((c) => c.body.trim())
         .filter(Boolean);
 
