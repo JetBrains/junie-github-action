@@ -23,7 +23,6 @@ import {
     JIRA_EVENT_ACTION, JUNIE_AGENT,
     MINOR_FIX_ACTION,
     RESOLVE_CONFLICTS_ACTION,
-    AUTO_COLLECT_FEEDBACK_ACTION,
     YOUTRACK_EVENT_ACTION,
 } from "../constants/github";
 import {isReviewOrCommentHasCodeReviewTrigger, isReviewOrCommentHasFixCITrigger, isReviewOrCommentHasMinorFixTrigger} from "./validation/trigger";
@@ -75,10 +74,6 @@ export type YouTrackIssuePayload = WorkflowDispatchEvent & {
 // Jira integration types
 export type ResolveConflictsEventPayload = WorkflowDispatchEvent & {
     action: typeof RESOLVE_CONFLICTS_ACTION;
-};
-
-export type AutoCollectFeedbackEventPayload = WorkflowDispatchEvent & {
-    action: typeof AUTO_COLLECT_FEEDBACK_ACTION;
 };
 
 export type ScheduleEvent = {
@@ -169,8 +164,7 @@ export type AutomationEventContext = JunieWorkflowContext & {
         | WorkflowRunEvent
         | JiraIssuePayload
         | YouTrackIssuePayload
-        | ResolveConflictsEventPayload
-        | AutoCollectFeedbackEventPayload;
+        | ResolveConflictsEventPayload;
 };
 
 // Union type representing all possible Junie execution contexts
@@ -311,21 +305,6 @@ export function extractJunieWorkflowContext(tokenOwner: TokenOwner): JunieExecut
                     },
                 };
                 break
-            }
-
-            if (payload.inputs?.action == AUTO_COLLECT_FEEDBACK_ACTION) {
-                const prNumber = Number(payload.inputs?.prNumber);
-                parsedContext = {
-                    ...commonFields,
-                    isPR: Number.isFinite(prNumber) && prNumber > 0,
-                    entityNumber: Number.isFinite(prNumber) && prNumber > 0 ? prNumber : undefined,
-                    eventName: context.eventName,
-                    payload: {
-                        ...payload,
-                        action: AUTO_COLLECT_FEEDBACK_ACTION,
-                    },
-                };
-                break;
             }
 
             // Handle Jira integration event
@@ -534,12 +513,6 @@ export function isResolveConflictsWorkflowDispatchEvent(context: JunieExecutionC
     payload: ResolveConflictsEventPayload
 } {
     return context.eventName === "workflow_dispatch" && 'action' in context.payload && context.payload.action === RESOLVE_CONFLICTS_ACTION;
-}
-
-export function isAutoCollectFeedbackWorkflowDispatchEvent(context: JunieExecutionContext): context is AutomationEventContext & {
-    payload: AutoCollectFeedbackEventPayload
-} {
-    return context.eventName === "workflow_dispatch" && 'action' in context.payload && context.payload.action === AUTO_COLLECT_FEEDBACK_ACTION;
 }
 
 export function isCheckSuiteEvent(context: JunieExecutionContext): context is AutomationEventContext & {

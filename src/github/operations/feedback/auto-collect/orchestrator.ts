@@ -20,11 +20,6 @@ export interface AutoCollectOptions {
     junieFlags?: string;
     /** When false, skip agent and treat ambiguous/text_only as skipped_ambiguous */
     enableAgent?: boolean;
-    /**
-     * Collect + resolve rating/comment but do not call BFF submit.
-     * Posts the would-be payload in the PR notification instead.
-     */
-    dryRun?: boolean;
 }
 
 async function processSession(
@@ -35,21 +30,17 @@ async function processSession(
         sessionId: signals.sessionId,
         runId: signals.runId,
     };
-    const dryRun = options.dryRun === true;
 
     if (!signals.token) {
         return { ...base, status: 'skipped_invalid_token', detail: 'no feedback token on PR' };
     }
 
-    let alreadySubmittedOnBackend = false;
     try {
         const verify = await verifyCodeReviewFeedbackToken(signals.token, options.apiBaseUrl);
         if (!verify.valid) {
             return { ...base, status: 'skipped_invalid_token', detail: 'token invalid or expired' };
         }
-        alreadySubmittedOnBackend = Boolean(verify.alreadySubmitted);
-        // In dry-run we still preview the payload even if backend already has a submission.
-        if (alreadySubmittedOnBackend && !dryRun) {
+        if (verify.alreadySubmitted) {
             return { ...base, status: 'already_submitted' };
         }
     } catch (error) {
@@ -59,12 +50,11 @@ async function processSession(
 
     const verdict = evaluateCollectorVerdict(signals);
     console.log(
-        `Session ${signals.sessionId}: verdict=${verdict.kind} 👍${verdict.thumbsUp} 👎${verdict.thumbsDown}` +
-        (dryRun ? ' (dry-run)' : ''),
+        `Session ${signals.sessionId}: verdict=${verdict.kind} 👍${verdict.thumbsUp} 👎${verdict.thumbsDown}`,
     );
 
     if (verdict.kind === 'empty') {
-        return { ...base, status: 'skipped_empty', alreadySubmittedOnBackend };
+        return { ...base, status: 'skipped_empty' };
     }
 
     let rating = verdict.rating;
@@ -76,7 +66,6 @@ async function processSession(
                 ...base,
                 status: 'skipped_ambiguous',
                 detail: verdict.kind,
-                alreadySubmittedOnBackend,
             };
         }
 
@@ -95,7 +84,6 @@ async function processSession(
                 detail: agentResult
                     ? `agent confidence=low (${agentResult.rationale || 'no rationale'})`
                     : 'agent unavailable or unparseable',
-                alreadySubmittedOnBackend,
             };
         }
 
@@ -108,24 +96,10 @@ async function processSession(
             ...base,
             status: 'skipped_ambiguous',
             detail: 'no rating produced',
-            alreadySubmittedOnBackend,
         };
     }
 
     const comment = buildAutoCollectedComment(verdict, agentComment);
-
-    if (dryRun) {
-        return {
-            ...base,
-            status: 'dry_run',
-            rating,
-            comment,
-            alreadySubmittedOnBackend,
-            detail: alreadySubmittedOnBackend
-                ? 'dry-run preview only; backend already has a submission'
-                : 'dry-run preview only; BFF submit skipped',
-        };
-    }
 
     const submitResult = await submitCodeReviewFeedback(
         { token: signals.token, rating, comment },
@@ -146,11 +120,8 @@ async function processSession(
 }
 
 export async function runAutoCollectFeedback(options: AutoCollectOptions): Promise<SessionCollectOutcome[]> {
-    const { octokit, owner, repo, prNumber, dryRun } = options;
-    console.log(
-        `Auto-collecting code-review feedback for ${owner}/${repo}#${prNumber}` +
-        (dryRun ? ' [DRY RUN — will not submit]' : ''),
-    );
+    const { octokit, owner, repo, prNumber } = options;
+    console.log(`Auto-collecting code-review feedback for ${owner}/${repo}#${prNumber}`);
 
     const sessions = await collectSessionFeedbackSignals(octokit, owner, repo, prNumber);
     console.log(`Found ${sessions.length} feedback session(s)`);
@@ -160,6 +131,6 @@ export async function runAutoCollectFeedback(options: AutoCollectOptions): Promi
         outcomes.push(await processSession(session, options));
     }
 
-    await postAutoCollectNotification(octokit, owner, repo, prNumber, outcomes, { dryRun: Boolean(dryRun) });
+    await postAutoCollectNotification(octokit, owner, repo, prNumber, outcomes);
     return outcomes;
 }

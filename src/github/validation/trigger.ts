@@ -8,11 +8,9 @@ import {
     isPullRequestEvent,
     isPullRequestReviewCommentEvent,
     isPullRequestReviewEvent,
-    isAutoCollectFeedbackWorkflowDispatchEvent,
 } from "../context";
 import {
     CODE_REVIEW_TRIGGER_PHRASE_REGEXP,
-    COLLECT_REVIEW_FEEDBACK_TRIGGER_PHRASE_REGEXP,
     FIX_CI_TRIGGER_PHRASE_REGEXP,
     MINOR_FIX_TRIGGER_PHRASE_REGEXP,
     RESOLVE_CONFLICTS_TRIGGER_PHRASE_REGEXP,
@@ -110,15 +108,9 @@ export function isReviewOrCommentHasMinorFixTrigger(context: JunieExecutionConte
     return isReviewOrCommentHasTrigger(context, MINOR_FIX_TRIGGER_PHRASE_REGEXP)
 }
 
-export function isReviewOrCommentHasCollectFeedbackTrigger(context: JunieExecutionContext) {
-    return isReviewOrCommentHasTrigger(context, COLLECT_REVIEW_FEEDBACK_TRIGGER_PHRASE_REGEXP)
-}
-
 /**
- * Auto-collect feedback triggers when input auto_collect_feedback is enabled:
- * - pull_request closed (merged or closed manually)
- * - comment / review containing "Collect review feedback" (for testing + manual re-run)
- * - workflow_dispatch with action=auto-collect-feedback + prNumber (branch-based testing)
+ * Auto-collect feedback runs when input auto_collect_feedback is enabled and the PR is closed
+ * (merged or closed manually).
  */
 export function shouldAutoCollectFeedback(context: JunieExecutionContext): boolean {
     if (!context.inputs.autoCollectFeedback) {
@@ -129,18 +121,8 @@ export function shouldAutoCollectFeedback(context: JunieExecutionContext): boole
         return false;
     }
 
-    if (isAutoCollectFeedbackWorkflowDispatchEvent(context)) {
-        console.log(`Auto-collect feedback triggered by workflow_dispatch for PR #${context.entityNumber}`);
-        return true;
-    }
-
     if (isPullRequestEvent(context) && context.eventAction === "closed") {
         console.log("Auto-collect feedback triggered by pull_request closed");
-        return true;
-    }
-
-    if (isReviewOrCommentHasCollectFeedbackTrigger(context)) {
-        console.log("Auto-collect feedback triggered by Collect review feedback comment");
         return true;
     }
 

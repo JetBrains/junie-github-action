@@ -71,14 +71,8 @@ inputs:
     default: "https://junie.jetbrains.com/api/public/no-auth"
   auto_collect_feedback:
     description: >
-      When true, enable auto-collect of code-review feedback (reactions/replies) on PR close
-      or "Collect review feedback" comments, and hide the manual Share feedback link after review.
-    required: false
-    default: "false"
-  auto_collect_feedback_dry_run:
-    description: >
-      When true (with auto_collect_feedback), collect and resolve feedback but do NOT call BFF submit.
-      Posts a PR comment with the rating/comment that would have been sent.
+      When true, enable auto-collect of code-review feedback (reactions/replies) when a PR is closed
+      (merged or closed manually), and hide the manual Share feedback link after review.
     required: false
     default: "false"
   model:
@@ -284,7 +278,6 @@ runs:
         APP_TOKEN: ${{ inputs.junie_api_key }}
         WORKING_DIR: ${{ inputs.junie_work_dir }}
         CODE_REVIEW_FEEDBACK_API_BASE_URL: ${{ inputs.code_review_feedback_api_base_url }}
-        AUTO_COLLECT_FEEDBACK_DRY_RUN: ${{ inputs.auto_collect_feedback_dry_run }}
         CUSTOM_JUNIE_ARGS: ${{ steps.prepare.outputs.CUSTOM_JUNIE_ARGS }}
         MODEL: ${{ inputs.model }}
         OPENAI_API_KEY: ${{ inputs.openai_api_key }}

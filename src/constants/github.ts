@@ -24,9 +24,6 @@ export const RESOLVE_CONFLICTS_TRIGGER_PHRASE = "resolve conflicts"
 
 export const RESOLVE_CONFLICTS_TRIGGER_PHRASE_REGEXP = new RegExp(RESOLVE_CONFLICTS_TRIGGER_PHRASE, 'i')
 
-/** workflow_dispatch action input for manual/test auto-collect runs from a feature branch. */
-export const AUTO_COLLECT_FEEDBACK_ACTION = "auto-collect-feedback";
-
 export const CODE_REVIEW_ACTION = "code-review";
 
 export const CODE_REVIEW_TRIGGER_PHRASE_REGEXP = new RegExp(CODE_REVIEW_ACTION, 'i')
@@ -38,14 +35,6 @@ export const FIX_CI_TRIGGER_PHRASE_REGEXP = new RegExp(FIX_CI_ACTION, 'i');
 export const MINOR_FIX_ACTION = "minor-fix";
 
 export const MINOR_FIX_TRIGGER_PHRASE_REGEXP = new RegExp(MINOR_FIX_ACTION, 'i');
-
-/** Manual / test trigger to auto-collect code-review feedback without closing the PR. */
-export const COLLECT_REVIEW_FEEDBACK_TRIGGER_PHRASE = "Collect review feedback";
-
-export const COLLECT_REVIEW_FEEDBACK_TRIGGER_PHRASE_REGEXP = new RegExp(
-    COLLECT_REVIEW_FEEDBACK_TRIGGER_PHRASE,
-    "i",
-);
 
 export const JIRA_EVENT_ACTION = "jira_event";
 
@@ -235,7 +224,7 @@ export const CODE_REVIEW_FEEDBACK_LINK_SECTION = (feedbackLink: string) =>
     `\n\n---\n\n**Help us improve Junie code review (EAP):** [Share feedback](${feedbackLink})`
 
 /**
- * Hidden machine-readable marker for auto-collect on PR close / comment trigger.
+ * Hidden machine-readable marker for auto-collect on PR close.
  * Includes token when Share feedback link is omitted (auto-collect mode).
  */
 export function createCodeReviewFeedbackMarker(

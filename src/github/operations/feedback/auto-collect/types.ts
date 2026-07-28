@@ -57,7 +57,6 @@ export interface AgentFeedbackResult {
 
 export type SessionCollectOutcomeStatus =
     | 'submitted'
-    | 'dry_run'
     | 'already_submitted'
     | 'skipped_empty'
     | 'skipped_ambiguous'
@@ -69,9 +68,7 @@ export interface SessionCollectOutcome {
     runId: string;
     status: SessionCollectOutcomeStatus;
     rating?: number;
-    /** Comment that was / would be sent to BFF submit */
+    /** Comment that was sent to BFF submit */
     comment?: string;
     detail?: string;
-    /** Informational: backend already has a submission (dry-run still previews) */
-    alreadySubmittedOnBackend?: boolean;
 }

@@ -2,7 +2,6 @@ import { describe, expect, test } from 'bun:test';
 import {
     createCodeReviewFeedbackMarker,
     createInlineFeedbackMarker,
-    COLLECT_REVIEW_FEEDBACK_TRIGGER_PHRASE_REGEXP,
 } from '../src/constants/github';
 import {
     extractFeedbackTokenFromBody,
@@ -98,14 +97,6 @@ describe('feedback markers', () => {
         expect(sessions[0].comments[1].reactions).toEqual([
             { content: '+1', userLogin: 'alice', userType: 'User' },
         ]);
-    });
-});
-
-describe('collect review feedback trigger', () => {
-    test('matches Collect review feedback phrase', () => {
-        expect(COLLECT_REVIEW_FEEDBACK_TRIGGER_PHRASE_REGEXP.test('Please Collect review feedback now')).toBe(true);
-        expect(COLLECT_REVIEW_FEEDBACK_TRIGGER_PHRASE_REGEXP.test('collect REVIEW feedback')).toBe(true);
-        expect(COLLECT_REVIEW_FEEDBACK_TRIGGER_PHRASE_REGEXP.test('code-review')).toBe(false);
     });
 });
 
@@ -302,23 +293,5 @@ describe('buildAutoCollectNotificationBody', () => {
         ]);
         expect(body).toContain('rating **4**');
         expect(body).toContain('no reactions/replies');
-    });
-
-    test('renders dry-run payload with comment', () => {
-        const body = buildAutoCollectNotificationBody(
-            [{
-                sessionId: 's1',
-                runId: '42',
-                status: 'dry_run',
-                rating: 4,
-                comment: '[auto-collected] nice review',
-                alreadySubmittedOnBackend: false,
-            }],
-            { dryRun: true },
-        );
-        expect(body).toContain('(dry-run)');
-        expect(body).toContain('was **not** submitted');
-        expect(body).toContain('**rating:** 4');
-        expect(body).toContain('[auto-collected] nice review');
     });
 });
