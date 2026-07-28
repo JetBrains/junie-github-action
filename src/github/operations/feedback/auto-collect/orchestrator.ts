@@ -18,8 +18,6 @@ export interface AutoCollectOptions {
     workingDir: string;
     cliToken?: string;
     junieFlags?: string;
-    /** When false, skip agent and treat ambiguous/text_only as skipped_ambiguous */
-    enableAgent?: boolean;
 }
 
 async function processSession(
@@ -61,14 +59,6 @@ async function processSession(
     let agentComment: string | undefined;
 
     if (verdict.needsAgent) {
-        if (options.enableAgent === false) {
-            return {
-                ...base,
-                status: 'skipped_ambiguous',
-                detail: verdict.kind,
-            };
-        }
-
         const agentResult = await runAgentFeedbackEnrichment({
             signals,
             verdict,

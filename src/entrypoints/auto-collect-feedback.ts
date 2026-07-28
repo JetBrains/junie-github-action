@@ -1,6 +1,5 @@
 #!/usr/bin/env bun
 
-import * as core from '@actions/core';
 import {buildGitHubApiClient} from '../github/api/client';
 import {JunieExecutionContext} from '../github/context';
 import {runAutoCollectFeedback} from '../github/operations/feedback/auto-collect/orchestrator';
@@ -16,7 +15,7 @@ async function run() {
         }
 
         if (!context.isPR || !context.entityNumber) {
-            console.log('Auto-collect feedback requires a pull request context — skipping');
+            console.log('Auto-collect feedback requires a pull request context - skipping');
             return;
         }
 
@@ -25,7 +24,7 @@ async function run() {
         const workingDir = process.env[ENV_VARS.WORKING_DIR] || '/tmp/junie-work';
         const octokit = buildGitHubApiClient(githubToken);
 
-        // JUNIE_FLAGS is assembled by src/scripts/build-junie-flags.sh (same as Run junie).
+        // JUNIE_FLAGS is assembled by src/scripts/build-junie-flags.sh (same as Run Junie).
         const outcomes = await runAutoCollectFeedback({
             octokit: octokit.rest,
             owner,
@@ -35,12 +34,9 @@ async function run() {
             workingDir,
             cliToken: process.env[OUTPUT_VARS.EJ_CLI_TOKEN] || process.env[ENV_VARS.APP_TOKEN],
             junieFlags: process.env.JUNIE_FLAGS || '',
-            enableAgent: process.env.AUTO_COLLECT_ENABLE_AGENT !== 'false',
         });
 
         const submitted = outcomes.filter((o) => o.status === 'submitted').length;
-        core.setOutput('AUTO_COLLECT_SUBMITTED_COUNT', String(submitted));
-        core.setOutput('AUTO_COLLECT_OUTCOMES', JSON.stringify(outcomes));
         console.log(`Auto-collect finished: ${submitted} submitted, ${outcomes.length} total`);
     } catch (error) {
         handleStepError('Auto-collect feedback step', error);

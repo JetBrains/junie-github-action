@@ -108,7 +108,7 @@ export function summarizeReplyTexts(replyTexts: string[], maxChars = 400): strin
 
 /**
  * Map aggregated PR signals to a collector verdict.
- * Merge/close alone never produces a rating — only explicit reactions/replies.
+ * Merge/close alone never produces a rating - only explicit reactions/replies.
  */
 export function evaluateCollectorVerdict(signals: SessionFeedbackSignals): CollectorVerdict {
     const { thumbsUp, thumbsDown } = countHumanThumbs(signals.comments);

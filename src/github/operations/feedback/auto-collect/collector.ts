@@ -154,7 +154,7 @@ export async function collectSessionFeedbackSignals(
     for (const session of sessionsByKey.values()) {
         if (session.runId === 'unknown') {
             console.warn(
-                `Session ${session.sessionId}: runId unknown — cannot correlate inline comments`,
+                `Session ${session.sessionId}: runId unknown - cannot correlate inline comments`,
             );
             continue;
         }
