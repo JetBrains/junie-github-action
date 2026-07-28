@@ -18,6 +18,7 @@ A powerful GitHub Action that integrates [Junie](https://www.jetbrains.com/junie
   - [GitHub Token Considerations](#github-token-considerations)
   - [BYOK Authentication](#byok-authentication)
 - [How It Works](#how-it-works)
+- [Auto-collect Code Review Feedback](#auto-collect-code-review-feedback)
 - [Security Considerations](#security-considerations)
 - [Troubleshooting](#troubleshooting)
 
@@ -27,6 +28,7 @@ A powerful GitHub Action that integrates [Junie](https://www.jetbrains.com/junie
 - **Issue Resolution**: Automatically implements solutions for GitHub issues
 - **PR Management**: Reviews code changes and implements requested modifications
 - **Inline Code Reviews**: Create code review comments with GitHub suggestions directly on PR diffs
+- **Auto-collect Code Review Feedback**: Optionally collect PR reactions/replies after close and submit feedback automatically (EAP / JUNP license only)
 - **Minor PR Fixes**: Quickly implement small changes in PRs using `@junie-agent minor-fix [instruction]`
 - **CI Failure Analysis**: Investigates failed checks and suggests fixes using MCP integration
 - **Flexible Triggers**: Activate via mentions, assignees, labels, or custom prompts
@@ -185,6 +187,7 @@ junie-args: --model=opus
 | `silent_mode` | Run Junie without comments, branch creation, or commits - only prepare data and output results | `false` |
 | `use_single_comment` | Update a single comment for all runs instead of creating new comments each time | `false` |
 | `attach_github_context_to_custom_prompt` | Attach GitHub context (PR/issue info, commits, reviews, etc.) when using custom prompt | `false` |
+| `auto_collect_feedback` | Auto-collect code-review feedback from reactions/replies when a PR is closed (EAP / JUNP only). Also hides the manual Share feedback link after review. See [Auto-collect Code Review Feedback](#auto-collect-code-review-feedback). | `false` |
 
 #### Jira Integration
 
@@ -415,6 +418,51 @@ jobs:
 7. **Junie Execution**: Runs Junie CLI with the prepared task and connected MCP tools
 8. **Result Processing**: Analyzes changes, determines the action (commit, PR, or comment), and sanitizes Junie's output to redact tokens and prevent self-triggering
 9. **Feedback**: Updates GitHub with results, PR links, and commit information
+
+## Auto-collect Code Review Feedback
+
+Optional flow for **EAP (JUNP) licenses only**. The feedback token/link is created only when the Junie API key resolves to license type `JUNP`. For other licenses, `create-link` returns 403, no marker/token is written, and auto-collect has nothing to submit (effectively a no-op).
+
+When `auto_collect_feedback: "true"` and the license is EAP:
+
+1. After a successful `code-review` run, the manual **Share feedback** link is hidden. A hidden marker (session, run id, token) stays on the review comment so collect can correlate summary + inline comments.
+2. When the PR is **closed** (merged or closed manually) and the same input is enabled, the action collects human reactions/replies, maps them to a 1-5 rating, submits to the feedback API, and posts a short PR comment with the outcome.
+
+Recommended setup: keep review and collect as separate workflows so open/sync PRs do not show a skipped collect check.
+
+```yaml
+# Review job (opened / ready_for_review)
+- uses: JetBrains/junie-github-action@v1
+  with:
+    junie_api_key: ${{ secrets.JUNIE_API_KEY }}
+    prompt: "code-review"
+    use_single_comment: "true"
+    auto_collect_feedback: "true"
+
+# Separate workflow on pull_request closed
+- uses: JetBrains/junie-github-action@v1
+  with:
+    junie_api_key: ${{ secrets.JUNIE_API_KEY }}
+    auto_collect_feedback: "true"
+```
+
+### Behavior
+
+| Signal | Result |
+|--------|--------|
+| Only positive reactions (`+1`, `heart`) | Rating 4 (one) or 5 (two+) |
+| Only negative reactions (`-1`, `confused`) | Rating 2 (one) or 1 (two+) |
+| Mixed positive + negative | Junie agent resolves rating + short comment |
+| Replies only (no useful reactions) | Junie agent resolves rating + short comment |
+| No reactions and no replies | Skip submit |
+| Already submitted / invalid token | Skip submit |
+
+Notes:
+- EAP / JUNP only - non-EAP keys skip feedback link creation and auto-collect submit.
+- Bot reactions are ignored.
+- Closing or merging alone never creates a rating.
+- When the agent is not used, reply text is stored as a short summary (not full comment bodies).
+- Other GitHub reactions (`laugh`, `hooray`, `rocket`, `eyes`) are ignored.
 
 ## Security Considerations
 

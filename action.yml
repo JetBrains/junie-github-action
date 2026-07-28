@@ -73,6 +73,7 @@ inputs:
     description: >
       When true, enable auto-collect of code-review feedback (reactions/replies) when a PR is closed
       (merged or closed manually), and hide the manual Share feedback link after review.
+      EAP (JUNP) licenses only; for other licenses create-link is skipped and collect is a no-op.
     required: false
     default: "false"
   model:

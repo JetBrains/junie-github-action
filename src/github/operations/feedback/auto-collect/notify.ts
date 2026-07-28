@@ -1,18 +1,21 @@
 import type {Octokit} from '@octokit/rest';
 import type {SessionCollectOutcome} from './types';
 
+/** Hidden marker so reopen/close can update the same outcome comment instead of spamming. */
+export const AUTO_COLLECT_NOTIFY_MARKER = '<!-- junie-auto-collect-feedback -->';
+
 function formatOutcomeLine(outcome: SessionCollectOutcome): string {
     switch (outcome.status) {
         case 'submitted':
             return `- Session \`${outcome.sessionId}\`: auto-collected feedback submitted (rating **${outcome.rating}**).`;
         case 'already_submitted':
-            return `- Session \`${outcome.sessionId}\`: feedback was already submitted — skipped.`;
+            return `- Session \`${outcome.sessionId}\`: feedback was already submitted - skipped.`;
         case 'skipped_empty':
-            return `- Session \`${outcome.sessionId}\`: no reactions/replies on Junie review — feedback not auto-submitted.`;
+            return `- Session \`${outcome.sessionId}\`: no reactions/replies on Junie review - feedback not auto-submitted.`;
         case 'skipped_ambiguous':
             return `- Session \`${outcome.sessionId}\`: could not confidently auto-collect feedback (${outcome.detail || 'mixed signals'}).`;
         case 'skipped_invalid_token':
-            return `- Session \`${outcome.sessionId}\`: feedback token missing/invalid — skipped.`;
+            return `- Session \`${outcome.sessionId}\`: feedback token missing/invalid - skipped.`;
         case 'submit_failed':
             return `- Session \`${outcome.sessionId}\`: submit failed (${outcome.detail || 'unknown error'}).`;
         default:
@@ -23,11 +26,36 @@ function formatOutcomeLine(outcome: SessionCollectOutcome): string {
 export function buildAutoCollectNotificationBody(outcomes: SessionCollectOutcome[]): string {
     const title = '### Junie auto-collect feedback';
 
-    if (outcomes.length === 0) {
-        return `${title}\n\nNo Junie code-review feedback sessions found on this PR.`;
-    }
+    const content = outcomes.length === 0
+        ? `${title}\n\nNo Junie code-review feedback sessions found on this PR.`
+        : [title, '', ...outcomes.map(formatOutcomeLine)].join('\n');
 
-    return [title, '', ...outcomes.map(formatOutcomeLine)].join('\n');
+    return `${AUTO_COLLECT_NOTIFY_MARKER}\n${content}`;
+}
+
+export async function findExistingAutoCollectNotification(
+    octokit: Octokit,
+    owner: string,
+    repo: string,
+    prNumber: number,
+): Promise<number | undefined> {
+    try {
+        const comments = await octokit.paginate(octokit.rest.issues.listComments, {
+            owner,
+            repo,
+            issue_number: prNumber,
+            per_page: 100,
+        });
+
+        const existing = [...comments]
+            .reverse()
+            .find((comment) => comment.body?.includes(AUTO_COLLECT_NOTIFY_MARKER));
+
+        return existing?.id;
+    } catch (error) {
+        console.warn('Failed to search for existing auto-collect notification:', error);
+        return undefined;
+    }
 }
 
 export async function postAutoCollectNotification(
@@ -38,6 +66,19 @@ export async function postAutoCollectNotification(
     outcomes: SessionCollectOutcome[],
 ): Promise<void> {
     const body = buildAutoCollectNotificationBody(outcomes);
+    const existingId = await findExistingAutoCollectNotification(octokit, owner, repo, prNumber);
+
+    if (existingId) {
+        await octokit.rest.issues.updateComment({
+            owner,
+            repo,
+            comment_id: existingId,
+            body,
+        });
+        console.log(`Updated auto-collect notification comment ${existingId} on PR #${prNumber}`);
+        return;
+    }
+
     await octokit.rest.issues.createComment({
         owner,
         repo,

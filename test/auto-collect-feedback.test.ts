@@ -15,7 +15,10 @@ import {
 } from '../src/github/operations/feedback/auto-collect/mapping';
 import { parseAgentFeedbackJson } from '../src/github/operations/feedback/auto-collect/agent';
 import { collectSessionFeedbackSignalsWithFetchers } from '../src/github/operations/feedback/auto-collect/collector';
-import { buildAutoCollectNotificationBody } from '../src/github/operations/feedback/auto-collect/notify';
+import {
+    AUTO_COLLECT_NOTIFY_MARKER,
+    buildAutoCollectNotificationBody,
+} from '../src/github/operations/feedback/auto-collect/notify';
 import type { SessionFeedbackSignals } from '../src/github/operations/feedback/auto-collect/types';
 
 describe('feedback markers', () => {
@@ -353,11 +356,12 @@ describe('collectSessionFeedbackSignalsWithFetchers', () => {
 });
 
 describe('buildAutoCollectNotificationBody', () => {
-    test('renders outcomes', () => {
+    test('renders outcomes with upsert marker', () => {
         const body = buildAutoCollectNotificationBody([
             { sessionId: 's1', runId: '1', status: 'submitted', rating: 4 },
             { sessionId: 's2', runId: '2', status: 'skipped_empty' },
         ]);
+        expect(body.startsWith(AUTO_COLLECT_NOTIFY_MARKER)).toBe(true);
         expect(body).toContain('rating **4**');
         expect(body).toContain('no reactions/replies');
     });
