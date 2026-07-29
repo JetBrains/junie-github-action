@@ -12,6 +12,7 @@ import {sanitizeJunieOutput, truncateOutput, OUTPUT_SIZE_LIMITS} from "../utils/
 import * as fs from "node:fs";
 import type {CliOutput} from "../github/junie/types/junie";
 import {fetchCodeReviewFeedbackLink} from "../utils/code-review-feedback-link";
+import {formatJunieErrors, formatJunieExitCodeNote, resolveJunieOutputFile} from "../utils/junie-failure";
 
 export enum ActionType {
     WRITE_COMMENT = 'WRITE_COMMENT',
@@ -25,13 +26,17 @@ export enum ActionType {
 export async function handleResults() {
     try {
         // Read Junie output from file
-        const outputFile = process.env[ENV_VARS.JSON_JUNIE_OUTPUT_FILE];
+        const junieExitCode = process.env[ENV_VARS.JUNIE_EXIT_CODE];
+        const exitCodeNote = formatJunieExitCodeNote(junieExitCode);
+        const outputFile = resolveJunieOutputFile();
 
         if (!outputFile) {
             throw new Error(
-                `❌ Junie output file path is not set.\n\n` +
-                `This indicates that Junie execution did not complete properly.\n` +
-                `Please check the Junie execution logs above for error details.`
+                `❌ Junie did not start properly, so there is no task result to read.\n\n` +
+                exitCodeNote +
+                `Neither the Junie output file path nor the working directory is known, ` +
+                `which usually means the Junie CLI failed to launch (installation, authentication or configuration problem).\n` +
+                `Please check the 'Run Junie' step logs above for error details.`
             );
         }
 
@@ -40,12 +45,13 @@ export async function handleResults() {
         // Check if file exists
         if (!fs.existsSync(outputFile)) {
             throw new Error(
-                `❌ Junie output file not found: ${outputFile}\n\n` +
+                `❌ Junie finished without writing its output file: ${outputFile}\n\n` +
+                exitCodeNote +
                 `This could be due to:\n` +
                 `• Junie execution failed before completing\n` +
-                `• Junie crashed or was terminated\n` +
+                `• Junie crashed or was terminated (for example, the job timed out or ran out of memory)\n` +
                 `• File system error\n\n` +
-                `Please check the Junie execution logs above for error details.`
+                `Please check the 'Run Junie' step logs above for error details.`
             );
         }
 
@@ -53,31 +59,39 @@ export async function handleResults() {
 
         if (!stringJunieJsonOutput || stringJunieJsonOutput.trim() === '') {
             throw new Error(
-                `❌ Junie output file is empty.\n\n` +
+                `❌ Junie output file is empty: ${outputFile}\n\n` +
+                exitCodeNote +
                 `This could be due to:\n` +
                 `• Junie execution did not complete successfully\n` +
                 `• Junie output was empty or invalid\n\n` +
-                `Please check the Junie execution logs above for details.`
+                `Please check the 'Run Junie' step logs above for details.`
             );
         }
-        const junieJsonOutput = JSON.parse(stringJunieJsonOutput) as CliOutput
+        let junieJsonOutput: CliOutput
+        try {
+            junieJsonOutput = JSON.parse(stringJunieJsonOutput) as CliOutput
+        } catch (parseError) {
+            const parseErrorMessage = parseError instanceof Error ? parseError.message : String(parseError)
+            throw new Error(
+                `❌ Junie output file contains invalid JSON: ${outputFile}\n\n` +
+                exitCodeNote +
+                `Parse error: ${parseErrorMessage}\n` +
+                `Please check the 'Run Junie' step logs above for error details.`
+            );
+        }
         const durationMs = junieJsonOutput.duration_ms;
         const sessionId = junieJsonOutput.sessionId;
         const context = JSON.parse(process.env[OUTPUT_VARS.PARSED_CONTEXT]!) as JunieExecutionContext
         const isResolveConflict = context.inputs.resolveConflicts || isReviewOrCommentHasResolveConflictsTrigger(context)
         const junieErrors = junieJsonOutput.errors
-        if (junieErrors && (junieErrors as string[]).length > 0) {
-            const errorList = (junieErrors as string[]).map(err => `  • ${err}`).join('\n');
-            throw new Error(
-                `❌ Junie execution encountered errors during task processing.\n\n` +
-                `Errors reported:\n${errorList}\n\n` +
-                `Review the errors above and check the Junie execution logs for more details.`
-            );
+        if (junieErrors && junieErrors.length > 0) {
+            throw new Error(formatJunieErrors(junieErrors, junieExitCode));
         }
         const rawResult = junieJsonOutput.result
         if (rawResult === "Empty" || !rawResult || rawResult.trim() === "") {
             throw new Error(
                 `❌ Junie execution returned an empty result.\n\n` +
+                exitCodeNote +
                 `This typically indicates an error during task processing.\n` +
                 `Please check the Junie execution logs for details.`
             );
