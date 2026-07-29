@@ -152,6 +152,56 @@ Additional context here`;
         expect(result.args).toEqual(['--model="gpt-5"', '--other-param="test"']);
         expect(result.cleanedText).toBe('code-review');
     });
+
+    it('should extract boolean flags without values', () => {
+        const text = `Task
+junie-args: --dry-run --verbose`;
+
+        const result = extractJunieArgs(text);
+
+        expect(result.args).toEqual(['--dry-run', '--verbose']);
+        expect(result.cleanedText).toBe('Task');
+    });
+
+    it('should not extract regular dashes as boolean flags', () => {
+        const text = `Task with -- regular dashes
+junie-args: --dry-run -- some-text --verbose`;
+
+        const result = extractJunieArgs(text);
+
+        // -- some-text might be captured if we are not careful, but argPattern matches --[\w-]+
+        // " some-text" doesn't start with --. "-- some-text" does but it has space after --.
+        // My regex is --[\w-]+, so it should NOT match "-- "
+        expect(result.args).toEqual(['--dry-run', '--verbose']);
+    });
+
+    it('should handle negative numbers or other patterns starting with dashes', () => {
+        const text = `Task
+junie-args: --value=-1 --delta=--2 --flag`;
+
+        const result = extractJunieArgs(text);
+
+        expect(result.args).toEqual(['--value=-1', '--delta=--2', '--flag']);
+    });
+
+    it('should handle complex multiline with mixed content', () => {
+        const text = `Fix it
+junie-args: --model=gpt-4
+  --dry-run
+  --temp=0.5
+Please also check logs.`;
+
+        const result = extractJunieArgs(text);
+
+        expect(result.args).toEqual(['--model=gpt-4', '--dry-run', '--temp=0.5']);
+        expect(result.cleanedText).toBe("Fix it\n\nPlease also check logs.");
+    });
+
+    it('should correctly handle multiple arguments on the same line', () => {
+        const text = `junie-args: --a --b=1 --c="2 3" --d`;
+        const result = extractJunieArgs(text);
+        expect(result.args).toEqual(['--a', '--b=1', '--c="2 3"', '--d']);
+    });
 });
 
 describe('junieArgsToString', () => {
@@ -173,5 +223,24 @@ describe('junieArgsToString', () => {
         const result = junieArgsToString(args);
 
         expect(result).toBe('--model="gpt-5"');
+    });
+});
+
+describe('deduplicateArgs', () => {
+    const { deduplicateArgs } = require("../../src/utils/junie-args-parser");
+
+    it('should keep the last occurrence of an argument', () => {
+        const args = ['--model=gpt-4', '--model=gpt-5'];
+        expect(deduplicateArgs(args)).toEqual(['--model=gpt-5']);
+    });
+
+    it('should handle multiple different arguments', () => {
+        const args = ['--model=gpt-4', '--verbose', '--model=gpt-5'];
+        expect(deduplicateArgs(args)).toEqual(['--model=gpt-5', '--verbose']);
+    });
+
+    it('should handle arguments with and without values', () => {
+        const args = ['--verbose', '--verbose=false'];
+        expect(deduplicateArgs(args)).toEqual(['--verbose=false']);
     });
 });

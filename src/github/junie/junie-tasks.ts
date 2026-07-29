@@ -1,10 +1,15 @@
 import {
     isCodeReviewEvent,
+    isFixCIEvent,
     isIssueCommentEvent,
     isIssuesEvent,
+    isJiraWorkflowDispatchEvent,
+    isMinorFixEvent,
     isPullRequestEvent,
     isPullRequestReviewCommentEvent,
     isPullRequestReviewEvent,
+    isTriggeredByUserInteraction,
+    isYouTrackWorkflowDispatchEvent,
     JunieExecutionContext
 } from "../context";
 import * as core from "@actions/core";
@@ -19,6 +24,26 @@ import {FetchedData} from "../api/queries";
 import {CliInput} from "./types/junie";
 import {generateMcpToolsPrompt} from "../../mcp/mcp-prompts";
 import {junieArgsToString} from "../../utils/junie-args-parser";
+import {
+    addGitExcludePatterns,
+    GENERATED_ARTIFACT_PATTERNS,
+    isRunningInGitHubActions,
+    PLAN_FILE_PATTERNS
+} from "../../utils/git-exclude";
+
+function shouldRunInGoalMode(context: JunieExecutionContext): boolean {
+    if (isMinorFixEvent(context)) {
+        return false;
+    }
+
+    return (
+        isTriggeredByUserInteraction(context) ||
+        isFixCIEvent(context) ||
+        isJiraWorkflowDispatchEvent(context) ||
+        isYouTrackWorkflowDispatchEvent(context) ||
+        Boolean(context.inputs.prompt)
+    );
+}
 
 function getTriggerTime(context: JunieExecutionContext): string | undefined {
     if (isIssueCommentEvent(context)) {
@@ -34,6 +59,9 @@ function getTriggerTime(context: JunieExecutionContext): string | undefined {
     }
     return undefined;
 }
+
+const DO_NOT_COMMIT_PLAN_NOTE =
+    "\n\nNote: do not commit any plan files to the repository. If you create a plan file, name it 'task-plan.md' but do not git add or commit it.";
 
 export async function prepareJunieTask(
     context: JunieExecutionContext,
@@ -71,6 +99,10 @@ export async function prepareJunieTask(
             console.log(`Extracted custom junie args: ${customJunieArgs.join(' ')}`);
         }
 
+        if (isRunningInGitHubActions()) {
+            addGitExcludePatterns([...GENERATED_ARTIFACT_PATTERNS, ...PLAN_FILE_PATTERNS]);
+        }
+
         // Append MCP tools information if any MCP servers are enabled
         const mcpToolsPrompt = generateMcpToolsPrompt(enabledMcpServers);
         if (mcpToolsPrompt) {
@@ -85,12 +117,14 @@ export async function prepareJunieTask(
                 description: promptText,
                 diffCommand
             }
+        } else if (shouldRunInGoalMode(context)) {
+            junieCLITask.orchestratedTask = {task: promptText + DO_NOT_COMMIT_PLAN_NOTE};
         } else {
             junieCLITask.task = promptText;
         }
     }
 
-    if (!junieCLITask.task && !junieCLITask.mergeTask && !junieCLITask.codeReviewTask) {
+    if (!junieCLITask.task && !junieCLITask.orchestratedTask && !junieCLITask.mergeTask && !junieCLITask.codeReviewTask) {
         throw new Error("No task was created. Please check your inputs.");
     }
 

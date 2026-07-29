@@ -30,9 +30,9 @@ export function extractJunieArgs(text: string | null | undefined): ParsedJunieAr
         const argsText = match[1].trim();
 
         if (argsText) {
-            // Extract individual arguments (format: --key="value" or --key=value)
+            // Extract individual arguments (format: --key="value" or --key=value or --key)
             // Supports quoted values with spaces
-            const argPattern = /--[\w-]+=(?:"[^"]*"|'[^']*'|[^\s]+)/g;
+            const argPattern = /--[\w-]+(?:=(?:"[^"]*"|'[^']*'|[^\s]+))?/g;
             const foundArgs = argsText.match(argPattern);
 
             if (foundArgs) {
@@ -58,4 +58,27 @@ export function extractJunieArgs(text: string | null | undefined): ParsedJunieAr
  */
 export function junieArgsToString(args: string[]): string {
     return args.join(' ');
+}
+
+/**
+ * Deduplicates junie args by keeping only the last occurrence of each argument.
+ * For arguments with values (--key=value or --key "value"), keeps the most recent value.
+ * For boolean flags (--flag), keeps only one occurrence.
+ */
+export function deduplicateArgs(args: string[]): string[] {
+    const argsMap = new Map<string, string>();
+
+    for (const arg of args) {
+        // Match --key=value or --key="value" or --key or -k
+        const match = arg.match(/^(-{1,2}[^=\s]+)(?:=(.*))?$/);
+        if (match) {
+            const key = match[1]; // e.g., "--model" or "-m"
+            argsMap.set(key, arg); // Store the full arg, overwriting previous occurrences
+        } else {
+            // If it doesn't match the pattern, keep it as-is
+            argsMap.set(arg, arg);
+        }
+    }
+
+    return Array.from(argsMap.values());
 }

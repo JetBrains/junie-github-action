@@ -33,7 +33,7 @@ import {
     CODE_REVIEW_ACTION,
     WORKFLOW_MODIFICATION_NOTE
 } from "../../constants/github";
-import {extractJunieArgs} from "../../utils/junie-args-parser";
+import {extractJunieArgs, deduplicateArgs} from "../../utils/junie-args-parser";
 import {BranchInfo} from "../operations/branch";
 
 export interface GeneratePromptResult {
@@ -82,7 +82,7 @@ export class NewGitHubPromptFormatter {
             const finalPrompt = sanitizeContent(prompt);
             return {
                 prompt: finalPrompt,
-                customJunieArgs: this.deduplicateArgs(customJunieArgs)
+                customJunieArgs: deduplicateArgs(customJunieArgs)
             };
         }
 
@@ -147,7 +147,7 @@ ${actorInfo ? actorInfo : ""}
         // This removes HTML comments, invisible characters, obfuscated entities, etc.
         return {
             prompt: sanitizeContent(finalPrompt),
-            customJunieArgs: this.deduplicateArgs(customJunieArgs)
+            customJunieArgs: deduplicateArgs(customJunieArgs)
         };
     }
 
@@ -634,26 +634,4 @@ Event: ${context.eventName}${context.eventAction ? ` (${context.eventAction})` :
 </actor>`
     }
 
-    /**
-     * Deduplicates junie args by keeping only the last occurrence of each argument.
-     * For arguments with values (--key=value or --key "value"), keeps the most recent value.
-     * For boolean flags (--flag), keeps only one occurrence.
-     */
-    private deduplicateArgs(args: string[]): string[] {
-        const argsMap = new Map<string, string>();
-
-        for (const arg of args) {
-            // Match --key=value or --key="value" or --key or -k
-            const match = arg.match(/^(-{1,2}[^=\s]+)(?:=(.*))?$/);
-            if (match) {
-                const key = match[1]; // e.g., "--model" or "-m"
-                argsMap.set(key, arg); // Store the full arg, overwriting previous occurrences
-            } else {
-                // If it doesn't match the pattern, keep it as-is (shouldn't happen normally)
-                argsMap.set(arg, arg);
-            }
-        }
-
-        return Array.from(argsMap.values());
-    }
 }
