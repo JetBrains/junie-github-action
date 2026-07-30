@@ -477,6 +477,28 @@ describe("Comment Feedback Operations", () => {
       });
     });
 
+    test("should not add success line and title for code review comment", async () => {
+      const data: FinishFeedbackData = {
+        ...baseFinishData,
+        isJobFailed: false,
+        successData: {
+          actionToDo: "WRITE_COMMENT",
+          junieTitle: "Analysis complete",
+          junieSummary: "Here are my findings...",
+          isCodeReview: true,
+          codeReviewFeedbackLink: "https://junie.example.com/code-review-feedback?token=abc",
+        },
+      };
+
+      await postJunieCompletionComment(mockOctokit, data);
+
+      const body = updateCommentSpy.mock.calls[0][0].body as string;
+      expect(body).toContain("Here are my findings...");
+      expect(body).toContain("https://junie.example.com/code-review-feedback?token=abc");
+      expect(body).not.toContain("Junie successfully finished!");
+      expect(body).not.toContain("Analysis complete");
+    });
+
     test("should append EAP feedback link for WRITE_COMMENT when provided", async () => {
       const data: FinishFeedbackData = {
         ...baseFinishData,

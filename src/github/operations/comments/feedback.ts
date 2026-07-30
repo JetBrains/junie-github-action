@@ -548,7 +548,9 @@ function getSuccessBody(repoFullName: string, successData: SuccessFeedbackData) 
             break;
         case "WRITE_COMMENT":
             console.log('No PR or commit - using Junie result');
-            result = SUCCESS_FEEDBACK_COMMENT_WITH_RESULT(successData.junieTitle || 'Task completed', successData.junieSummary || 'No additional details');
+            result = successData.isCodeReview
+                ? (successData.junieSummary || 'No additional details')
+                : SUCCESS_FEEDBACK_COMMENT_WITH_RESULT(successData.junieTitle || 'Task completed', successData.junieSummary || 'No additional details');
             if (successData.codeReviewFeedbackLink) {
                 result += CODE_REVIEW_FEEDBACK_LINK_SECTION(successData.codeReviewFeedbackLink);
             }

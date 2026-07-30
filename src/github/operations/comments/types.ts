@@ -20,6 +20,7 @@ export interface SuccessFeedbackData {
     workingBranch?: string;
     baseBranch?: string;
     codeReviewFeedbackLink?: string;
+    isCodeReview?: boolean;
 }
 
 export interface FailureFeedbackData {
