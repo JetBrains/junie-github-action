@@ -2,7 +2,7 @@ import {describe, test, beforeAll, afterAll, expect} from "bun:test";
 import {INIT_COMMENT_BODY} from "../../src/constants/github";
 import {testClient} from "../client/client";
 
-const CODE_REVIEW_SUMMARY_SECTION = "Summary of Changes";
+const CODE_REVIEW_SUMMARY_SECTION = "Help us improve Junie";
 
 describe("Code Review: Built-in", () => {
     let repoName: string;
