@@ -33,6 +33,8 @@ export const GENERATED_ARTIFACT_PATTERNS = [
     'venv/',
     // JS / TS
     'node_modules/',
+    'dist/',
+    'coverage/',
     '.next/',
     '.turbo/',
     '.parcel-cache/',

@@ -8,6 +8,7 @@ import {
     isPullRequestEvent,
     isPullRequestReviewCommentEvent,
     isPullRequestReviewEvent,
+    isPushEvent,
     isTriggeredByUserInteraction,
     isYouTrackWorkflowDispatchEvent,
     JunieExecutionContext
@@ -37,7 +38,7 @@ function shouldRunInGoalMode(context: JunieExecutionContext): boolean {
     }
 
     return (
-        isTriggeredByUserInteraction(context) ||
+        (isTriggeredByUserInteraction(context) && !isPushEvent(context)) ||
         isFixCIEvent(context) ||
         isJiraWorkflowDispatchEvent(context) ||
         isYouTrackWorkflowDispatchEvent(context) ||
