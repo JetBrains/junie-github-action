@@ -1,3 +1,4 @@
+import {createHash} from 'crypto';
 import type {Octokit} from '@octokit/rest';
 import {
     extractFeedbackTokenFromBody,
@@ -103,7 +104,7 @@ export function resolveSessionIdentity(body: string): {
     if (!sessionId || !runId) {
         if (token) {
             return {
-                sessionId: `token-${token.slice(-16)}`,
+                sessionId: `token-${createHash('sha256').update(token).digest('hex').slice(0, 16)}`,
                 runId: 'unknown',
                 token,
             };

@@ -28,8 +28,8 @@ function isBotComment(comment: CollectedComment): boolean {
  * GitHub has no dedicated "sad" reaction; confused is the closest negative face.
  */
 export function countHumanThumbs(comments: CollectedComment[]): { thumbsUp: number; thumbsDown: number } {
-    let thumbsUp = 0;
-    let thumbsDown = 0;
+    const upUsers = new Set<string>();
+    const downUsers = new Set<string>();
 
     for (const comment of comments) {
         for (const reaction of comment.reactions) {
@@ -37,14 +37,14 @@ export function countHumanThumbs(comments: CollectedComment[]): { thumbsUp: numb
                 continue;
             }
             if (reaction.content === '+1' || reaction.content === 'heart') {
-                thumbsUp += 1;
+                upUsers.add(reaction.userLogin);
             } else if (reaction.content === '-1' || reaction.content === 'confused') {
-                thumbsDown += 1;
+                downUsers.add(reaction.userLogin);
             }
         }
     }
 
-    return { thumbsUp, thumbsDown };
+    return { thumbsUp: upUsers.size, thumbsDown: downUsers.size };
 }
 
 export function collectReplyTexts(comments: CollectedComment[], maxChars = 4000): string[] {
@@ -59,7 +59,10 @@ export function collectReplyTexts(comments: CollectedComment[], maxChars = 4000)
         if (used >= maxChars) {
             break;
         }
-        const slice = reply.slice(0, maxChars - used);
+        const room = maxChars - used;
+        const slice = reply.length > room
+            ? `${reply.slice(0, room - 1).trimEnd()}…`
+            : reply;
         result.push(slice);
         used += slice.length;
     }

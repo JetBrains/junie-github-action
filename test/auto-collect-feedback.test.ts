@@ -117,8 +117,8 @@ describe('feedback markers', () => {
         const identity = resolveSessionIdentity(
             `[Share feedback](https://x/code-review-feedback?token=${token})`,
         );
-        // last 16 chars of token
-        expect(identity?.sessionId).toBe('token--in-unique-chars');
+        // SHA-256 hash slice
+        expect(identity?.sessionId).toBe('token-1fb6d43fe72ee76b');
     });
 
     test('collects reactions for replies', async () => {
@@ -280,6 +280,23 @@ describe('evaluateCollectorVerdict', () => {
         }));
         expect(verdict.kind).toBe('obvious_positive');
         expect(verdict.rating).toBe(5);
+    });
+
+    test('counts unique users for reactions (prevents inflation)', () => {
+        const verdict = evaluateCollectorVerdict(signals({
+            comments: [{
+                id: 1,
+                kind: 'summary',
+                body: 'x',
+                userLogin: 'junie',
+                reactions: [
+                    { content: '+1', userLogin: 'alice', userType: 'User' },
+                    { content: 'heart', userLogin: 'alice', userType: 'User' },
+                ],
+            }],
+        }));
+        expect(verdict.thumbsUp).toBe(1); // One user, not two reactions
+        expect(verdict.rating).toBe(4); // Only 1 unique positive signal
     });
 
     test('ambiguous when both thumbs', () => {

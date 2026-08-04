@@ -65,28 +65,6 @@ export function parseAgentFeedbackJson(text: string): AgentFeedbackResult | unde
         }
     }
 
-    // Fallback: if no small objects matched, try a larger greedy match in case of nesting
-    const greedyMatch = text.match(/\{[\s\S]*\"rating\"[\s\S]*\}/);
-    if (greedyMatch) {
-        try {
-            const parsed = JSON.parse(greedyMatch[0]) as Partial<AgentFeedbackResult>;
-            const rating = Number(parsed.rating);
-            if (Number.isInteger(rating) && rating >= 1 && rating <= 5) {
-                const confidence = parsed.confidence;
-                if (confidence === 'high' || confidence === 'medium' || confidence === 'low') {
-                    return {
-                        rating,
-                        comment: String(parsed.comment || '').slice(0, 500),
-                        confidence,
-                        rationale: parsed.rationale ? String(parsed.rationale).slice(0, 300) : undefined,
-                    };
-                }
-            }
-        } catch {
-            // ignore
-        }
-    }
-
     return undefined;
 }
 
@@ -125,7 +103,16 @@ export async function runAgentFeedbackEnrichment(
     }
     if (junieFlags.trim()) {
         const matches = junieFlags.trim().match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [];
-        args.push(...matches.map((arg) => arg.replace(/^["']|["']$/g, '')));
+        args.push(
+            ...matches.map((arg) => {
+                // Remove outer quotes if the whole argument is quoted
+                if (/^["'].*["']$/.test(arg)) {
+                    return arg.slice(1, -1);
+                }
+                // Also handle cases like --flag="value"
+                return arg.replace(/=(["'])(.*)\1$/, '=$2');
+            }),
+        );
     }
 
     console.log('Running Junie agent enrichment for ambiguous/text-only feedback...');
