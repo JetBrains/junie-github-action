@@ -282,7 +282,7 @@ describe('evaluateCollectorVerdict', () => {
         expect(verdict.rating).toBe(5);
     });
 
-    test('counts unique users for reactions (prevents inflation)', () => {
+    test('counts all reactions even from same user', () => {
         const verdict = evaluateCollectorVerdict(signals({
             comments: [{
                 id: 1,
@@ -295,8 +295,8 @@ describe('evaluateCollectorVerdict', () => {
                 ],
             }],
         }));
-        expect(verdict.thumbsUp).toBe(1); // One user, not two reactions
-        expect(verdict.rating).toBe(4); // Only 1 unique positive signal
+        expect(verdict.thumbsUp).toBe(2);
+        expect(verdict.rating).toBe(5);
     });
 
     test('ambiguous when both thumbs', () => {
