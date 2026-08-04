@@ -8,7 +8,12 @@ import {handleStepError} from '../utils/error-handler';
 
 async function run() {
     try {
-        const context = JSON.parse(process.env[OUTPUT_VARS.PARSED_CONTEXT]!) as JunieExecutionContext;
+        const rawContext = process.env[OUTPUT_VARS.PARSED_CONTEXT];
+        if (!rawContext) {
+            throw new Error(`Missing environment variable: ${OUTPUT_VARS.PARSED_CONTEXT}`);
+        }
+        const context = JSON.parse(rawContext) as JunieExecutionContext;
+
         const githubToken = process.env[OUTPUT_VARS.EJ_AUTH_GITHUB_TOKEN] || process.env[ENV_VARS.GITHUB_TOKEN];
         if (!githubToken) {
             throw new Error('Missing GitHub token for auto-collect feedback');

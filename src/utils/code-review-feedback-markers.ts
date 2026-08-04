@@ -68,8 +68,7 @@ export function parseFeedbackTokenClaims(token: string): FeedbackTokenClaims | u
     }
 
     try {
-        const padded = payloadPart + '='.repeat((4 - (payloadPart.length % 4)) % 4);
-        const json = Buffer.from(padded, 'base64url').toString('utf-8');
+        const json = Buffer.from(payloadPart, 'base64url').toString('utf-8');
         const parsed = JSON.parse(json) as { sid?: unknown; rid?: unknown; repo?: unknown; pr?: unknown };
         const sessionId = typeof parsed.sid === 'string' ? parsed.sid : undefined;
         const runId = parsed.rid != null ? String(parsed.rid) : undefined;

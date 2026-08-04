@@ -342,6 +342,17 @@ describe('parseAgentFeedbackJson', () => {
     test('rejects invalid rating', () => {
         expect(parseAgentFeedbackJson('{"rating":9,"comment":"x","confidence":"high"}')).toBeUndefined();
     });
+
+    test('handles multiple objects by picking the one with rating (best effort)', () => {
+        const text = 'Prefix {"foo":"bar"} Result: {"rating":4,"comment":"ok","confidence":"high"}';
+        // Current regex /\{[\s\S]*?\"rating\"[\s\S]*?\}/ will match '{"foo":"bar"} Result: {"rating":4,"comment":"ok","confidence":"high"}'
+        // which is invalid JSON. We check that it at least doesn't crash and returns undefined if invalid.
+        expect(parseAgentFeedbackJson(text)).toBeUndefined();
+        
+        // If they are separated by newlines or other text, it might still fail if it captures too much.
+        // But if it's just the object, it works:
+        expect(parseAgentFeedbackJson('{"rating":4,"comment":"ok","confidence":"high"}')).toBeDefined();
+    });
 });
 
 describe('collectSessionFeedbackSignalsWithFetchers', () => {

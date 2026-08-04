@@ -116,11 +116,11 @@ export async function runAutoCollectFeedback(options: AutoCollectOptions): Promi
     const sessions = await collectSessionFeedbackSignals(octokit, owner, repo, prNumber);
     console.log(`Found ${sessions.length} feedback session(s)`);
 
-    const outcomes: SessionCollectOutcome[] = [];
-    for (const session of sessions) {
-        outcomes.push(await processSession(session, options));
+    const outcomes = await Promise.all(sessions.map((session) => processSession(session, options)));
+
+    if (outcomes.length > 0) {
+        await postAutoCollectNotification(octokit, owner, repo, prNumber, outcomes);
     }
 
-    await postAutoCollectNotification(octokit, owner, repo, prNumber, outcomes);
     return outcomes;
 }

@@ -2,7 +2,7 @@ import {mkdir, writeFile, readFile} from 'fs/promises';
 import {join} from 'path';
 import type {AgentFeedbackResult, CollectorVerdict, SessionFeedbackSignals} from './types';
 
-const AGENT_JSON_RE = /\{[\s\S]*?"rating"[\s\S]*?\}/;
+const AGENT_JSON_RE = /\{[\s\S]*?\"rating\"[\s\S]*?\}/;
 
 export function buildAgentPrompt(signals: SessionFeedbackSignals, verdict: CollectorVerdict): string {
     const junieComments = signals.comments
@@ -103,7 +103,8 @@ export async function runAgentFeedbackEnrichment(
         args.push('--auth', cliToken);
     }
     if (junieFlags.trim()) {
-        args.push(...junieFlags.trim().split(/\s+/).filter(Boolean));
+        const matches = junieFlags.trim().match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [];
+        args.push(...matches.map((arg) => arg.replace(/^["']|["']$/g, '')));
     }
 
     console.log('Running Junie agent enrichment for ambiguous/text-only feedback...');
@@ -114,8 +115,11 @@ export async function runAgentFeedbackEnrichment(
         cwd: workingDir,
     });
 
+    const stderrPromise = new Response(proc.stderr).text();
+    const stdoutPromise = new Response(proc.stdout).text();
     const exitCode = await proc.exited;
-    const stderr = await new Response(proc.stderr).text();
+    const stderr = await stderrPromise;
+
     if (exitCode !== 0) {
         console.warn(`Junie agent enrichment failed (exit ${exitCode}): ${stderr.slice(0, 500)}`);
         return undefined;
@@ -125,7 +129,7 @@ export async function runAgentFeedbackEnrichment(
     try {
         raw = await readFile(outputPath, 'utf-8');
     } catch {
-        raw = await new Response(proc.stdout).text();
+        raw = await stdoutPromise;
     }
 
     let textToParse = raw;

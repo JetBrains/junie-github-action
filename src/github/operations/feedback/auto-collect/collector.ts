@@ -19,17 +19,22 @@ async function listIssueCommentReactions(
     repo: string,
     commentId: number,
 ): Promise<CollectedReaction[]> {
-    const { data } = await octokit.rest.reactions.listForIssueComment({
-        owner,
-        repo,
-        comment_id: commentId,
-        per_page: 100,
-    });
-    return data.map((r) => ({
-        content: r.content,
-        userLogin: r.user?.login || 'unknown',
-        userType: r.user?.type,
-    }));
+    try {
+        const reactions = await octokit.paginate(octokit.rest.reactions.listForIssueComment, {
+            owner,
+            repo,
+            comment_id: commentId,
+            per_page: 100,
+        });
+        return reactions.map((r) => ({
+            content: r.content,
+            userLogin: r.user?.login || 'unknown',
+            userType: r.user?.type,
+        }));
+    } catch (error) {
+        console.warn(`Failed to list reactions for issue comment ${commentId}:`, error);
+        return [];
+    }
 }
 
 async function listReviewCommentReactions(
@@ -38,17 +43,22 @@ async function listReviewCommentReactions(
     repo: string,
     commentId: number,
 ): Promise<CollectedReaction[]> {
-    const { data } = await octokit.rest.reactions.listForPullRequestReviewComment({
-        owner,
-        repo,
-        comment_id: commentId,
-        per_page: 100,
-    });
-    return data.map((r) => ({
-        content: r.content,
-        userLogin: r.user?.login || 'unknown',
-        userType: r.user?.type,
-    }));
+    try {
+        const reactions = await octokit.paginate(octokit.rest.reactions.listForPullRequestReviewComment, {
+            owner,
+            repo,
+            comment_id: commentId,
+            per_page: 100,
+        });
+        return reactions.map((r) => ({
+            content: r.content,
+            userLogin: r.user?.login || 'unknown',
+            userType: r.user?.type,
+        }));
+    } catch (error) {
+        console.warn(`Failed to list reactions for review comment ${commentId}:`, error);
+        return [];
+    }
 }
 
 async function paginateIssueComments(
@@ -114,10 +124,32 @@ export async function collectSessionFeedbackSignals(
     repo: string,
     prNumber: number,
 ): Promise<SessionFeedbackSignals[]> {
-    const issueComments = await paginateIssueComments(octokit, owner, repo, prNumber);
-    const reviewComments = await paginateReviewComments(octokit, owner, repo, prNumber);
+    const [issueComments, reviewComments] = await Promise.all([
+        paginateIssueComments(octokit, owner, repo, prNumber),
+        paginateReviewComments(octokit, owner, repo, prNumber),
+    ]);
 
     const sessionsByKey = new Map<string, SessionFeedbackSignals>();
+
+    // Index review comments for O(N) lookup
+    const reviewCommentsByRunId = new Map<string, typeof reviewComments>();
+    const reviewCommentsByReplyId = new Map<number, typeof reviewComments>();
+
+    for (const rc of reviewComments) {
+        const runId = parseInlineFeedbackRunId(rc.body || '');
+        if (runId) {
+            const list = reviewCommentsByRunId.get(runId) || [];
+            list.push(rc);
+            reviewCommentsByRunId.set(runId, list);
+        }
+        if (rc.in_reply_to_id) {
+            const list = reviewCommentsByReplyId.get(rc.in_reply_to_id) || [];
+            list.push(rc);
+            reviewCommentsByReplyId.set(rc.in_reply_to_id, list);
+        }
+    }
+
+    const reactionPromises: Promise<void>[] = [];
 
     for (const comment of issueComments) {
         const identity = resolveSessionIdentity(comment.body || '');
@@ -138,16 +170,20 @@ export async function collectSessionFeedbackSignals(
         existing.token = existing.token || identity.token;
         existing.summaryCommentId = comment.id;
 
-        const reactions = await listIssueCommentReactions(octokit, owner, repo, comment.id);
-        existing.comments.push({
+        const collected: CollectedComment = {
             id: comment.id,
             kind: 'summary',
             body: comment.body || '',
             userLogin: comment.user?.login || 'unknown',
             userType: comment.user?.type,
             htmlUrl: comment.html_url,
-            reactions,
-        });
+            reactions: [],
+        };
+        existing.comments.push(collected);
+
+        reactionPromises.push((async () => {
+            collected.reactions = await listIssueCommentReactions(octokit, owner, repo, comment.id);
+        })());
 
         sessionsByKey.set(key, existing);
     }
@@ -160,13 +196,10 @@ export async function collectSessionFeedbackSignals(
             continue;
         }
 
-        const inlineForRun = reviewComments.filter(
-            (c) => parseInlineFeedbackRunId(c.body || '') === session.runId,
-        );
+        const inlineForRun = reviewCommentsByRunId.get(session.runId) || [];
 
         for (const inline of inlineForRun) {
-            const reactions = await listReviewCommentReactions(octokit, owner, repo, inline.id);
-            session.comments.push({
+            const collected: CollectedComment = {
                 id: inline.id,
                 kind: 'inline',
                 body: inline.body || '',
@@ -174,10 +207,15 @@ export async function collectSessionFeedbackSignals(
                 userType: inline.user?.type,
                 htmlUrl: inline.html_url,
                 path: inline.path,
-                reactions,
-            });
+                reactions: [],
+            };
+            session.comments.push(collected);
 
-            const replies = reviewComments.filter((c) => c.in_reply_to_id === inline.id);
+            reactionPromises.push((async () => {
+                collected.reactions = await listReviewCommentReactions(octokit, owner, repo, inline.id);
+            })());
+
+            const replies = reviewCommentsByReplyId.get(inline.id) || [];
             for (const reply of replies) {
                 session.comments.push({
                     id: reply.id,
@@ -192,6 +230,8 @@ export async function collectSessionFeedbackSignals(
             }
         }
     }
+
+    await Promise.all(reactionPromises);
 
     return Array.from(sessionsByKey.values());
 }
