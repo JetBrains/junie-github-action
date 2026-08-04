@@ -2,7 +2,6 @@ import {mkdir, writeFile, readFile} from 'fs/promises';
 import {join} from 'path';
 import type {AgentFeedbackResult, CollectorVerdict, SessionFeedbackSignals} from './types';
 
-const AGENT_JSON_RE = /\{[\s\S]*\"rating\"[\s\S]*\}/;
 
 export function buildAgentPrompt(signals: SessionFeedbackSignals, verdict: CollectorVerdict): string {
     const junieComments = signals.comments
@@ -43,30 +42,52 @@ ${JSON.stringify({
 }
 
 export function parseAgentFeedbackJson(text: string): AgentFeedbackResult | undefined {
-    const match = text.match(AGENT_JSON_RE);
-    if (!match) {
-        return undefined;
+    // Attempt to find all JSON-like objects. Using non-greedy match to avoid capturing multiple objects as one.
+    // This may miss objects with high nesting, but for agent output it's usually flat or shallow.
+    const regex = /\{[\s\S]*?\}/g;
+    let match;
+    while ((match = regex.exec(text)) !== null) {
+        try {
+            const parsed = JSON.parse(match[0]) as Partial<AgentFeedbackResult>;
+            if (typeof parsed.rating === 'number' && parsed.rating >= 1 && parsed.rating <= 5) {
+                const confidence = parsed.confidence;
+                if (confidence === 'high' || confidence === 'medium' || confidence === 'low') {
+                    return {
+                        rating: parsed.rating,
+                        comment: String(parsed.comment || '').slice(0, 500),
+                        confidence,
+                        rationale: parsed.rationale ? String(parsed.rationale).slice(0, 300) : undefined,
+                    };
+                }
+            }
+        } catch {
+            // ignore and continue
+        }
     }
 
-    try {
-        const parsed = JSON.parse(match[0]) as Partial<AgentFeedbackResult>;
-        const rating = Number(parsed.rating);
-        if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
-            return undefined;
+    // Fallback: if no small objects matched, try a larger greedy match in case of nesting
+    const greedyMatch = text.match(/\{[\s\S]*\"rating\"[\s\S]*\}/);
+    if (greedyMatch) {
+        try {
+            const parsed = JSON.parse(greedyMatch[0]) as Partial<AgentFeedbackResult>;
+            const rating = Number(parsed.rating);
+            if (Number.isInteger(rating) && rating >= 1 && rating <= 5) {
+                const confidence = parsed.confidence;
+                if (confidence === 'high' || confidence === 'medium' || confidence === 'low') {
+                    return {
+                        rating,
+                        comment: String(parsed.comment || '').slice(0, 500),
+                        confidence,
+                        rationale: parsed.rationale ? String(parsed.rationale).slice(0, 300) : undefined,
+                    };
+                }
+            }
+        } catch {
+            // ignore
         }
-        const confidence = parsed.confidence;
-        if (confidence !== 'high' && confidence !== 'medium' && confidence !== 'low') {
-            return undefined;
-        }
-        return {
-            rating,
-            comment: String(parsed.comment || '').slice(0, 500),
-            confidence,
-            rationale: parsed.rationale ? String(parsed.rationale).slice(0, 300) : undefined,
-        };
-    } catch {
-        return undefined;
     }
+
+    return undefined;
 }
 
 export interface RunAgentFeedbackOptions {
