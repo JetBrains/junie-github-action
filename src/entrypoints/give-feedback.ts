@@ -1,6 +1,6 @@
 import {postJunieCompletionComment} from "../github/operations/comments/feedback";
 import type {FinishFeedbackData} from "../github/operations/comments/types";
-import {JunieExecutionContext} from "../github/context";
+import {isCodeReviewEvent, JunieExecutionContext} from "../github/context";
 import {ActionType} from "./handle-results";
 import {ENV_VARS, OUTPUT_VARS} from "../constants/environment";
 import {formatJunieSummary} from "./format-summary";
@@ -32,6 +32,7 @@ async function writeFeedbackComment(isJobFailed: boolean, initCommentId?: string
             prLink: process.env[ENV_VARS.PR_LINK],
             workingBranch: process.env[OUTPUT_VARS.WORKING_BRANCH],
             codeReviewFeedbackLink: process.env[OUTPUT_VARS.CODE_REVIEW_FEEDBACK_LINK],
+            isCodeReview: isCodeReviewEvent(data.parsedContext),
             junieSessionId: process.env[OUTPUT_VARS.JUNIE_SESSION_ID],
             githubRunId: process.env[ENV_VARS.GITHUB_RUN_ID],
             hideManualFeedbackLink: process.env[ENV_VARS.AUTO_COLLECT_FEEDBACK] === 'true',

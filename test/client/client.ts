@@ -201,19 +201,21 @@ export class GitHubClient {
     async waitForJunieComment(issueOrPRNumber: number, message: string): Promise<Comment> {
         console.log(`Waiting for Junie to post comment containing "${message}" in issue #${issueOrPRNumber} in ${this.currentRepo}...`);
         let foundComment: Comment | undefined;
+        const expectedMessage = message.toLowerCase();
         await startPoll(
             `Junie didn't post comment containing "${message}" in issue #${issueOrPRNumber}`,
             {},
             async () => {
                 try {
                     const {data: comments} = await this.getAllIssueOrPRComments(issueOrPRNumber);
-                    const junieComment = comments.find(c => c.body?.includes(message));
+                    const junieComment = comments.find(c => c.body?.toLowerCase().includes(expectedMessage));
 
                     if (junieComment) {
                         foundComment = junieComment;
                         console.log(`Found comment with message: "${message}"`);
                         return true;
                     }
+                    console.log(`Comment containing "${message}" not found in issue #${issueOrPRNumber}. All comments:\n${comments.map(c => `--- comment #${c.id} by ${c.user?.login}:\n${c.body || ''}`).join('\n')}`);
                     return false;
                 } catch (error) {
                     console.log(`Comments not yet available for #${issueOrPRNumber}, waiting...`);

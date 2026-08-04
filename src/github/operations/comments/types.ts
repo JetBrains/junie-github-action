@@ -20,6 +20,7 @@ export interface SuccessFeedbackData {
     workingBranch?: string;
     baseBranch?: string;
     codeReviewFeedbackLink?: string;
+    isCodeReview?: boolean;
     junieSessionId?: string;
     githubRunId?: string;
     /** When true, write hidden marker/token only — no visible Share feedback CTA. */

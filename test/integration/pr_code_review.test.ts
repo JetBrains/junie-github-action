@@ -1,6 +1,8 @@
 import {describe, test, beforeAll, afterAll, expect} from "bun:test";
-import {INIT_COMMENT_BODY, SUCCESS_FEEDBACK_COMMENT} from "../../src/constants/github";
+import {INIT_COMMENT_BODY} from "../../src/constants/github";
 import {testClient} from "../client/client";
+
+const CODE_REVIEW_SUMMARY_SECTION = "Help us improve Junie";
 
 describe("Code Review: Built-in", () => {
     let repoName: string;
@@ -81,7 +83,8 @@ describe("Code Review: Built-in", () => {
             );
             const expectedLength = 2;
             const commentTexts = filteredComments.map(c => c.body || '').join('\n---\n');
-            expect(filteredComments.length, `Expected at least ${expectedLength} comments, but got ${filteredComments.length}. All filtered comments:\n${commentTexts}`).toBeGreaterThanOrEqual(expectedLength);await testClient.waitForJunieComment(prNumber, SUCCESS_FEEDBACK_COMMENT);
+            expect(filteredComments.length, `Expected at least ${expectedLength} comments, but got ${filteredComments.length}. All filtered comments:\n${commentTexts}`).toBeGreaterThanOrEqual(expectedLength);
+            await testClient.waitForJunieComment(prNumber, CODE_REVIEW_SUMMARY_SECTION);
             testPassed = true;
         },
         900000
@@ -169,7 +172,7 @@ describe("Code Review: On-Demand via comment", () => {
             const expectedLength = 2;
             const commentTexts = filteredComments.map(c => c.body || '').join('\n---\n');
             expect(filteredComments.length, `Expected at least ${expectedLength} comments, but got ${filteredComments.length}. All filtered comments:\n${commentTexts}`).toBeGreaterThanOrEqual(expectedLength);
-            await testClient.waitForJunieComment(prNumber, SUCCESS_FEEDBACK_COMMENT);
+            await testClient.waitForJunieComment(prNumber, CODE_REVIEW_SUMMARY_SECTION);
             testPassed = true;
         },
         900000
