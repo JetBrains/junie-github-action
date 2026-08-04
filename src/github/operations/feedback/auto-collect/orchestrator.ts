@@ -119,7 +119,11 @@ export async function runAutoCollectFeedback(options: AutoCollectOptions): Promi
     const outcomes = await Promise.all(sessions.map((session) => processSession(session, options)));
 
     if (outcomes.length > 0) {
-        await postAutoCollectNotification(octokit, owner, repo, prNumber, outcomes);
+        try {
+            await postAutoCollectNotification(octokit, owner, repo, prNumber, outcomes);
+        } catch (error) {
+            console.warn('Failed to post auto-collect notification comment:', error);
+        }
     }
 
     return outcomes;
