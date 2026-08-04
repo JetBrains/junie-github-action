@@ -14,7 +14,10 @@ import {
     evaluateCollectorVerdict,
 } from '../src/github/operations/feedback/auto-collect/mapping';
 import { parseAgentFeedbackJson } from '../src/github/operations/feedback/auto-collect/agent';
-import { collectSessionFeedbackSignalsWithFetchers } from '../src/github/operations/feedback/auto-collect/collector';
+import {
+    collectSessionFeedbackSignalsWithFetchers,
+    resolveSessionIdentity,
+} from '../src/github/operations/feedback/auto-collect/collector';
 import {
     AUTO_COLLECT_NOTIFY_MARKER,
     buildAutoCollectNotificationBody,
@@ -100,6 +103,57 @@ describe('feedback markers', () => {
         expect(sessions[0].comments[1].reactions).toEqual([
             { content: '+1', userLogin: 'alice', userType: 'User' },
         ]);
+    });
+
+    test('uses token suffix for sessionId fallback when sid claim is missing', () => {
+        const payload = Buffer.from(
+            JSON.stringify({
+                rid: 123,
+                exp: 1785770192,
+            }),
+        ).toString('base64url');
+        const token = `prefix.${payload}.very-long-signature-ending-in-unique-chars`;
+
+        const identity = resolveSessionIdentity(
+            `[Share feedback](https://x/code-review-feedback?token=${token})`,
+        );
+        // last 16 chars of token
+        expect(identity?.sessionId).toBe('token--in-unique-chars');
+    });
+
+    test('collects reactions for replies', async () => {
+        const payload = Buffer.from(JSON.stringify({ sid: 's1', rid: 'r1' })).toString(
+            'base64url',
+        );
+        const token = `${payload}.sig`;
+
+        const sessions = await collectSessionFeedbackSignalsWithFetchers(
+            [
+                {
+                    id: 1,
+                    body: `<!-- junie-feedback:session=s1;run=r1;token=${token} -->`,
+                    userLogin: 'junie',
+                },
+            ],
+            [
+                {
+                    id: 2,
+                    body: `inline\n${createInlineFeedbackMarker('r1')}`,
+                    userLogin: 'junie',
+                    path: 'f.ts',
+                },
+                { id: 3, body: 'reply', userLogin: 'alice', inReplyToId: 2 },
+            ],
+            async (id) => {
+                if (id === 3) return [{ content: '+1', userLogin: 'bob', userType: 'User' }];
+                return [];
+            },
+        );
+
+        expect(sessions[0].comments.find((c) => c.id === 3)?.reactions).toHaveLength(1);
+        expect(sessions[0].comments.find((c) => c.id === 3)?.reactions[0].userLogin).toBe(
+            'bob',
+        );
     });
 });
 

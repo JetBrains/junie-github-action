@@ -2,7 +2,7 @@ import {mkdir, writeFile, readFile} from 'fs/promises';
 import {join} from 'path';
 import type {AgentFeedbackResult, CollectorVerdict, SessionFeedbackSignals} from './types';
 
-const AGENT_JSON_RE = /\{[\s\S]*?\"rating\"[\s\S]*?\}/;
+const AGENT_JSON_RE = /\{[\s\S]*\"rating\"[\s\S]*\}/;
 
 export function buildAgentPrompt(signals: SessionFeedbackSignals, verdict: CollectorVerdict): string {
     const junieComments = signals.comments
@@ -87,8 +87,8 @@ export async function runAgentFeedbackEnrichment(
     const { signals, verdict, workingDir, cliToken, junieFlags = '' } = options;
     await mkdir(workingDir, { recursive: true });
 
-    const inputPath = join(workingDir, 'auto-collect-feedback-input.json');
-    const outputPath = join(workingDir, 'auto-collect-feedback-output.json');
+    const inputPath = join(workingDir, `auto-collect-input-${signals.sessionId}.json`);
+    const outputPath = join(workingDir, `auto-collect-output-${signals.sessionId}.json`);
     const prompt = buildAgentPrompt(signals, verdict);
 
     await writeFile(inputPath, JSON.stringify({ task: prompt }, null, 2), 'utf-8');

@@ -116,7 +116,21 @@ export async function runAutoCollectFeedback(options: AutoCollectOptions): Promi
     const sessions = await collectSessionFeedbackSignals(octokit, owner, repo, prNumber);
     console.log(`Found ${sessions.length} feedback session(s)`);
 
-    const outcomes = await Promise.all(sessions.map((session) => processSession(session, options)));
+    const outcomes = await Promise.all(
+        sessions.map(async (session) => {
+            try {
+                return await processSession(session, options);
+            } catch (error) {
+                console.error(`Failed to process session ${session.sessionId}:`, error);
+                return {
+                    sessionId: session.sessionId,
+                    runId: session.runId,
+                    status: 'submit_failed',
+                    detail: error instanceof Error ? error.message : String(error),
+                } as SessionCollectOutcome;
+            }
+        }),
+    );
 
     if (outcomes.length > 0) {
         try {

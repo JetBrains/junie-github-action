@@ -89,7 +89,7 @@ async function paginateReviewComments(
     });
 }
 
-function resolveSessionIdentity(body: string): {
+export function resolveSessionIdentity(body: string): {
     sessionId: string;
     runId: string;
     token?: string;
@@ -103,7 +103,7 @@ function resolveSessionIdentity(body: string): {
     if (!sessionId || !runId) {
         if (token) {
             return {
-                sessionId: `token-${token.slice(0, 16)}`,
+                sessionId: `token-${token.slice(-16)}`,
                 runId: 'unknown',
                 token,
             };
@@ -217,7 +217,7 @@ export async function collectSessionFeedbackSignals(
 
             const replies = reviewCommentsByReplyId.get(inline.id) || [];
             for (const reply of replies) {
-                session.comments.push({
+                const collectedReply: CollectedComment = {
                     id: reply.id,
                     kind: 'reply',
                     body: reply.body || '',
@@ -226,7 +226,19 @@ export async function collectSessionFeedbackSignals(
                     htmlUrl: reply.html_url,
                     path: reply.path,
                     reactions: [],
-                });
+                };
+                session.comments.push(collectedReply);
+
+                reactionPromises.push(
+                    (async () => {
+                        collectedReply.reactions = await listReviewCommentReactions(
+                            octokit,
+                            owner,
+                            repo,
+                            reply.id,
+                        );
+                    })(),
+                );
             }
         }
     }
@@ -304,7 +316,7 @@ export async function collectSessionFeedbackSignalsWithFetchers(
                     userType: reply.userType,
                     htmlUrl: reply.htmlUrl,
                     path: reply.path,
-                    reactions: [],
+                    reactions: await listReactions(reply.id, 'review'),
                 });
             }
         }
