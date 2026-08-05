@@ -2,8 +2,8 @@ import {GITHUB_ACTIONS_BOT, JUNIE_AGENT} from '../../../../constants/github';
 import type {CollectorVerdict, CollectedComment, CollectedReaction, SessionFeedbackSignals} from './types';
 
 const BOT_LOGINS = new Set([
-    GITHUB_ACTIONS_BOT.login.toLowerCase(),
-    JUNIE_AGENT.login.toLowerCase(),
+    GITHUB_ACTIONS_BOT.login,
+    JUNIE_AGENT.login,
     'junie[bot]',
 ]);
 

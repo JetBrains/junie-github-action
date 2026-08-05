@@ -265,6 +265,25 @@ export async function collectSessionFeedbackSignalsWithFetchers(
 ): Promise<SessionFeedbackSignals[]> {
     const sessionsByKey = new Map<string, SessionFeedbackSignals>();
 
+    const reviewCommentsByRunId = new Map<string, typeof reviewComments>();
+    const reviewCommentsByReplyId = new Map<number, typeof reviewComments>();
+
+    for (const rc of reviewComments) {
+        const runId = parseInlineFeedbackRunId(rc.body || '');
+        if (runId) {
+            const list = reviewCommentsByRunId.get(runId) || [];
+            list.push(rc);
+            reviewCommentsByRunId.set(runId, list);
+        }
+        if (rc.inReplyToId) {
+            const list = reviewCommentsByReplyId.get(rc.inReplyToId) || [];
+            list.push(rc);
+            reviewCommentsByReplyId.set(rc.inReplyToId, list);
+        }
+    }
+
+    const reactionPromises: Promise<void>[] = [];
+
     for (const comment of issueComments) {
         const identity = resolveSessionIdentity(comment.body);
         if (!identity) {
@@ -280,25 +299,30 @@ export async function collectSessionFeedbackSignalsWithFetchers(
         };
         existing.token = existing.token || identity.token;
         existing.summaryCommentId = comment.id;
-        existing.comments.push({
+
+        const collected: CollectedComment = {
             id: comment.id,
             kind: 'summary',
             body: comment.body,
             userLogin: comment.userLogin,
             userType: comment.userType,
             htmlUrl: comment.htmlUrl,
-            reactions: await listReactions(comment.id, 'issue'),
-        });
+            reactions: [],
+        };
+        existing.comments.push(collected);
+        reactionPromises.push((async () => {
+            collected.reactions = await listReactions(comment.id, 'issue');
+        })());
+
         sessionsByKey.set(key, existing);
     }
 
     for (const session of sessionsByKey.values()) {
         if (session.runId === 'unknown') continue;
-        const inlineForRun = reviewComments.filter(
-            (c) => parseInlineFeedbackRunId(c.body) === session.runId,
-        );
+
+        const inlineForRun = reviewCommentsByRunId.get(session.runId) || [];
         for (const inline of inlineForRun) {
-            session.comments.push({
+            const collected: CollectedComment = {
                 id: inline.id,
                 kind: 'inline',
                 body: inline.body,
@@ -306,10 +330,16 @@ export async function collectSessionFeedbackSignalsWithFetchers(
                 userType: inline.userType,
                 htmlUrl: inline.htmlUrl,
                 path: inline.path,
-                reactions: await listReactions(inline.id, 'review'),
-            });
-            for (const reply of reviewComments.filter((c) => c.inReplyToId === inline.id)) {
-                session.comments.push({
+                reactions: [],
+            };
+            session.comments.push(collected);
+            reactionPromises.push((async () => {
+                collected.reactions = await listReactions(inline.id, 'review');
+            })());
+
+            const replies = reviewCommentsByReplyId.get(inline.id) || [];
+            for (const reply of replies) {
+                const collectedReply: CollectedComment = {
                     id: reply.id,
                     kind: 'reply',
                     body: reply.body,
@@ -317,11 +347,16 @@ export async function collectSessionFeedbackSignalsWithFetchers(
                     userType: reply.userType,
                     htmlUrl: reply.htmlUrl,
                     path: reply.path,
-                    reactions: await listReactions(reply.id, 'review'),
-                });
+                    reactions: [],
+                };
+                session.comments.push(collectedReply);
+                reactionPromises.push((async () => {
+                    collectedReply.reactions = await listReactions(reply.id, 'review');
+                })());
             }
         }
     }
 
+    await Promise.all(reactionPromises);
     return Array.from(sessionsByKey.values());
 }

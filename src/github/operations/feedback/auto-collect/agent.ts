@@ -47,6 +47,9 @@ export function parseAgentFeedbackJson(text: string): AgentFeedbackResult | unde
     const regex = /\{[\s\S]*?\}/g;
     let match;
     while ((match = regex.exec(text)) !== null) {
+        if (!match[0].includes('"rating"')) {
+            continue;
+        }
         try {
             const parsed = JSON.parse(match[0]) as Partial<AgentFeedbackResult>;
             if (typeof parsed.rating === 'number' && parsed.rating >= 1 && parsed.rating <= 5) {
@@ -103,16 +106,7 @@ export async function runAgentFeedbackEnrichment(
     }
     if (junieFlags.trim()) {
         const matches = junieFlags.trim().match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [];
-        args.push(
-            ...matches.map((arg) => {
-                // Remove outer quotes if the whole argument is quoted
-                if (/^["'].*["']$/.test(arg)) {
-                    return arg.slice(1, -1);
-                }
-                // Also handle cases like --flag="value"
-                return arg.replace(/=(["'])(.*)\1$/, '=$2');
-            }),
-        );
+        args.push(...matches.map((arg) => arg.replace(/^["']|["']$/g, '')));
     }
 
     console.log('Running Junie agent enrichment for ambiguous/text-only feedback...');
@@ -123,8 +117,9 @@ export async function runAgentFeedbackEnrichment(
         cwd: workingDir,
     });
 
-    const stderrPromise = new Response(proc.stderr).text();
-    const stdoutPromise = new Response(proc.stdout).text();
+    const stdoutPromise = proc.stdout.text();
+    const stderrPromise = proc.stderr.text();
+
     const exitCode = await proc.exited;
     const stderr = await stderrPromise;
 
