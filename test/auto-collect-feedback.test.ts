@@ -435,6 +435,17 @@ describe('parseAgentFeedbackJson', () => {
             rationale: undefined,
         });
     });
+
+    test('parses agent JSON when string values contain braces', () => {
+        const text = 'Result: {"rating": 4, "comment": "Fixed {foo} and } brace", "confidence": "high", "rationale": "looks good {123}"}';
+        const result = parseAgentFeedbackJson(text);
+        expect(result).toEqual({
+            rating: 4,
+            comment: 'Fixed {foo} and } brace',
+            confidence: 'high',
+            rationale: 'looks good {123}',
+        });
+    });
 });
 
 describe('collectSessionFeedbackSignalsWithFetchers', () => {

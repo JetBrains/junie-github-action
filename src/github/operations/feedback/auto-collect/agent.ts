@@ -49,13 +49,31 @@ export function parseAgentFeedbackJson(text: string): AgentFeedbackResult | unde
 
         let depth = 0;
         let end = -1;
+        let inString = false;
+        let escape = false;
         for (let i = start; i < text.length; i++) {
-            if (text[i] === '{') depth++;
-            else if (text[i] === '}') {
-                depth--;
-                if (depth === 0) {
-                    end = i;
-                    break;
+            const char = text[i];
+            if (escape) {
+                escape = false;
+                continue;
+            }
+            if (char === '\\' && inString) {
+                escape = true;
+                continue;
+            }
+            if (char === '"') {
+                inString = !inString;
+                continue;
+            }
+            if (!inString) {
+                if (char === '{') {
+                    depth++;
+                } else if (char === '}') {
+                    depth--;
+                    if (depth === 0) {
+                        end = i;
+                        break;
+                    }
                 }
             }
         }
@@ -111,8 +129,6 @@ export async function runAgentFeedbackEnrichment(
     const outputPath = join(workingDir, `auto-collect-output-${signals.sessionId}.json`);
     const prompt = buildAgentPrompt(signals, verdict);
 
-    await writeFile(inputPath, JSON.stringify({ task: prompt }, null, 2), 'utf-8');
-
     const args = [
         '--cache-dir', workingDir,
         '--output-format', 'json',
@@ -124,7 +140,7 @@ export async function runAgentFeedbackEnrichment(
     }
     if (junieFlags.trim()) {
         const matches = junieFlags.trim().match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [];
-        args.push(...matches.map((arg) => arg.replace(/^["']|["']$/g, '')));
+        args.push(...matches.map((arg) => arg.replace(/^([^=]+=)?["'](.*)["']$/, '$1$2')));
     }
 
     console.log('Running Junie agent enrichment for ambiguous/text-only feedback...');
