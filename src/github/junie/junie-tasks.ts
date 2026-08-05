@@ -32,7 +32,7 @@ import {
     PLAN_FILE_PATTERNS
 } from "../../utils/git-exclude";
 
-function shouldRunInGoalMode(context: JunieExecutionContext): boolean {
+export function shouldRunInGoalMode(context: JunieExecutionContext): boolean {
     if (isMinorFixEvent(context)) {
         return false;
     }
@@ -63,6 +63,36 @@ function getTriggerTime(context: JunieExecutionContext): string | undefined {
 
 const DO_NOT_COMMIT_PLAN_NOTE =
     "\n\nNote: do not commit any plan files to the repository. If you create a plan file, name it 'task-plan.md' but do not git add or commit it.";
+
+/**
+ * The final result of the run becomes the pull request description and the feedback comment,
+ * so it has to stay as short as it was before goal mode. The orchestrated flow otherwise
+ * reports every step in full and pastes what the tools printed (compiler help, logs, file
+ * contents) straight into the summary.
+ */
+const SUMMARY_FORMAT_NOTE =
+    "\n\nFinal summary format (the result is published as the pull request description):\n" +
+    "- Keep it to a few sentences: what was changed and why, nothing else.\n" +
+    "- Plain prose or a short bullet list only. No headings, no per-step report.\n" +
+    "- Never paste code, diffs, file contents, command output, logs or tool help into it.";
+
+/**
+ * Goal mode runs an orchestrated flow that publishes the result on its own — pushing and
+ * opening a pull request — which produces a second pull request next to the one the action
+ * creates, on a branch the user's settings (`create_new_branch_for_pr`, `output_branch`, ...)
+ * did not ask for.
+ *
+ * Only publishing is forbidden here. The local branch is deliberately not pinned: the
+ * orchestrated flow checks out a branch of its own before the task even starts, and demanding
+ * a specific one makes it report a conflict and do nothing at all. Whichever branch it ends up
+ * on, `restoreWorkingBranch` in the results step moves the work onto the branch the action
+ * prepared, so the user's settings still decide where the changes land.
+ */
+const PUBLISHING_POLICY_NOTE =
+    "\n\nPublishing policy (must be followed exactly):\n" +
+    "- Do NOT push anything to the remote and do NOT create or update a pull request.\n" +
+    "- The action itself performs staging, committing, pushing and pull request creation once the task is done.\n" +
+    "- Working locally on whatever branch the workflow has checked out is fine — just leave the changes committed or uncommitted there and finish the task.";
 
 export async function prepareJunieTask(
     context: JunieExecutionContext,
@@ -119,7 +149,9 @@ export async function prepareJunieTask(
                 diffCommand
             }
         } else if (shouldRunInGoalMode(context)) {
-            junieCLITask.orchestratedTask = {task: promptText + DO_NOT_COMMIT_PLAN_NOTE};
+            junieCLITask.orchestratedTask = {
+                task: promptText + PUBLISHING_POLICY_NOTE + DO_NOT_COMMIT_PLAN_NOTE + SUMMARY_FORMAT_NOTE
+            };
         } else {
             junieCLITask.task = promptText;
         }

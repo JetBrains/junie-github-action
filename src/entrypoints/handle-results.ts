@@ -13,6 +13,8 @@ import * as fs from "node:fs";
 import type {CliOutput} from "../github/junie/types/junie";
 import {fetchCodeReviewFeedbackLink} from "../utils/code-review-feedback-link";
 import {formatJunieErrors, formatJunieExitCodeNote, resolveJunieOutputFile} from "../utils/junie-failure";
+import {shouldRunInGoalMode} from "../github/junie/junie-tasks";
+import {condenseSummary} from "../utils/result-summary";
 
 export enum ActionType {
     WRITE_COMMENT = 'WRITE_COMMENT',
@@ -101,7 +103,11 @@ export async function handleResults() {
         await exportCodeReviewFeedbackLink(context, sessionId, actionToDo);
         // Sanitize Junie's output to prevent token leakage and self-triggering
         const rawTitle = junieJsonOutput.taskName || (isResolveConflict ? `Resolve conflicts for ${context.entityNumber} PR` : 'Junie finished task successfully')
-        const rawBody = junieJsonOutput.result
+        // Goal mode reports every step and pastes tool output into its summary; the description
+        // has to stay as short as it was before goal mode, so the noise is dropped here.
+        const rawBody = shouldRunInGoalMode(context)
+            ? condenseSummary(junieJsonOutput.result!)
+            : junieJsonOutput.result
         const triggerPhrase = context.inputs.triggerPhrase
 
         // Sanitize and truncate to prevent ARG_MAX issues
@@ -183,6 +189,7 @@ async function getActionToDo(context: JunieExecutionContext): Promise<ActionType
     const isNewBranch = process.env[OUTPUT_VARS.IS_NEW_BRANCH] === 'true';
     const workingBranch = process.env[OUTPUT_VARS.WORKING_BRANCH]!;
     const baseBranch = process.env[OUTPUT_VARS.BASE_BRANCH]!;
+    restoreWorkingBranch(workingBranch);
     const hasChangedFiles = await checkForChangedFiles();
     const hasUnpushedCommits = await checkForUnpushedCommits(isNewBranch, baseBranch);
     const isExternalIntegration = isJiraWorkflowDispatchEvent(context) || isYouTrackWorkflowDispatchEvent(context);
@@ -209,6 +216,35 @@ async function getActionToDo(context: JunieExecutionContext): Promise<ActionType
     console.log("Action to do:", action);
     core.setOutput(OUTPUT_VARS.ACTION_TO_DO, action);
     return action;
+}
+
+/**
+ * Makes sure the branch prepared by the action is the one that gets committed and pushed.
+ *
+ * The branch was chosen according to the user's settings (`create_new_branch_for_pr`,
+ * `output_branch`, ...), but Junie can switch to a branch of its own during the run — most
+ * notably in goal mode, where the orchestrated flow may do git work by itself. In that case
+ * the changes (and any commits Junie already made) are moved back onto the prepared branch
+ * with `git checkout -B`, which keeps the working tree, the index and the commits of the
+ * current HEAD intact, so the user's setting is respected instead of Junie's choice.
+ */
+function restoreWorkingBranch(workingBranch: string): void {
+    if (!workingBranch) {
+        return;
+    }
+
+    try {
+        const currentBranch = execSync('git rev-parse --abbrev-ref HEAD', {encoding: 'utf-8'}).trim();
+        if (currentBranch === workingBranch) {
+            return;
+        }
+
+        console.log(`Junie left the repository on branch "${currentBranch}", ` +
+            `moving the changes back to the working branch "${workingBranch}"`);
+        execSync(`git checkout -B ${workingBranch} HEAD`, {encoding: 'utf-8'});
+    } catch (error) {
+        console.error(`Error restoring working branch "${workingBranch}":`, error);
+    }
 }
 
 async function checkForChangedFiles(): Promise<boolean> {

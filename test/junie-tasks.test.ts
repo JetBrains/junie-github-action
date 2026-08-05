@@ -289,6 +289,42 @@ describe("prepareJunieTask", () => {
 
             expect(core.setOutput).toHaveBeenCalledWith("CUSTOM_JUNIE_ARGS", "");
         });
+
+        test("should forbid goal mode from publishing the result itself", async () => {
+            const context = createMockContext({
+                eventName: "issue_comment",
+                isPR: false
+            });
+            const octokit = createMockOctokit();
+
+            const result = await prepareJunieTask(context, {
+                baseBranch: "main",
+                workingBranch: "existing-pr-branch",
+                isNewBranch: false
+            }, octokit);
+
+            expect(result.orchestratedTask?.task).toContain("Publishing policy");
+            expect(result.orchestratedTask?.task).toContain("Do NOT push anything to the remote");
+            expect(result.orchestratedTask?.task).toContain("do NOT create or update a pull request");
+            // The local branch must not be pinned: the orchestrated flow checks out its own
+            // branch before the task starts and reports a conflict instead of doing the work.
+            expect(result.orchestratedTask?.task).not.toContain("'existing-pr-branch'");
+            expect(result.orchestratedTask?.task).toContain("whatever branch the workflow has checked out is fine");
+        });
+
+        test("should ask goal mode for a short final summary", async () => {
+            const context = createMockContext({
+                eventName: "issue_comment",
+                isPR: false
+            });
+            const octokit = createMockOctokit();
+
+            const result = await prepareJunieTask(context, branchInfo, octokit);
+
+            expect(result.orchestratedTask?.task).toContain("Final summary format");
+            expect(result.orchestratedTask?.task).toContain("Keep it to a few sentences");
+            expect(result.orchestratedTask?.task).toContain("Never paste code, diffs, file contents");
+        });
     });
 
     describe("issues event", () => {
