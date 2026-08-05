@@ -270,6 +270,12 @@ function exportCodeReviewFeedbackLink(
         return Promise.resolve();
     }
 
+    // The feedback link is rendered inside the summary comment, which is not posted in this mode
+    if (context.inputs.skipReviewSummary) {
+        console.log('Skipping code review feedback link: skip_review_summary is enabled');
+        return Promise.resolve();
+    }
+
     const apiToken = process.env[ENV_VARS.APP_TOKEN];
     const prNumber = context.entityNumber;
     const runId = Number(process.env[ENV_VARS.GITHUB_RUN_ID]);
