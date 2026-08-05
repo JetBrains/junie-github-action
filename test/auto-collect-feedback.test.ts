@@ -423,9 +423,17 @@ describe('parseAgentFeedbackJson', () => {
             confidence: 'high',
             rationale: undefined,
         });
+    });
 
-        // If it's just the object, it also works:
-        expect(parseAgentFeedbackJson('{"rating":4,"comment":"ok","confidence":"high"}')).toBeDefined();
+    test('parses agent JSON with nested braces', () => {
+        const text = 'Here is the result: {"rating": 5, "comment": "Good job!", "confidence": "high", "metadata": {"foo": "bar"}} and some extra text.';
+        const result = parseAgentFeedbackJson(text);
+        expect(result).toEqual({
+            rating: 5,
+            comment: 'Good job!',
+            confidence: 'high',
+            rationale: undefined,
+        });
     });
 });
 

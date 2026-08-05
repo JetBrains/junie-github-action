@@ -150,7 +150,7 @@ export async function collectSessionFeedbackSignals(
         }
     }
 
-    const reactionPromises: Promise<void>[] = [];
+    const reactionTasks: (() => Promise<void>)[] = [];
 
     for (const comment of issueComments) {
         const identity = resolveSessionIdentity(comment.body || '');
@@ -182,9 +182,9 @@ export async function collectSessionFeedbackSignals(
         };
         existing.comments.push(collected);
 
-        reactionPromises.push((async () => {
+        reactionTasks.push(async () => {
             collected.reactions = await listIssueCommentReactions(octokit, owner, repo, comment.id);
-        })());
+        });
 
         sessionsByKey.set(key, existing);
     }
@@ -212,9 +212,9 @@ export async function collectSessionFeedbackSignals(
             };
             session.comments.push(collected);
 
-            reactionPromises.push((async () => {
+            reactionTasks.push(async () => {
                 collected.reactions = await listReviewCommentReactions(octokit, owner, repo, inline.id);
-            })());
+            });
 
             const replies = reviewCommentsByReplyId.get(inline.id) || [];
             for (const reply of replies) {
@@ -230,21 +230,24 @@ export async function collectSessionFeedbackSignals(
                 };
                 session.comments.push(collectedReply);
 
-                reactionPromises.push(
-                    (async () => {
-                        collectedReply.reactions = await listReviewCommentReactions(
-                            octokit,
-                            owner,
-                            repo,
-                            reply.id,
-                        );
-                    })(),
-                );
+                reactionTasks.push(async () => {
+                    collectedReply.reactions = await listReviewCommentReactions(
+                        octokit,
+                        owner,
+                        repo,
+                        reply.id,
+                    );
+                });
             }
         }
     }
 
-    await Promise.all(reactionPromises);
+    // Run reaction fetching in batches to avoid rate limits
+    const BATCH_SIZE = 10;
+    for (let i = 0; i < reactionTasks.length; i += BATCH_SIZE) {
+        const batch = reactionTasks.slice(i, i + BATCH_SIZE);
+        await Promise.all(batch.map((t) => t()));
+    }
 
     return Array.from(sessionsByKey.values());
 }
@@ -282,7 +285,7 @@ export async function collectSessionFeedbackSignalsWithFetchers(
         }
     }
 
-    const reactionPromises: Promise<void>[] = [];
+    const reactionTasks: (() => Promise<void>)[] = [];
 
     for (const comment of issueComments) {
         const identity = resolveSessionIdentity(comment.body);
@@ -310,9 +313,9 @@ export async function collectSessionFeedbackSignalsWithFetchers(
             reactions: [],
         };
         existing.comments.push(collected);
-        reactionPromises.push((async () => {
+        reactionTasks.push(async () => {
             collected.reactions = await listReactions(comment.id, 'issue');
-        })());
+        });
 
         sessionsByKey.set(key, existing);
     }
@@ -333,9 +336,9 @@ export async function collectSessionFeedbackSignalsWithFetchers(
                 reactions: [],
             };
             session.comments.push(collected);
-            reactionPromises.push((async () => {
+            reactionTasks.push(async () => {
                 collected.reactions = await listReactions(inline.id, 'review');
-            })());
+            });
 
             const replies = reviewCommentsByReplyId.get(inline.id) || [];
             for (const reply of replies) {
@@ -350,13 +353,19 @@ export async function collectSessionFeedbackSignalsWithFetchers(
                     reactions: [],
                 };
                 session.comments.push(collectedReply);
-                reactionPromises.push((async () => {
+                reactionTasks.push(async () => {
                     collectedReply.reactions = await listReactions(reply.id, 'review');
-                })());
+                });
             }
         }
     }
 
-    await Promise.all(reactionPromises);
+    // Run reaction fetching in batches to avoid rate limits
+    const BATCH_SIZE = 10;
+    for (let i = 0; i < reactionTasks.length; i += BATCH_SIZE) {
+        const batch = reactionTasks.slice(i, i + BATCH_SIZE);
+        await Promise.all(batch.map((t) => t()));
+    }
+
     return Array.from(sessionsByKey.values());
 }

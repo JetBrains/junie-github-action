@@ -1,4 +1,4 @@
-import {mkdir, writeFile, readFile} from 'fs/promises';
+import {mkdir, writeFile, readFile, unlink} from 'fs/promises';
 import {join} from 'path';
 import type {AgentFeedbackResult, CollectorVerdict, SessionFeedbackSignals} from './types';
 
@@ -42,29 +42,47 @@ ${JSON.stringify({
 }
 
 export function parseAgentFeedbackJson(text: string): AgentFeedbackResult | undefined {
-    // Attempt to find all JSON-like objects. Using non-greedy match to avoid capturing multiple objects as one.
-    // This may miss objects with high nesting, but for agent output it's usually flat or shallow.
-    const regex = /\{[\s\S]*?\}/g;
-    let match;
-    while ((match = regex.exec(text)) !== null) {
-        if (!match[0].includes('"rating"')) {
-            continue;
-        }
-        try {
-            const parsed = JSON.parse(match[0]) as Partial<AgentFeedbackResult>;
-            if (typeof parsed.rating === 'number' && parsed.rating >= 1 && parsed.rating <= 5) {
-                const confidence = parsed.confidence;
-                if (confidence === 'high' || confidence === 'medium' || confidence === 'low') {
-                    return {
-                        rating: parsed.rating,
-                        comment: String(parsed.comment || '').slice(0, 500),
-                        confidence,
-                        rationale: parsed.rationale ? String(parsed.rationale).slice(0, 300) : undefined,
-                    };
+    let searchIndex = 0;
+    while (true) {
+        const start = text.indexOf('{', searchIndex);
+        if (start === -1) break;
+
+        let depth = 0;
+        let end = -1;
+        for (let i = start; i < text.length; i++) {
+            if (text[i] === '{') depth++;
+            else if (text[i] === '}') {
+                depth--;
+                if (depth === 0) {
+                    end = i;
+                    break;
                 }
             }
-        } catch {
-            // ignore and continue
+        }
+
+        if (end !== -1) {
+            const candidate = text.slice(start, end + 1);
+            if (candidate.includes('"rating"')) {
+                try {
+                    const parsed = JSON.parse(candidate) as Partial<AgentFeedbackResult>;
+                    if (typeof parsed.rating === 'number' && parsed.rating >= 1 && parsed.rating <= 5) {
+                        const confidence = parsed.confidence;
+                        if (confidence === 'high' || confidence === 'medium' || confidence === 'low') {
+                            return {
+                                rating: parsed.rating,
+                                comment: String(parsed.comment || '').slice(0, 500),
+                                confidence,
+                                rationale: parsed.rationale ? String(parsed.rationale).slice(0, 300) : undefined,
+                            };
+                        }
+                    }
+                } catch {
+                    // ignore and try next
+                }
+            }
+            searchIndex = start + 1;
+        } else {
+            break;
         }
     }
 
@@ -110,42 +128,51 @@ export async function runAgentFeedbackEnrichment(
     }
 
     console.log('Running Junie agent enrichment for ambiguous/text-only feedback...');
-    const proc = Bun.spawn(['junie', ...args], {
-        stdin: Bun.file(inputPath),
-        stdout: 'pipe',
-        stderr: 'pipe',
-        cwd: workingDir,
-    });
-
-    const stdoutPromise = proc.stdout.text();
-    const stderrPromise = proc.stderr.text();
-
-    const exitCode = await proc.exited;
-    const stderr = await stderrPromise;
-
-    if (exitCode !== 0) {
-        console.warn(`Junie agent enrichment failed (exit ${exitCode}): ${stderr.slice(0, 500)}`);
-        return undefined;
-    }
-
-    let raw: string;
     try {
-        raw = await readFile(outputPath, 'utf-8');
-    } catch {
-        raw = await stdoutPromise;
-    }
+        await writeFile(inputPath, JSON.stringify({ task: prompt }, null, 2), 'utf-8');
 
-    let textToParse = raw;
-    try {
-        const json = JSON.parse(raw) as { result?: string; summary?: string };
-        textToParse = json.result || json.summary || raw;
-    } catch {
-        // use raw
-    }
+        const proc = Bun.spawn(['junie', ...args], {
+            stdin: Bun.file(inputPath),
+            stdout: 'pipe',
+            stderr: 'pipe',
+            cwd: workingDir,
+        });
 
-    const parsed = parseAgentFeedbackJson(textToParse);
-    if (!parsed) {
-        console.warn('Could not parse agent feedback JSON from Junie output');
+        const stdoutPromise = new Response(proc.stdout).text();
+        const stderrPromise = new Response(proc.stderr).text();
+
+        const exitCode = await proc.exited;
+        const stderr = await stderrPromise;
+
+        if (exitCode !== 0) {
+            console.warn(`Junie agent enrichment failed (exit ${exitCode}): ${stderr.slice(0, 500)}`);
+            return undefined;
+        }
+
+        let raw: string;
+        try {
+            raw = await readFile(outputPath, 'utf-8');
+        } catch {
+            raw = await stdoutPromise;
+        }
+
+        let textToParse = raw;
+        try {
+            const json = JSON.parse(raw) as { result?: string; summary?: string };
+            textToParse = json.result || json.summary || raw;
+        } catch {
+            // use raw
+        }
+
+        const parsed = parseAgentFeedbackJson(textToParse);
+        if (!parsed) {
+            console.warn('Could not parse agent feedback JSON from Junie output');
+        }
+        return parsed;
+    } finally {
+        await Promise.all([
+            unlink(inputPath).catch(() => {}),
+            unlink(outputPath).catch(() => {}),
+        ]);
     }
-    return parsed;
 }
