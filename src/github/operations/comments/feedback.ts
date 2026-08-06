@@ -3,6 +3,7 @@
 import * as core from "@actions/core";
 import {addJunieMarker, createCommentBody, createJobRunLink, hasJunieMarker} from "./common";
 import {
+    isCodeReviewEvent,
     isIssueCommentEvent,
     isJiraWorkflowDispatchEvent,
     isPullRequestReviewCommentEvent,
@@ -224,6 +225,42 @@ async function updateExistingComment(
 }
 
 /**
+ * Deletes a comment previously created by Junie.
+ *
+ * Used when the final comment must not be posted (e.g. `skip_review_summary`),
+ * so the "Junie is working..." comment doesn't stay on the PR forever.
+ *
+ * @param octokit - Octokit REST client for GitHub API
+ * @param context - GitHub context (contains event payload and entity number)
+ * @param commentId - ID of the comment to delete
+ * @param ownerLogin - Repository owner login
+ * @param repoName - Repository name
+ */
+async function deleteExistingComment(
+    octokit: Octokit,
+    context: JunieExecutionContext,
+    commentId: number,
+    ownerLogin: string,
+    repoName: string,
+): Promise<void> {
+    if (isPullRequestReviewCommentEvent(context)) {
+        await octokit.rest.pulls.deleteReviewComment({
+            owner: ownerLogin,
+            repo: repoName,
+            comment_id: commentId,
+        });
+    } else {
+        await octokit.rest.issues.deleteComment({
+            owner: ownerLogin,
+            repo: repoName,
+            comment_id: commentId,
+        });
+    }
+
+    console.log(`Deleted comment with ID: ${commentId}`);
+}
+
+/**
  * Creates an initial "Junie is working..." feedback comment on the issue/PR.
  *
  * This provides immediate feedback to users that Junie has started processing.
@@ -406,6 +443,20 @@ export async function postJunieCompletionComment(
         return;
     }
 
+    const initCommentId = +data.initCommentId;
+
+    // Code review summary is opt-out: drop the summary comment, keep the inline review comments.
+    // Errors are still reported, otherwise the run would fail silently.
+    if (!data.isJobFailed && shouldSkipReviewSummary(data)) {
+        console.log('skip_review_summary enabled - not posting the code review summary comment');
+        try {
+            await deleteExistingComment(octokit, data.parsedContext, initCommentId, ownerLogin, name);
+        } catch (error) {
+            console.warn(`Failed to delete working status comment ${initCommentId}:`, error);
+        }
+        return;
+    }
+
     let feedbackBody: string | undefined;
     if (data.isJobFailed) {
         feedbackBody = getFailedBodyWithMarker(ownerLogin, name, data.parsedContext.runId, data.failureData!, workflowName)
@@ -417,8 +468,6 @@ export async function postJunieCompletionComment(
         console.log('No feedback body - skipping feedback');
         return;
     }
-
-    const initCommentId = +data.initCommentId;
 
     console.log(`Updating feedback comment ${initCommentId}`);
 
@@ -444,6 +493,15 @@ export async function postJunieCompletionComment(
             `Original error: ${error instanceof Error ? error.message : String(error)}`
         );
     }
+}
+
+/**
+ * Whether the code review summary comment must not be posted.
+ *
+ * Only applies to code review runs - other runs always report their result.
+ */
+export function shouldSkipReviewSummary(data: FinishFeedbackData): boolean {
+    return !!data.parsedContext.inputs?.skipReviewSummary && isCodeReviewEvent(data.parsedContext);
 }
 
 /**

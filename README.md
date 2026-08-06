@@ -152,7 +152,7 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 | Input | Description | Default    |
 |-------|-------------|------------|
 | `prompt` | Custom instructions for Junie. Special values: `code-review` for PR reviews, `fix-ci` for CI failure analysis, `minor-fix` for quick PR adjustments. See [Cookbook](COOKBOOK.md) for examples. | -          |
-| `junie_version` | Junie CLI version to install | `2548.5`         |
+| `junie_version` | Junie CLI version to install | `2698.3`         |
 | `model` | Model to use for the primary agent. Available: `sonnet`, `opus`, `gpt`, `gpt-codex`, `gemini-pro`, `gemini-flash`, `grok` | -          |
 | `junie_work_dir` | Working directory for Junie files | `/tmp/junie-work` |
 | `junie_guidelines_filename` | Filename of the guidelines file (should be in `<project-root>/.junie` dir) | `guidelines.md` |
@@ -186,6 +186,7 @@ junie-args: --model=opus
 |-------|-------------|---------|
 | `silent_mode` | Run Junie without comments, branch creation, or commits - only prepare data and output results | `false` |
 | `use_single_comment` | Update a single comment for all runs instead of creating new comments each time | `false` |
+| `skip_review_summary` | For code review runs: don't post the summary comment with the review results. Inline comments are still posted, and failures are still reported | `false` |
 | `attach_github_context_to_custom_prompt` | Attach GitHub context (PR/issue info, commits, reviews, etc.) when using custom prompt | `false` |
 | `auto_collect_feedback` | **EAP / JUNP only.** Collect feedback from reactions/replies on `pull_request` `closed`. Use in a separate closed-PR workflow; review workflows omit the flag (markers are written by default). See [Auto-collect Code Review Feedback](#auto-collect-code-review-feedback). | `false` |
 
