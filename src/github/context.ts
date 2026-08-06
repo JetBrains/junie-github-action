@@ -118,6 +118,7 @@ type JunieWorkflowContext = {
         resolveConflicts: boolean;
         createNewBranchForPR: boolean;
         silentMode: boolean;
+        skipReviewSummary: boolean;
         skipPr: boolean;
         outputBranch?: string;
         useSingleComment: boolean;
@@ -187,6 +188,7 @@ export function extractJunieWorkflowContext(tokenOwner: TokenOwner): JunieExecut
             resolveConflicts: process.env.RESOLVE_CONFLICTS == "true",
             createNewBranchForPR: process.env.CREATE_NEW_BRANCH_FOR_PR == "true",
             silentMode: process.env.SILENT_MODE == "true",
+            skipReviewSummary: process.env.SKIP_REVIEW_SUMMARY == "true",
             skipPr: process.env.SKIP_PR == "true",
             outputBranch: process.env.OUTPUT_BRANCH || undefined,
             useSingleComment: process.env.USE_SINGLE_COMMENT == "true",

@@ -12,6 +12,7 @@ const defaultInputs = {
     resolveConflicts: false,
     createNewBranchForPR: false,
     silentMode: false,
+    skipReviewSummary: false,
     skipPr: false,
     outputBranch: undefined,
     useSingleComment: false,

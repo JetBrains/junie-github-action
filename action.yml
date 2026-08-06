@@ -35,6 +35,10 @@ inputs:
     description: "Skip final feedback comments and summary updates while still allowing commits and pushes."
     required: false
     default: "false"
+  skip_review_summary:
+    description: "For code review runs: do not post the summary comment with the review results. Inline review comments are still posted. The initial 'Junie is working...' comment is removed once the review succeeds."
+    required: false
+    default: "false"
   use_single_comment:
     description: "Use a single comment that gets updated instead of creating new comments for each run(per workflow)"
     required: false
@@ -229,6 +233,7 @@ runs:
         RESOLVE_CONFLICTS: ${{ inputs.resolve_conflicts }}
         CREATE_NEW_BRANCH_FOR_PR: ${{ inputs.create_new_branch_for_pr }}
         SILENT_MODE: ${{ inputs.silent_mode }}
+        SKIP_REVIEW_SUMMARY: ${{ inputs.skip_review_summary }}
         USE_SINGLE_COMMENT: ${{ inputs.use_single_comment }}
         ATTACH_GITHUB_CONTEXT_TO_CUSTOM_PROMPT: ${{ inputs.attach_github_context_to_custom_prompt }}
         SKIP_PR: ${{ inputs.skip_pr }}

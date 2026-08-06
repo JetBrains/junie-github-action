@@ -19,6 +19,7 @@ import {createJunieCommentMarker} from "../src/constants/github";
 describe("Comment Feedback Operations", () => {
   let createCommentSpy: any;
   let updateCommentSpy: any;
+  let deleteCommentSpy: any;
   let listCommentsSpy: any;
   let listReviewCommentsSpy: any;
   let createReplyForReviewCommentSpy: any;
@@ -34,6 +35,7 @@ describe("Comment Feedback Operations", () => {
           createComment: mock(async () => ({ data: { id: 12345 } })),
           updateComment: mock(async () => ({ data: { id: 12345 } })),
           listComments: mock(async () => ({ data: [] })),
+          deleteComment: mock(async () => ({ data: {} })),
         },
         pulls: {
           createReplyForReviewComment: mock(async () => ({ data: { id: 67890 } })),
@@ -45,6 +47,7 @@ describe("Comment Feedback Operations", () => {
 
     createCommentSpy = mockOctokit.rest.issues.createComment;
     updateCommentSpy = mockOctokit.rest.issues.updateComment;
+    deleteCommentSpy = mockOctokit.rest.issues.deleteComment;
     listCommentsSpy = mockOctokit.rest.issues.listComments;
     createReplyForReviewCommentSpy = mockOctokit.rest.pulls.createReplyForReviewComment;
     updateReviewCommentSpy = mockOctokit.rest.pulls.updateReviewComment;
@@ -497,6 +500,80 @@ describe("Comment Feedback Operations", () => {
       expect(body).toContain("https://junie.example.com/code-review-feedback?token=abc");
       expect(body).not.toContain("Junie successfully finished!");
       expect(body).not.toContain("Analysis complete");
+    });
+
+    test("should delete working status comment instead of posting code review summary when skip_review_summary is enabled", async () => {
+      const data: FinishFeedbackData = {
+        ...baseFinishData,
+        parsedContext: {
+          ...mockIssueCommentContext,
+          inputs: {...mockIssueCommentContext.inputs, prompt: "code-review", skipReviewSummary: true},
+        } as JunieExecutionContext,
+        isJobFailed: false,
+        successData: {
+          actionToDo: "WRITE_COMMENT",
+          junieTitle: "Analysis complete",
+          junieSummary: "Here are my findings...",
+          isCodeReview: true,
+        },
+      };
+
+      await postJunieCompletionComment(mockOctokit, data);
+
+      expect(updateCommentSpy).not.toHaveBeenCalled();
+      expect(deleteCommentSpy).toHaveBeenCalledWith({
+        owner: "test-owner",
+        repo: "test-repo",
+        comment_id: 12345,
+      });
+    });
+
+    test("should still report failures when skip_review_summary is enabled", async () => {
+      const data: FinishFeedbackData = {
+        ...baseFinishData,
+        parsedContext: {
+          ...mockIssueCommentContext,
+          inputs: {...mockIssueCommentContext.inputs, prompt: "code-review", skipReviewSummary: true},
+        } as JunieExecutionContext,
+        isJobFailed: true,
+        failureData: {error: "Junie failed to run"},
+      };
+
+      await postJunieCompletionComment(mockOctokit, data);
+
+      expect(deleteCommentSpy).not.toHaveBeenCalled();
+      expect(updateCommentSpy).toHaveBeenCalledWith({
+        owner: "test-owner",
+        repo: "test-repo",
+        comment_id: 12345,
+        body: expect.stringContaining("Junie failed to run"),
+      });
+    });
+
+    test("should keep summary comment for non code review runs when skip_review_summary is enabled", async () => {
+      const data: FinishFeedbackData = {
+        ...baseFinishData,
+        parsedContext: {
+          ...mockIssueCommentContext,
+          inputs: {...mockIssueCommentContext.inputs, skipReviewSummary: true},
+        } as JunieExecutionContext,
+        isJobFailed: false,
+        successData: {
+          actionToDo: "WRITE_COMMENT",
+          junieTitle: "Analysis complete",
+          junieSummary: "Here are my findings...",
+        },
+      };
+
+      await postJunieCompletionComment(mockOctokit, data);
+
+      expect(deleteCommentSpy).not.toHaveBeenCalled();
+      expect(updateCommentSpy).toHaveBeenCalledWith({
+        owner: "test-owner",
+        repo: "test-repo",
+        comment_id: 12345,
+        body: expect.stringContaining("Analysis complete"),
+      });
     });
 
     test("should append EAP feedback link for WRITE_COMMENT when provided", async () => {
