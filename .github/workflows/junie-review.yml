@@ -25,10 +25,11 @@ jobs:
           app-id: ${{ secrets.JUNIE_APP_ID }}
           private-key: ${{ secrets.JUNIE_APP_PRIVATE_KEY }}
 
-      - uses: JetBrains/junie-github-action@v1
+      - uses: JetBrains/junie-github-action@fadeeva/summary-parameter
         with:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
           junie_version: "latest"
           use_single_comment: "true"
           prompt: "code-review"
+          skip_review_summary: "true"
           custom_github_token: ${{ steps.app-token.outputs.token }}
