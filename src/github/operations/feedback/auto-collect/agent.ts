@@ -123,14 +123,16 @@ export async function runAgentFeedbackEnrichment(
     options: RunAgentFeedbackOptions,
 ): Promise<AgentFeedbackResult | undefined> {
     const { signals, verdict, workingDir, cliToken, junieFlags = '' } = options;
-    await mkdir(workingDir, { recursive: true });
+    // Isolate cache/cwd per session: parallel enrichments must not share --cache-dir.
+    const sessionDir = join(workingDir, `auto-collect-${signals.sessionId}`);
+    await mkdir(sessionDir, { recursive: true });
 
-    const inputPath = join(workingDir, `auto-collect-input-${signals.sessionId}.json`);
-    const outputPath = join(workingDir, `auto-collect-output-${signals.sessionId}.json`);
+    const inputPath = join(sessionDir, 'input.json');
+    const outputPath = join(sessionDir, 'output.json');
     const prompt = buildAgentPrompt(signals, verdict);
 
     const args = [
-        '--cache-dir', workingDir,
+        '--cache-dir', sessionDir,
         '--output-format', 'json',
         '--input-format', 'json',
         '--json-output-file', outputPath,
@@ -143,7 +145,10 @@ export async function runAgentFeedbackEnrichment(
         args.push(...matches.map((arg) => arg.replace(/^([^=]+=)?["'](.*)["']$/, '$1$2')));
     }
 
-    console.log('Running Junie agent enrichment for ambiguous/text-only feedback...');
+    console.log(
+        `Running Junie agent enrichment for session ${signals.sessionId} ` +
+        `(verdict=${verdict.kind}, replies=${verdict.replyTexts.length})...`,
+    );
     try {
         await writeFile(inputPath, JSON.stringify({ task: prompt }, null, 2), 'utf-8');
 
@@ -151,7 +156,7 @@ export async function runAgentFeedbackEnrichment(
             stdin: Bun.file(inputPath),
             stdout: 'pipe',
             stderr: 'pipe',
-            cwd: workingDir,
+            cwd: sessionDir,
         });
 
         const stdoutPromise = new Response(proc.stdout).text();
@@ -161,7 +166,10 @@ export async function runAgentFeedbackEnrichment(
         const stderr = await stderrPromise;
 
         if (exitCode !== 0) {
-            console.warn(`Junie agent enrichment failed (exit ${exitCode}): ${stderr.slice(0, 500)}`);
+            console.warn(
+                `Junie agent enrichment failed for ${signals.sessionId} (exit ${exitCode}): ` +
+                `${stderr.slice(0, 800)}`,
+            );
             return undefined;
         }
 
@@ -182,7 +190,10 @@ export async function runAgentFeedbackEnrichment(
 
         const parsed = parseAgentFeedbackJson(textToParse);
         if (!parsed) {
-            console.warn('Could not parse agent feedback JSON from Junie output');
+            console.warn(
+                `Could not parse agent feedback JSON for ${signals.sessionId}. ` +
+                `Output snippet: ${textToParse.slice(0, 800).replace(/\s+/g, ' ')}`,
+            );
         }
         return parsed;
     } finally {

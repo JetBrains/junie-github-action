@@ -499,7 +499,7 @@ describe('collectSessionFeedbackSignalsWithFetchers', () => {
 });
 
 describe('buildAutoCollectNotificationBody', () => {
-    test('renders outcomes with upsert marker', () => {
+    test('renders outcomes with marker', () => {
         const body = buildAutoCollectNotificationBody([
             { sessionId: 's1', runId: '1', status: 'submitted', rating: 4 },
             { sessionId: 's2', runId: '2', status: 'skipped_empty' },

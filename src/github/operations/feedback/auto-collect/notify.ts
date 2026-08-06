@@ -1,7 +1,7 @@
 import type {Octokit} from '@octokit/rest';
 import type {SessionCollectOutcome} from './types';
 
-/** Hidden marker so reopen/close can update the same outcome comment instead of spamming. */
+/** Hidden marker to identify auto-collect outcome comments. */
 export const AUTO_COLLECT_NOTIFY_MARKER = '<!-- junie-auto-collect-feedback -->';
 
 function formatOutcomeLine(outcome: SessionCollectOutcome): string {
@@ -33,31 +33,7 @@ export function buildAutoCollectNotificationBody(outcomes: SessionCollectOutcome
     return `${AUTO_COLLECT_NOTIFY_MARKER}\n${content}`;
 }
 
-export async function findExistingAutoCollectNotification(
-    octokit: Octokit,
-    owner: string,
-    repo: string,
-    prNumber: number,
-): Promise<number | undefined> {
-    try {
-        const comments = await octokit.paginate(octokit.rest.issues.listComments, {
-            owner,
-            repo,
-            issue_number: prNumber,
-            per_page: 100,
-        });
-
-        const existing = [...comments]
-            .reverse()
-            .find((comment) => comment.body?.includes(AUTO_COLLECT_NOTIFY_MARKER));
-
-        return existing?.id;
-    } catch (error) {
-        console.warn('Failed to search for existing auto-collect notification:', error);
-        return undefined;
-    }
-}
-
+/** Always create a new comment so the outcome appears at the bottom of the PR timeline. */
 export async function postAutoCollectNotification(
     octokit: Octokit,
     owner: string,
@@ -66,18 +42,6 @@ export async function postAutoCollectNotification(
     outcomes: SessionCollectOutcome[],
 ): Promise<void> {
     const body = buildAutoCollectNotificationBody(outcomes);
-    const existingId = await findExistingAutoCollectNotification(octokit, owner, repo, prNumber);
-
-    if (existingId) {
-        await octokit.rest.issues.updateComment({
-            owner,
-            repo,
-            comment_id: existingId,
-            body,
-        });
-        console.log(`Updated auto-collect notification comment ${existingId} on PR #${prNumber}`);
-        return;
-    }
 
     await octokit.rest.issues.createComment({
         owner,
