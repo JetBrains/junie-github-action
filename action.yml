@@ -71,9 +71,9 @@ inputs:
     default: "https://junie.jetbrains.com/api/public/no-auth"
   auto_collect_feedback:
     description: >
-      When true, enable auto-collect of code-review feedback (reactions/replies) when a PR is closed
-      (merged or closed manually), and hide the manual Share feedback link after review.
-      EAP (JUNP) licenses only; for other licenses create-link is skipped and collect is a no-op.
+      EAP (JUNP) only. When true, collect code-review feedback from reactions/replies
+      on pull_request closed. Use in a separate closed-PR workflow; review workflows
+      omit this flag (EAP markers are written by default). No-op for non-EAP licenses.
     required: false
     default: "false"
   model:

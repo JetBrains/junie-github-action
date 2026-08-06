@@ -108,10 +108,7 @@ export function isReviewOrCommentHasMinorFixTrigger(context: JunieExecutionConte
     return isReviewOrCommentHasTrigger(context, MINOR_FIX_TRIGGER_PHRASE_REGEXP)
 }
 
-/**
- * Auto-collect feedback runs when input auto_collect_feedback is enabled and the PR is closed
- * (merged or closed manually).
- */
+/** True when auto_collect_feedback is set and the event is pull_request closed. */
 export function shouldAutoCollectFeedback(context: JunieExecutionContext): boolean {
     if (!context.inputs.autoCollectFeedback) {
         return false;

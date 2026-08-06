@@ -119,16 +119,13 @@ jobs:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
           use_single_comment: "true"
           prompt: "code-review"
-          # Optional: hide Share feedback link; collect reactions/replies on PR close
-          # (use a separate workflow with auto_collect_feedback on pull_request closed)
-          auto_collect_feedback: "true"
 ```
 
 </details>
 
 The built-in review provides structured feedback directly on the PR.
 
-For auto-collect of reactions/replies after PR close (EAP / JUNP only), see [Auto-collect Code Review Feedback](README.md#auto-collect-code-review-feedback) in the README.
+For EAP auto-collect on PR close, see [Auto-collect Code Review Feedback](README.md#auto-collect-code-review-feedback).
 
 ### Option B: Custom Review Prompt
 

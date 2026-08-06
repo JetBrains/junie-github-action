@@ -553,6 +553,7 @@ function getSuccessBody(repoFullName: string, successData: SuccessFeedbackData) 
             result = successData.isCodeReview
                 ? (successData.junieSummary || 'No additional details')
                 : SUCCESS_FEEDBACK_COMMENT_WITH_RESULT(successData.junieTitle || 'Task completed', successData.junieSummary || 'No additional details');
+            // Markers are written whenever create-link succeeds; flag only hides the Share CTA.
             if (successData.codeReviewFeedbackLink) {
                 if (successData.junieSessionId && successData.githubRunId) {
                     if (successData.hideManualFeedbackLink) {

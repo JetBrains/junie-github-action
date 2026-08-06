@@ -223,10 +223,7 @@ export const SUCCESS_FEEDBACK_COMMENT_WITH_RESULT = (junieTitle: string, junieBo
 export const CODE_REVIEW_FEEDBACK_LINK_SECTION = (feedbackLink: string) =>
     `\n\n---\n\n**Help us improve Junie code review (EAP):** [Share feedback](${feedbackLink})`
 
-/**
- * Hidden machine-readable marker for auto-collect on PR close.
- * Includes token when Share feedback link is omitted (auto-collect mode).
- */
+/** Hidden marker for correlating review sessions on PR close. */
 export function createCodeReviewFeedbackMarker(
     sessionId: string,
     runId: string | number,
@@ -236,11 +233,12 @@ export function createCodeReviewFeedbackMarker(
     return `<!-- junie-feedback:session=${sessionId};run=${runId}${tokenPart} -->`;
 }
 
-/** Hidden marker appended to inline review comments so auto-collect can group by GITHUB_RUN_ID. */
+/** Inline marker so collect can group comments by GITHUB_RUN_ID. */
 export function createInlineFeedbackMarker(runId: string | number): string {
     return `<!-- junie-inline-feedback:run=${runId} -->`;
 }
 
+/** Marker + visible Share feedback link (default after EAP review). */
 export const CODE_REVIEW_FEEDBACK_SECTION_WITH_MARKER = (
     feedbackLink: string,
     sessionId: string,
@@ -252,7 +250,7 @@ export const CODE_REVIEW_FEEDBACK_SECTION_WITH_MARKER = (
     return `\n\n${createCodeReviewFeedbackMarker(sessionId, runId, token)}${CODE_REVIEW_FEEDBACK_LINK_SECTION(feedbackLink)}`;
 };
 
-/** Auto-collect mode: keep machine-readable session/token, hide the manual Share feedback CTA. */
+/** Marker only, no Share feedback CTA. */
 export const CODE_REVIEW_FEEDBACK_AUTO_COLLECT_MARKER_ONLY = (
     feedbackLink: string,
     sessionId: string,

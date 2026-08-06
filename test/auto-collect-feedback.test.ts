@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import {
+    CODE_REVIEW_FEEDBACK_SECTION_WITH_MARKER,
     createCodeReviewFeedbackMarker,
     createInlineFeedbackMarker,
 } from '../src/constants/github';
@@ -36,6 +37,18 @@ describe('feedback markers', () => {
             token: 'abc.def',
         });
         expect(extractFeedbackTokenFromBody(body)).toBe('abc.def');
+    });
+
+    test('default review footer includes marker + Share link', () => {
+        const link = 'https://junie.jetbrains.com/code-review-feedback?token=tok.en';
+        const section = CODE_REVIEW_FEEDBACK_SECTION_WITH_MARKER(link, 'sess-default', 12345);
+        expect(parseFeedbackMarker(section)).toEqual({
+            sessionId: 'sess-default',
+            runId: '12345',
+            token: 'tok.en',
+        });
+        expect(section).toContain('Share feedback');
+        expect(section).toContain(link);
     });
 
     test('parses inline marker', () => {

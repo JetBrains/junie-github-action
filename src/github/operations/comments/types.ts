@@ -23,7 +23,7 @@ export interface SuccessFeedbackData {
     isCodeReview?: boolean;
     junieSessionId?: string;
     githubRunId?: string;
-    /** When true, write hidden marker/token only — no visible Share feedback CTA. */
+    /** When true, write marker/token only (no Share feedback CTA). */
     hideManualFeedbackLink?: boolean;
 }
 
