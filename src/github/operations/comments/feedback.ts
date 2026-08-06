@@ -445,9 +445,27 @@ export async function postJunieCompletionComment(
 
     const initCommentId = +data.initCommentId;
 
-    // Code review summary is opt-out: drop the summary comment, keep the inline review comments.
-    // Errors are still reported, otherwise the run would fail silently.
+    // Drop the review summary text, but keep a marker/token comment for EAP auto-collect.
     if (!data.isJobFailed && shouldSkipReviewSummary(data)) {
+        const anchorBody = buildSkipReviewSummaryAnchor(data.successData!, workflowName);
+        if (anchorBody) {
+            console.log('skip_review_summary: keeping feedback marker comment (no review summary)');
+            try {
+                await updateExistingComment(
+                    octokit,
+                    data.parsedContext,
+                    initCommentId,
+                    anchorBody,
+                    ownerLogin,
+                    name,
+                );
+            } catch (error) {
+                console.error(`❌ Failed to update feedback marker comment ${initCommentId}:`, error);
+                throw error;
+            }
+            return;
+        }
+
         console.log('skip_review_summary enabled - not posting the code review summary comment');
         try {
             await deleteExistingComment(octokit, data.parsedContext, initCommentId, ownerLogin, name);
@@ -502,6 +520,34 @@ export async function postJunieCompletionComment(
  */
 export function shouldSkipReviewSummary(data: FinishFeedbackData): boolean {
     return !!data.parsedContext.inputs?.skipReviewSummary && isCodeReviewEvent(data.parsedContext);
+}
+
+/** Marker/token comment when summary text is skipped (so closed-PR collect can still find the session). */
+function buildSkipReviewSummaryAnchor(
+    successData: SuccessFeedbackData,
+    workflowName: string,
+): string | undefined {
+    if (!successData.codeReviewFeedbackLink || !successData.junieSessionId || !successData.githubRunId) {
+        return undefined;
+    }
+
+    const section = successData.hideManualFeedbackLink
+        ? CODE_REVIEW_FEEDBACK_AUTO_COLLECT_MARKER_ONLY(
+            successData.codeReviewFeedbackLink,
+            successData.junieSessionId,
+            successData.githubRunId,
+        )
+        : CODE_REVIEW_FEEDBACK_SECTION_WITH_MARKER(
+            successData.codeReviewFeedbackLink,
+            successData.junieSessionId,
+            successData.githubRunId,
+        );
+
+    const body = successData.hideManualFeedbackLink
+        ? `${section.trim()}\nJunie left inline review comments.`
+        : section.trim();
+
+    return addJunieMarker(body, workflowName);
 }
 
 /**

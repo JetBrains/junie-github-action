@@ -36,7 +36,10 @@ inputs:
     required: false
     default: "false"
   skip_review_summary:
-    description: "For code review runs: do not post the summary comment with the review results. Inline review comments are still posted. The initial 'Junie is working...' comment is removed once the review succeeds."
+    description: >
+      For code review runs: do not post the review summary text. Inline comments are still posted.
+      On EAP, a small marker/Share-feedback comment is kept so auto-collect can find the session;
+      otherwise the working-status comment is removed after success.
     required: false
     default: "false"
   use_single_comment:

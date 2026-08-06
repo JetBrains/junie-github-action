@@ -186,7 +186,7 @@ junie-args: --model=opus
 |-------|-------------|---------|
 | `silent_mode` | Run Junie without comments, branch creation, or commits - only prepare data and output results | `false` |
 | `use_single_comment` | Update a single comment for all runs instead of creating new comments each time | `false` |
-| `skip_review_summary` | For code review runs: don't post the summary comment with the review results. Inline comments are still posted, and failures are still reported | `false` |
+| `skip_review_summary` | For code review runs: don't post the review summary text. Inline comments are still posted; on EAP a marker/Share-feedback comment is kept for auto-collect. Failures are still reported | `false` |
 | `attach_github_context_to_custom_prompt` | Attach GitHub context (PR/issue info, commits, reviews, etc.) when using custom prompt | `false` |
 | `auto_collect_feedback` | **EAP / JUNP only.** Collect feedback from reactions/replies on `pull_request` `closed`. Use in a separate closed-PR workflow; review workflows omit the flag (markers are written by default). See [Auto-collect Code Review Feedback](#auto-collect-code-review-feedback). | `false` |
 
