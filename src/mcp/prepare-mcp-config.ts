@@ -57,6 +57,7 @@ export async function prepareMcpConfig(
                 REPO_NAME: repo,
                 PR_NUMBER: String(prNumber),
                 COMMIT_SHA: commitSha,
+                GITHUB_RUN_ID: process.env.GITHUB_RUN_ID || "",
             },
         };
         enabledServers.push('mcp_github_inline_comment_server');

@@ -42,6 +42,10 @@ describe("Comment Feedback Operations", () => {
           updateReviewComment: mock(async () => ({ data: { id: 67890 } })),
           listReviewComments: mock(async () => ({ data: [] })),
         },
+        reactions: {
+          createForIssueComment: mock(async () => ({ data: {} })),
+          createForPullRequestReviewComment: mock(async () => ({ data: {} })),
+        },
       },
     } as any;
 
@@ -502,7 +506,7 @@ describe("Comment Feedback Operations", () => {
       expect(body).not.toContain("Analysis complete");
     });
 
-    test("should delete working status comment instead of posting code review summary when skip_review_summary is enabled", async () => {
+    test("should delete working status comment when skip_review_summary and no EAP feedback link", async () => {
       const data: FinishFeedbackData = {
         ...baseFinishData,
         parsedContext: {
@@ -526,6 +530,35 @@ describe("Comment Feedback Operations", () => {
         repo: "test-repo",
         comment_id: 12345,
       });
+    });
+
+    test("should keep marker comment for auto-collect when skip_review_summary and EAP link present", async () => {
+      const data: FinishFeedbackData = {
+        ...baseFinishData,
+        parsedContext: {
+          ...mockIssueCommentContext,
+          inputs: {...mockIssueCommentContext.inputs, prompt: "code-review", skipReviewSummary: true},
+        } as JunieExecutionContext,
+        isJobFailed: false,
+        successData: {
+          actionToDo: "WRITE_COMMENT",
+          junieTitle: "Analysis complete",
+          junieSummary: "Here are my findings...",
+          isCodeReview: true,
+          codeReviewFeedbackLink: "https://junie.example.com/code-review-feedback?token=abc",
+          junieSessionId: "session-1",
+          githubRunId: "99",
+        },
+      };
+
+      await postJunieCompletionComment(mockOctokit, data);
+
+      expect(deleteCommentSpy).not.toHaveBeenCalled();
+      expect(updateCommentSpy).toHaveBeenCalledTimes(1);
+      const body = updateCommentSpy.mock.calls[0][0].body as string;
+      expect(body).toContain("<!-- junie-feedback:session=session-1;run=99;token=abc -->");
+      expect(body).toContain("Share feedback");
+      expect(body).not.toContain("Here are my findings...");
     });
 
     test("should still report failures when skip_review_summary is enabled", async () => {

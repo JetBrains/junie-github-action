@@ -125,8 +125,9 @@ jobs:
 
 The built-in review provides structured feedback directly on the PR.
 
-**Inline comments only:** set `skip_review_summary: "true"` to drop the summary comment and keep only the inline
-review comments. The "Junie is working..." comment is removed when the review finishes; failures are still reported.
+**Inline comments only:** set `skip_review_summary: "true"` to drop the review summary text and keep inline
+comments. On EAP a small marker/Share-feedback comment remains for auto-collect; otherwise the working-status
+comment is removed. Failures are still reported.
 
 ```yaml
       - uses: JetBrains/junie-github-action@v1
@@ -135,6 +136,8 @@ review comments. The "Junie is working..." comment is removed when the review fi
           prompt: "code-review"
           skip_review_summary: "true"
 ```
+
+For EAP auto-collect on PR close, see [Auto-collect Code Review Feedback](README.md#auto-collect-code-review-feedback).
 
 ### Option B: Custom Review Prompt
 

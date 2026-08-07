@@ -21,6 +21,10 @@ export interface SuccessFeedbackData {
     baseBranch?: string;
     codeReviewFeedbackLink?: string;
     isCodeReview?: boolean;
+    junieSessionId?: string;
+    githubRunId?: string;
+    /** When true, write marker/token only (no Share feedback CTA). */
+    hideManualFeedbackLink?: boolean;
 }
 
 export interface FailureFeedbackData {

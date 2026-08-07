@@ -18,6 +18,7 @@ A powerful GitHub Action that integrates [Junie](https://www.jetbrains.com/junie
   - [GitHub Token Considerations](#github-token-considerations)
   - [BYOK Authentication](#byok-authentication)
 - [How It Works](#how-it-works)
+- [Auto-collect Code Review Feedback](#auto-collect-code-review-feedback)
 - [Security Considerations](#security-considerations)
 - [Troubleshooting](#troubleshooting)
 
@@ -27,6 +28,7 @@ A powerful GitHub Action that integrates [Junie](https://www.jetbrains.com/junie
 - **Issue Resolution**: Automatically implements solutions for GitHub issues
 - **PR Management**: Reviews code changes and implements requested modifications
 - **Inline Code Reviews**: Create code review comments with GitHub suggestions directly on PR diffs
+- **Auto-collect Code Review Feedback**: Optionally collect PR reactions/replies after close and submit feedback automatically (EAP / JUNP license only)
 - **Minor PR Fixes**: Quickly implement small changes in PRs using `@junie-agent minor-fix [instruction]`
 - **CI Failure Analysis**: Investigates failed checks and suggests fixes using MCP integration
 - **Flexible Triggers**: Activate via mentions, assignees, labels, or custom prompts
@@ -184,8 +186,9 @@ junie-args: --model=opus
 |-------|-------------|---------|
 | `silent_mode` | Run Junie without comments, branch creation, or commits - only prepare data and output results | `false` |
 | `use_single_comment` | Update a single comment for all runs instead of creating new comments each time | `false` |
-| `skip_review_summary` | For code review runs: don't post the summary comment with the review results. Inline comments are still posted, and failures are still reported | `false` |
+| `skip_review_summary` | For code review runs: don't post the review summary text. Inline comments are still posted; on EAP a marker/Share-feedback comment is kept for auto-collect. Failures are still reported | `false` |
 | `attach_github_context_to_custom_prompt` | Attach GitHub context (PR/issue info, commits, reviews, etc.) when using custom prompt | `false` |
+| `auto_collect_feedback` | **EAP / JUNP only.** Collect feedback from reactions/replies on `pull_request` `closed`. Use in a separate closed-PR workflow; review workflows omit the flag (markers are written by default). See [Auto-collect Code Review Feedback](#auto-collect-code-review-feedback). | `false` |
 
 #### Jira Integration
 
@@ -416,6 +419,81 @@ jobs:
 7. **Junie Execution**: Runs Junie CLI with the prepared task and connected MCP tools
 8. **Result Processing**: Analyzes changes, determines the action (commit, PR, or comment), and sanitizes Junie's output to redact tokens and prevent self-triggering
 9. **Feedback**: Updates GitHub with results, PR links, and commit information
+
+## Auto-collect Code Review Feedback
+
+Optional flow for **EAP (JUNP) licenses only**. The feedback token/link is created only when the Junie API key resolves to license type `JUNP`. For other licenses, `create-link` returns 403, no marker/token is written, and auto-collect has nothing to submit (effectively a no-op).
+
+### How it works
+
+1. **Review workflow** (no flag): after EAP `code-review`, hidden markers (`session`/`run`/`token`, inline `run`) are always written. The **Share feedback** link stays visible.
+2. **Collect workflow** (`auto_collect_feedback: "true"` on `pull_request` `closed`): finds markers, groups sessions, maps reactions/replies to a 1-5 rating, submits, and posts a short outcome comment.
+
+Use two workflow files (review on opened/synchronize, collect on closed). Collect uses the GitHub API only; checkout the head commit SHA so the job still runs if the branch was auto-deleted.
+
+```yaml
+# .github/workflows/code-review.yml
+name: Code Review
+on:
+  pull_request:
+    types: [opened, synchronize]
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: JetBrains/junie-github-action@v1
+        with:
+          junie_api_key: ${{ secrets.JUNIE_API_KEY }}
+          prompt: "code-review"
+          use_single_comment: "true"
+
+# .github/workflows/junie-auto-collect-feedback.yml
+name: Junie Auto-collect Feedback
+on:
+  pull_request:
+    types: [closed]
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+      - uses: JetBrains/junie-github-action@v1
+        with:
+          junie_api_key: ${{ secrets.JUNIE_API_KEY }}
+          auto_collect_feedback: "true"
+```
+
+### Behavior
+
+| Signal | Result |
+|--------|--------|
+| Only positive reactions (`+1`, `heart`) | Rating 4 (one) or 5 (two+) |
+| Only negative reactions (`-1`, `confused`) | Rating 2 (one) or 1 (two+) |
+| Mixed positive + negative | Junie agent resolves rating + short comment |
+| Replies only (no useful reactions) | Junie agent resolves rating + short comment |
+| No reactions and no replies | Skip submit |
+| Already submitted / invalid token | Skip submit |
+
+Notes:
+- EAP / JUNP only; non-EAP keys skip link/marker creation and collect submit.
+- `auto_collect_feedback` only enables collect on `pull_request` `closed`.
+- If feedback was already submitted via the Share link, collect skips that session.
+- Bot reactions are ignored. Closing/merging alone never creates a rating.
+- Other GitHub reactions (`laugh`, `hooray`, `rocket`, `eyes`) are ignored.
 
 ## Security Considerations
 

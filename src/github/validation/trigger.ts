@@ -9,7 +9,12 @@ import {
     isPullRequestReviewCommentEvent,
     isPullRequestReviewEvent,
 } from "../context";
-import {CODE_REVIEW_TRIGGER_PHRASE_REGEXP, FIX_CI_TRIGGER_PHRASE_REGEXP, MINOR_FIX_TRIGGER_PHRASE_REGEXP, RESOLVE_CONFLICTS_TRIGGER_PHRASE_REGEXP} from "../../constants/github";
+import {
+    CODE_REVIEW_TRIGGER_PHRASE_REGEXP,
+    FIX_CI_TRIGGER_PHRASE_REGEXP,
+    MINOR_FIX_TRIGGER_PHRASE_REGEXP,
+    RESOLVE_CONFLICTS_TRIGGER_PHRASE_REGEXP,
+} from "../../constants/github";
 
 /**
  * Detects if the Junie trigger phrase is present in the workflow context
@@ -101,6 +106,24 @@ export function isReviewOrCommentHasFixCITrigger(context: JunieExecutionContext)
 
 export function isReviewOrCommentHasMinorFixTrigger(context: JunieExecutionContext) {
     return isReviewOrCommentHasTrigger(context, MINOR_FIX_TRIGGER_PHRASE_REGEXP)
+}
+
+/** True when auto_collect_feedback is set and the event is pull_request closed. */
+export function shouldAutoCollectFeedback(context: JunieExecutionContext): boolean {
+    if (!context.inputs.autoCollectFeedback) {
+        return false;
+    }
+
+    if (!context.isPR || !context.entityNumber) {
+        return false;
+    }
+
+    if (isPullRequestEvent(context) && context.eventAction === "closed") {
+        console.log("Auto-collect feedback triggered by pull_request closed");
+        return true;
+    }
+
+    return false;
 }
 
 export function isReviewOrCommentHasTrigger(context: JunieExecutionContext, regExp: RegExp) {

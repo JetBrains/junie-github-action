@@ -69,3 +69,77 @@ export async function fetchCodeReviewFeedbackLink(
         return undefined;
     }
 }
+
+export interface VerifyCodeReviewFeedbackResponse {
+    valid: boolean;
+    sessionId?: string;
+    repository?: string;
+    prNumber?: number;
+    runId?: number;
+    alreadySubmitted?: boolean;
+}
+
+export interface SubmitCodeReviewFeedbackParams {
+    token: string;
+    rating: number;
+    comment?: string;
+}
+
+export interface SubmitCodeReviewFeedbackResponse {
+    success: boolean;
+    error?: string;
+}
+
+export async function verifyCodeReviewFeedbackToken(
+    token: string,
+    apiBaseUrl?: string,
+): Promise<VerifyCodeReviewFeedbackResponse> {
+    const baseUrl = resolveCodeReviewFeedbackApiBaseUrl(apiBaseUrl);
+    const url = `${baseUrl}/code-review-feedback/verify?token=${encodeURIComponent(token)}`;
+    try {
+        const response = await fetch(url, { method: 'GET' });
+        if (!response.ok) {
+            console.warn(`Feedback verify failed with status ${response.status}`);
+            return { valid: false };
+        }
+        return (await response.json()) as VerifyCodeReviewFeedbackResponse;
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn(`Feedback verify failed: ${message}`);
+        return { valid: false };
+    }
+}
+
+export async function submitCodeReviewFeedback(
+    params: SubmitCodeReviewFeedbackParams,
+    apiBaseUrl?: string,
+): Promise<SubmitCodeReviewFeedbackResponse> {
+    const baseUrl = resolveCodeReviewFeedbackApiBaseUrl(apiBaseUrl);
+    try {
+        const response = await fetch(`${baseUrl}/code-review-feedback/submit`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                token: params.token,
+                rating: params.rating,
+                comment: params.comment,
+            }),
+        });
+
+        if (!response.ok) {
+            const text = await response.text().catch(() => '');
+            return {
+                success: false,
+                error: `submit failed with status ${response.status}${text ? `: ${text}` : ''}`,
+            };
+        }
+
+        return (await response.json()) as SubmitCodeReviewFeedbackResponse;
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return {
+            success: false,
+            error: message,
+        };
+    }
+}

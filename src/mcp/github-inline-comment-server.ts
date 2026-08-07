@@ -5,6 +5,7 @@ import {StdioServerTransport} from "@modelcontextprotocol/sdk/server/stdio.js";
 import {z} from "zod";
 import {Octokit} from "@octokit/rest";
 import {GITHUB_API_URL} from "../github/api/config";
+import {createInlineFeedbackMarker} from "../constants/github";
 import {readFile} from "fs/promises";
 
 /**
@@ -21,6 +22,7 @@ interface ServerConfig {
     prNumber: number;
     apiUrl: string;
     commitSha: string;
+    githubRunId?: string;
 }
 
 interface InlineCommentParams {
@@ -68,6 +70,7 @@ function loadConfiguration(): ServerConfig {
         prNumber: parsedPrNumber,
         apiUrl,
         commitSha,
+        githubRunId: process.env.GITHUB_RUN_ID || undefined,
     };
 }
 
@@ -320,6 +323,14 @@ async function initializeServer() {
                 } else {
                     // Without suggestion - just the comment
                     fullCommentBody = commentBody;
+                }
+
+                // Correlate inline comments with the GITHUB_RUN_ID for auto-collect feedback
+                if (config.githubRunId) {
+                    const marker = createInlineFeedbackMarker(config.githubRunId);
+                    if (!fullCommentBody.includes(marker)) {
+                        fullCommentBody = `${fullCommentBody}\n\n${marker}`;
+                    }
                 }
 
                 // Set line numbers for GitHub API

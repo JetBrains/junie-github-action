@@ -36,7 +36,10 @@ inputs:
     required: false
     default: "false"
   skip_review_summary:
-    description: "For code review runs: do not post the summary comment with the review results. Inline review comments are still posted. The initial 'Junie is working...' comment is removed once the review succeeds."
+    description: >
+      For code review runs: do not post the review summary text. Inline comments are still posted.
+      On EAP, a small marker/Share-feedback comment is kept so auto-collect can find the session;
+      otherwise the working-status comment is removed after success.
     required: false
     default: "false"
   use_single_comment:
@@ -73,6 +76,13 @@ inputs:
       https://junie-kitty-external.labs.jb.gg/api/public/no-auth).
     required: false
     default: "https://junie.jetbrains.com/api/public/no-auth"
+  auto_collect_feedback:
+    description: >
+      EAP (JUNP) only. When true, collect code-review feedback from reactions/replies
+      on pull_request closed. Use in a separate closed-PR workflow; review workflows
+      omit this flag (EAP markers are written by default). No-op for non-EAP licenses.
+    required: false
+    default: "false"
   model:
     description: "Model to use for the primary agent"
     required: false
@@ -248,10 +258,11 @@ runs:
         GROK_API_KEY: ${{ inputs.grok_api_key }}
         OPENROUTER_API_KEY: ${{ inputs.openrouter_api_key }}
         GOOGLE_API_KEY: ${{ inputs.google_api_key }}
+        AUTO_COLLECT_FEEDBACK: ${{ inputs.auto_collect_feedback }}
 
 
     - name: Install Junie
-      if: steps.prepare.outputs.SHOULD_SKIP != 'true'
+      if: steps.prepare.outputs.SHOULD_SKIP != 'true' || steps.prepare.outputs.AUTO_COLLECT_FEEDBACK == 'true'
       shell: bash
       run: |
         if [ "${{ inputs.junie_version }}" == "latest" ]; then
@@ -259,6 +270,30 @@ runs:
         else
           curl -fsSL https://junie.jetbrains.com/install.sh | JUNIE_VERSION=${{ inputs.junie_version }} bash
         fi
+
+    - name: Auto-collect code review feedback
+      if: steps.prepare.outputs.AUTO_COLLECT_FEEDBACK == 'true'
+      shell: bash
+      id: auto-collect-feedback
+      run: |
+        JUNIE_FLAGS="$(bash "${GITHUB_ACTION_PATH}/src/scripts/build-junie-flags.sh")"
+        export JUNIE_FLAGS
+        echo "Using Junie flags for auto-collect agent: ${JUNIE_FLAGS}"
+        bun run ${GITHUB_ACTION_PATH}/src/entrypoints/auto-collect-feedback.ts
+      env:
+        PARSED_CONTEXT: ${{ steps.prepare.outputs.PARSED_CONTEXT }}
+        EJ_AUTH_GITHUB_TOKEN: ${{ steps.prepare.outputs.EJ_AUTH_GITHUB_TOKEN }}
+        EJ_CLI_TOKEN: ${{ steps.prepare.outputs.EJ_CLI_TOKEN }}
+        APP_TOKEN: ${{ inputs.junie_api_key }}
+        WORKING_DIR: ${{ inputs.junie_work_dir }}
+        CODE_REVIEW_FEEDBACK_API_BASE_URL: ${{ inputs.code_review_feedback_api_base_url }}
+        CUSTOM_JUNIE_ARGS: ${{ steps.prepare.outputs.CUSTOM_JUNIE_ARGS }}
+        MODEL: ${{ inputs.model }}
+        OPENAI_API_KEY: ${{ inputs.openai_api_key }}
+        ANTHROPIC_API_KEY: ${{ inputs.anthropic_api_key }}
+        GROK_API_KEY: ${{ inputs.grok_api_key }}
+        OPENROUTER_API_KEY: ${{ inputs.openrouter_api_key }}
+        GOOGLE_API_KEY: ${{ inputs.google_api_key }}
 
     - name: Run Junie
       if: steps.prepare.outputs.SHOULD_SKIP != 'true'
@@ -282,20 +317,7 @@ runs:
         OPENROUTER_API_KEY: ${{ inputs.openrouter_api_key }}
         GOOGLE_API_KEY: ${{ inputs.google_api_key }}
       run: |
-        # Start with custom junie args if provided (highest priority)
-        JUNIE_FLAGS="${CUSTOM_JUNIE_ARGS}"
-
-        # If no custom --model flag in CUSTOM_JUNIE_ARGS, use MODEL input
-        if [ -n "${MODEL}" ] && ! echo "${CUSTOM_JUNIE_ARGS}" | grep -q -- "--model="; then
-          JUNIE_FLAGS="${JUNIE_FLAGS} --model=${MODEL}"
-        fi
-
-        # Add BYOK API key flags if provided
-        [ -n "${OPENAI_API_KEY}" ] && JUNIE_FLAGS="${JUNIE_FLAGS} --openai-api-key=${OPENAI_API_KEY}"
-        [ -n "${ANTHROPIC_API_KEY}" ] && JUNIE_FLAGS="${JUNIE_FLAGS} --anthropic-api-key=${ANTHROPIC_API_KEY}"
-        [ -n "${GROK_API_KEY}" ] && JUNIE_FLAGS="${JUNIE_FLAGS} --grok-api-key=${GROK_API_KEY}"
-        [ -n "${OPENROUTER_API_KEY}" ] && JUNIE_FLAGS="${JUNIE_FLAGS} --openrouter-api-key=${OPENROUTER_API_KEY}"
-        [ -n "${GOOGLE_API_KEY}" ] && JUNIE_FLAGS="${JUNIE_FLAGS} --google-api-key=${GOOGLE_API_KEY}"
+        JUNIE_FLAGS="$(bash "${GITHUB_ACTION_PATH}/src/scripts/build-junie-flags.sh")"
 
         JUNIE_OUTPUT_FILE="${WORKING_DIR}/junie_output.json"
         echo "Using Junie flags: ${JUNIE_FLAGS}"
@@ -413,7 +435,9 @@ runs:
         JUNIE_TITLE: ${{ steps.junie-run-results.outputs.JUNIE_TITLE }}
         JUNIE_SUMMARY: ${{ steps.junie-run-results.outputs.JUNIE_SUMMARY }}
         JUNIE_DURATION_MS: ${{ steps.junie-run-results.outputs.JUNIE_DURATION_MS }}
+        JUNIE_SESSION_ID: ${{ steps.junie-run-results.outputs.JUNIE_SESSION_ID }}
         CODE_REVIEW_FEEDBACK_LINK: ${{ steps.junie-run-results.outputs.CODE_REVIEW_FEEDBACK_LINK }}
+        AUTO_COLLECT_FEEDBACK: ${{ inputs.auto_collect_feedback }}
         JIRA_BASE_URL: ${{ inputs.jira_base_url }}
         JIRA_EMAIL: ${{ inputs.jira_email }}
         JIRA_API_TOKEN: ${{ inputs.jira_api_token }}
@@ -439,7 +463,9 @@ runs:
         JUNIE_TITLE: ${{ steps.junie-run-results.outputs.JUNIE_TITLE }}
         JUNIE_SUMMARY: ${{ steps.junie-run-results.outputs.JUNIE_SUMMARY }}
         JUNIE_DURATION_MS: ${{ steps.junie-run-results.outputs.JUNIE_DURATION_MS }}
+        JUNIE_SESSION_ID: ${{ steps.junie-run-results.outputs.JUNIE_SESSION_ID }}
         CODE_REVIEW_FEEDBACK_LINK: ${{ steps.junie-run-results.outputs.CODE_REVIEW_FEEDBACK_LINK }}
+        AUTO_COLLECT_FEEDBACK: ${{ inputs.auto_collect_feedback }}
         JIRA_BASE_URL: ${{ inputs.jira_base_url }}
         JIRA_EMAIL: ${{ inputs.jira_email }}
         JIRA_API_TOKEN: ${{ inputs.jira_api_token }}
