@@ -423,6 +423,8 @@ describe("prepareJunieTask", () => {
             expect(result).toBeDefined();
             expect(result.codeReviewTask).toBeDefined();
             expect(result.codeReviewTask?.diffCommand).toContain("git diff origin/main");
+            expect(result.codeReviewTask?.fetchVcsInfo).toBe(true);
+            expect(result.codeReviewTask?.reviewTarget).toEqual({type: "remoteRequest", number: 123});
             expect(result.codeReviewTask?.description).toContain("<pull_request_info>");
             // Header should NOT contain "Your task is to:"
             expect(result.codeReviewTask?.description).toContain("You were triggered as a GitHub AI Assistant by pull_request action.");
@@ -468,12 +470,36 @@ describe("prepareJunieTask", () => {
             expect(result.codeReviewTask).toBeDefined();
             // Should detect code-review trigger from comment and create codeReviewTask
             expect(result.codeReviewTask?.diffCommand).toContain("git diff origin/main");
+            expect(result.codeReviewTask?.fetchVcsInfo).toBe(true);
+            expect(result.codeReviewTask?.reviewTarget).toEqual({type: "remoteRequest", number: 123});
             expect(result.codeReviewTask?.description).toContain("<pull_request_info>");
             // Header should NOT contain "Your task is to:"
             expect(result.codeReviewTask?.description).toContain("You were triggered as a GitHub AI Assistant by pull_request_review action.");
             expect(result.codeReviewTask?.description).not.toContain("Your task is to:");
             // For code review, user_instruction should not be attached
             expect(result.codeReviewTask?.description).not.toContain("<user_instruction>");
+        });
+
+        test("should fail to create codeReviewTask when PR number is not available", async () => {
+            const context = createMockContext({
+                eventName: "workflow_dispatch" as any,
+                isPR: false,
+                entityNumber: undefined,
+                inputs: {
+                    prompt: "code-review"
+                },
+                payload: {
+                    repository: {
+                        owner: {login: "owner"},
+                        name: "repo"
+                    }
+                } as any
+            });
+            const octokit = createMockOctokit();
+
+            await expect(prepareJunieTask(context, branchInfo, octokit)).rejects.toThrow(
+                "Code review requires a Pull Request number"
+            );
         });
 
         test("should not trigger fix CI prompt when workflow_run event has success conclusion", async () => {

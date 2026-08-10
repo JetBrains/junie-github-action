@@ -16,7 +16,7 @@ import {Octokits} from "../api/client";
 import {NewGitHubPromptFormatter} from "./new-prompt-formatter";
 import {GraphQLGitHubDataFetcher} from "../api/graphql-data-fetcher";
 import {FetchedData} from "../api/queries";
-import {CliInput} from "./types/junie";
+import {CliInput, remoteRequestReviewTarget} from "./types/junie";
 import {generateMcpToolsPrompt} from "../../mcp/mcp-prompts";
 import {junieArgsToString} from "../../utils/junie-args-parser";
 import {buildDiffCommand} from "../../constants/github";
@@ -81,10 +81,16 @@ export async function prepareJunieTask(
         // Note: Attachments are already processed in fetchIssueData/fetchPullRequestData
         if (isCodeReviewEvent(context)) {
             const diffPoint = branchInfo.prBaseBranch || branchInfo.baseBranch;
+            const prNumber = context.entityNumber;
+            if (!prNumber) {
+                throw new Error("Code review requires a Pull Request number, but none was found in the event context.");
+            }
             const diffCommand = buildDiffCommand(diffPoint, branchInfo.mergeBaseSha);
             junieCLITask.codeReviewTask = {
                 description: promptText,
-                diffCommand
+                diffCommand,
+                fetchVcsInfo: true,
+                reviewTarget: remoteRequestReviewTarget(prNumber),
             }
         } else {
             junieCLITask.task = promptText;
