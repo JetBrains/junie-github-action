@@ -36,7 +36,7 @@ describe("Trigger Junie in Issue", () => {
 
         await testClient.waitForJunieComment(issueNumber, INIT_COMMENT_BODY);
 
-        const titleKeywords = ["greeting", "hello", "requirements"]
+        const titleKeywords = ["greeting", "hello", "requirements", "function"]
 
         const foundPR = await testClient.waitForPR(testClient.conditionIncludes(titleKeywords));
 
