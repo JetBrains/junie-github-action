@@ -1,10 +1,16 @@
 import {
     isCodeReviewEvent,
+    isFixCIEvent,
     isIssueCommentEvent,
     isIssuesEvent,
+    isJiraWorkflowDispatchEvent,
+    isMinorFixEvent,
     isPullRequestEvent,
     isPullRequestReviewCommentEvent,
     isPullRequestReviewEvent,
+    isPushEvent,
+    isTriggeredByUserInteraction,
+    isYouTrackWorkflowDispatchEvent,
     JunieExecutionContext
 } from "../context";
 import * as core from "@actions/core";
@@ -19,6 +25,38 @@ import {FetchedData} from "../api/queries";
 import {CliInput} from "./types/junie";
 import {generateMcpToolsPrompt} from "../../mcp/mcp-prompts";
 import {junieArgsToString} from "../../utils/junie-args-parser";
+import {addGitExcludePatterns, AGENT_ARTIFACT_PATTERNS} from "../../utils/git-exclude";
+
+export function shouldRunInGoalMode(context: JunieExecutionContext): boolean {
+    if (isMinorFixEvent(context)) {
+        return false;
+    }
+
+    return (
+        (isTriggeredByUserInteraction(context) && !isPushEvent(context)) ||
+        isFixCIEvent(context) ||
+        isJiraWorkflowDispatchEvent(context) ||
+        isYouTrackWorkflowDispatchEvent(context) ||
+        Boolean(context.inputs.prompt)
+    );
+}
+
+const PUBLISHING_POLICY_NOTE =
+    "\n\nPublishing policy (must be followed exactly):\n" +
+    "- Do NOT push to the remote, and do NOT create or update a pull request. The workflow " +
+    "stages, commits, pushes and opens the pull request itself once the task is done.\n" +
+    "- Do NOT create git worktrees and do NOT switch to another branch. Work on the branch " +
+    "that is currently checked out and leave the changes there.";
+
+const PLAN_ARTIFACT_NOTE =
+    "\n\nDo not stage or commit your plan file or any other scratch file you create while " +
+    "working. Only the actual code changes the task calls for belong in the commit.";
+
+const SUMMARY_FORMAT_NOTE =
+    "\n\nFinal summary format (it is published as the pull request description):\n" +
+    "- A few sentences: what changed and why, nothing else.\n" +
+    "- Plain prose or a short bullet list. No headings, no per-step report.\n" +
+    "- Never paste code, diffs, file contents, command output or logs into it.";
 
 function getTriggerTime(context: JunieExecutionContext): string | undefined {
     if (isIssueCommentEvent(context)) {
@@ -85,12 +123,21 @@ export async function prepareJunieTask(
                 description: promptText,
                 diffCommand
             }
+        } else if (shouldRunInGoalMode(context)) {
+            console.log("Running this task in goal mode (orchestrated)");
+
+            // Keep the agent's own artifacts out of the commit the action builds later.
+            addGitExcludePatterns(AGENT_ARTIFACT_PATTERNS);
+
+            junieCLITask.orchestratedTask = {
+                task: promptText + PUBLISHING_POLICY_NOTE + PLAN_ARTIFACT_NOTE + SUMMARY_FORMAT_NOTE
+            };
         } else {
             junieCLITask.task = promptText;
         }
     }
 
-    if (!junieCLITask.task && !junieCLITask.mergeTask && !junieCLITask.codeReviewTask) {
+    if (!junieCLITask.task && !junieCLITask.orchestratedTask && !junieCLITask.mergeTask && !junieCLITask.codeReviewTask) {
         throw new Error("No task was created. Please check your inputs.");
     }
 

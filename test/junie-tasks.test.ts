@@ -1,10 +1,13 @@
-import {describe, test, expect, mock, beforeEach} from "bun:test";
+import {describe, test, expect, mock, beforeEach, beforeAll, afterAll} from "bun:test";
 import {prepareJunieTask} from "../src/github/junie/junie-tasks";
 import {JunieExecutionContext} from "../src/github/context";
 import {BranchInfo} from "../src/github/operations/branch";
 import {Octokits} from "../src/github/api/client";
 import * as core from "@actions/core";
+import {execSync} from "child_process";
 import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 
 // Mock modules
 mock.module("@actions/core", () => ({
@@ -198,6 +201,24 @@ describe("prepareJunieTask", () => {
         isNewBranch: true
     };
 
+    // Goal-mode runs excludes the agent's artifacts via `.git/info/exclude` of the
+    // repository they run in. Run from a throwaway repository so these tests do not
+    // write to this checkout's own git directory.
+    let originalCwd: string;
+    let scratchRepo: string;
+
+    beforeAll(() => {
+        originalCwd = process.cwd();
+        scratchRepo = fs.mkdtempSync(path.join(os.tmpdir(), "junie-tasks-test-"));
+        execSync("git init -q", {cwd: scratchRepo});
+        process.chdir(scratchRepo);
+    });
+
+    afterAll(() => {
+        process.chdir(originalCwd);
+        fs.rmSync(scratchRepo, {recursive: true, force: true});
+    });
+
     beforeEach(() => {
         (core.setOutput as any).mockClear();
         // Set WORKING_DIR for file operations
@@ -230,10 +251,11 @@ describe("prepareJunieTask", () => {
             const result = await prepareJunieTask(context, branchInfo, octokit);
 
             expect(result).toBeDefined();
-            expect(result.task).toBeDefined();
-            expect(result.task).toContain("Do something");
-            expect(result.task).toContain("<repository>");
-            expect(result.task).toContain("<actor>");
+            expect(result.orchestratedTask).toBeDefined();
+            expect(result.task).toBeUndefined();
+            expect(result.orchestratedTask?.task).toContain("Do something");
+            expect(result.orchestratedTask?.task).toContain("<repository>");
+            expect(result.orchestratedTask?.task).toContain("<actor>");
             expect(result.mergeTask).toBeUndefined();
             expect(core.setOutput).toHaveBeenCalledWith("JUNIE_INPUT_FILE", expect.any(String));
         });
@@ -258,9 +280,10 @@ describe("prepareJunieTask", () => {
             const result = await prepareJunieTask(context, branchInfo, octokit);
 
             expect(result).toBeDefined();
-            expect(result.task).toBeDefined();
-            expect(result.task).toContain("Do something");
-            expect(result.task).toContain("Do NOT commit or push changes");
+            expect(result.orchestratedTask).toBeDefined();
+            expect(result.task).toBeUndefined();
+            expect(result.orchestratedTask?.task).toContain("Do something");
+            expect(result.orchestratedTask?.task).toContain("Do NOT commit or push changes");
             expect(result.mergeTask).toBeUndefined();
             expect(core.setOutput).toHaveBeenCalledWith("JUNIE_INPUT_FILE", expect.any(String));
         });
@@ -277,12 +300,13 @@ describe("prepareJunieTask", () => {
             const result = await prepareJunieTask(context, branchInfo, octokit);
 
             expect(result).toBeDefined();
-            expect(result.task).toBeDefined();
+            expect(result.orchestratedTask).toBeDefined();
+            expect(result.task).toBeUndefined();
             expect(result.mergeTask).toBeUndefined();
-            expect(result.task).toContain("<user_instruction>");
-            expect(result.task).toContain("@junie-agent help");
-            expect(result.task).toContain("<repository>");
-            expect(result.task).toContain("<actor>");
+            expect(result.orchestratedTask?.task).toContain("<user_instruction>");
+            expect(result.orchestratedTask?.task).toContain("@junie-agent help");
+            expect(result.orchestratedTask?.task).toContain("<repository>");
+            expect(result.orchestratedTask?.task).toContain("<actor>");
         });
     });
 
@@ -311,11 +335,12 @@ describe("prepareJunieTask", () => {
             const result = await prepareJunieTask(context, branchInfo, octokit);
 
             expect(result).toBeDefined();
-            expect(result.task).toBeDefined();
+            expect(result.orchestratedTask).toBeDefined();
+            expect(result.task).toBeUndefined();
             expect(result.mergeTask).toBeUndefined();
-            expect(result.task).toContain("<user_instruction>");
-            expect(result.task).toContain("Issue body");
-            expect(result.task).toContain("<repository>");
+            expect(result.orchestratedTask?.task).toContain("<user_instruction>");
+            expect(result.orchestratedTask?.task).toContain("Issue body");
+            expect(result.orchestratedTask?.task).toContain("<repository>");
         });
     });
 
@@ -352,12 +377,13 @@ describe("prepareJunieTask", () => {
             const result = await prepareJunieTask(context, branchInfo, octokit);
 
             expect(result).toBeDefined();
-            expect(result.task).toBeDefined();
+            expect(result.orchestratedTask).toBeDefined();
+            expect(result.task).toBeUndefined();
             expect(result.mergeTask).toBeUndefined();
-            expect(result.task).toContain("<user_instruction>");
-            expect(result.task).toContain("Please fix this");
-            expect(result.task).toContain("<repository>");
-            expect(result.task).toContain("<pull_request_info>");
+            expect(result.orchestratedTask?.task).toContain("<user_instruction>");
+            expect(result.orchestratedTask?.task).toContain("Please fix this");
+            expect(result.orchestratedTask?.task).toContain("<repository>");
+            expect(result.orchestratedTask?.task).toContain("<pull_request_info>");
         });
     });
 
@@ -389,11 +415,12 @@ describe("prepareJunieTask", () => {
             const result = await prepareJunieTask(context, branchInfo, octokit);
 
             expect(result).toBeDefined();
-            expect(result.task).toBeDefined();
+            expect(result.orchestratedTask).toBeDefined();
+            expect(result.task).toBeUndefined();
             expect(result.mergeTask).toBeUndefined();
-            expect(result.task).toContain("<user_instruction>");
-            expect(result.task).toContain("Changes needed");
-            expect(result.task).toContain("<repository>");
+            expect(result.orchestratedTask?.task).toContain("<user_instruction>");
+            expect(result.orchestratedTask?.task).toContain("Changes needed");
+            expect(result.orchestratedTask?.task).toContain("<repository>");
         });
 
         test("should create codeReviewTask when code-review prompt is provided", async () => {
@@ -536,11 +563,12 @@ describe("prepareJunieTask", () => {
             const result = await prepareJunieTask(context, branchInfo, octokit);
 
             expect(result).toBeDefined();
-            expect(result.task).toBeDefined();
+            expect(result.orchestratedTask).toBeDefined();
+            expect(result.task).toBeUndefined();
             expect(result.mergeTask).toBeUndefined();
-            expect(result.task).toContain("<user_instruction>");
-            expect(result.task).toContain("Fix this line");
-            expect(result.task).toContain("<repository>");
+            expect(result.orchestratedTask?.task).toContain("<user_instruction>");
+            expect(result.orchestratedTask?.task).toContain("Fix this line");
+            expect(result.orchestratedTask?.task).toContain("<repository>");
         });
     });
 
@@ -571,12 +599,165 @@ describe("prepareJunieTask", () => {
             const result = await prepareJunieTask(context, branchInfo, octokit);
 
             expect(result).toBeDefined();
-            expect(result.task).toBeDefined();
+            expect(result.orchestratedTask).toBeDefined();
+            expect(result.task).toBeUndefined();
             expect(result.mergeTask).toBeUndefined();
-            expect(result.task).toContain("<user_instruction>");
-            expect(result.task).toContain("PR description");
-            expect(result.task).toContain("<pull_request_info>");
-            expect(result.task).toContain("<repository>");
+            expect(result.orchestratedTask?.task).toContain("<user_instruction>");
+            expect(result.orchestratedTask?.task).toContain("PR description");
+            expect(result.orchestratedTask?.task).toContain("<pull_request_info>");
+            expect(result.orchestratedTask?.task).toContain("<repository>");
+        });
+    });
+
+    describe("goal mode", () => {
+        test("should keep the agent from publishing, so the action decides where changes land", async () => {
+            const context = createMockContext({eventName: "issue_comment", isPR: true});
+            const octokit = createMockOctokit();
+
+            const result = await prepareJunieTask(context, branchInfo, octokit);
+
+            const task = result.orchestratedTask?.task ?? "";
+            expect(task).toContain("Do NOT push to the remote");
+            expect(task).toContain("do NOT create or update a pull request");
+            expect(task).toContain("Do NOT create git worktrees");
+        });
+
+        test("should tell the agent not to commit its plan file", async () => {
+            const context = createMockContext({eventName: "issues"});
+            const octokit = createMockOctokit();
+
+            const result = await prepareJunieTask(context, branchInfo, octokit);
+
+            expect(result.orchestratedTask?.task).toContain("Do not stage or commit your plan file");
+        });
+
+        test("should ask for a short summary, so the PR description keeps its shape", async () => {
+            const context = createMockContext({eventName: "issues"});
+            const octokit = createMockOctokit();
+
+            const result = await prepareJunieTask(context, branchInfo, octokit);
+
+            const task = result.orchestratedTask?.task ?? "";
+            expect(task).toContain("Final summary format");
+            expect(task).toContain("A few sentences");
+        });
+
+        test("should not use goal mode for a minor fix", async () => {
+            const context = createMockContext({
+                eventName: "workflow_dispatch",
+                inputs: {
+                    ...createMockContext().inputs,
+                    prompt: "minor-fix"
+                },
+                payload: {
+                    repository: {
+                        owner: {login: "owner"},
+                        name: "repo"
+                    }
+                } as any
+            });
+            const octokit = createMockOctokit();
+
+            const result = await prepareJunieTask(context, branchInfo, octokit);
+
+            expect(result.task).toBeDefined();
+            expect(result.orchestratedTask).toBeUndefined();
+        });
+
+        test("should not use goal mode for a push event", async () => {
+            const context = createMockContext({
+                eventName: "push",
+                payload: {
+                    ref: "refs/heads/main",
+                    repository: {
+                        owner: {login: "owner"},
+                        name: "repo"
+                    }
+                } as any
+            });
+            const octokit = createMockOctokit();
+
+            const result = await prepareJunieTask(context, branchInfo, octokit);
+
+            expect(result.task).toBeDefined();
+            expect(result.orchestratedTask).toBeUndefined();
+        });
+
+        test("should use goal mode for a fix-ci run", async () => {
+            const context = createMockContext({
+                eventName: "workflow_run" as any,
+                isPR: true,
+                entityNumber: 123,
+                inputs: {
+                    ...createMockContext().inputs,
+                    prompt: "fix-ci"
+                },
+                payload: {
+                    action: "completed",
+                    workflow_run: {
+                        id: 12345,
+                        name: "CI",
+                        head_branch: "feature-branch",
+                        head_sha: "abc123",
+                        conclusion: "failure",
+                        pull_requests: [{number: 123}]
+                    },
+                    repository: {
+                        owner: {login: "owner"},
+                        name: "repo"
+                    }
+                } as any
+            });
+            const octokit = createMockOctokit();
+
+            const result = await prepareJunieTask(context, branchInfo, octokit);
+
+            expect(result.orchestratedTask).toBeDefined();
+            expect(result.task).toBeUndefined();
+        });
+
+        test("should not use goal mode for a code review", async () => {
+            const context = createMockContext({
+                eventName: "pull_request",
+                isPR: true,
+                entityNumber: 123,
+                inputs: {
+                    ...createMockContext().inputs,
+                    prompt: "code-review"
+                },
+                payload: {
+                    pull_request: {
+                        number: 123,
+                        title: "Test PR",
+                        updated_at: "2024-01-01T00:00:00Z"
+                    },
+                    repository: {
+                        owner: {login: "owner"},
+                        name: "repo"
+                    }
+                } as any
+            });
+            const octokit = createMockOctokit();
+
+            const result = await prepareJunieTask(context, branchInfo, octokit);
+
+            expect(result.codeReviewTask).toBeDefined();
+            expect(result.orchestratedTask).toBeUndefined();
+        });
+
+        test("should not use goal mode when resolving conflicts", async () => {
+            const context = createMockContext({
+                inputs: {
+                    ...createMockContext().inputs,
+                    resolveConflicts: true
+                }
+            });
+            const octokit = createMockOctokit();
+
+            const result = await prepareJunieTask(context, branchInfo, octokit);
+
+            expect(result.mergeTask).toBeDefined();
+            expect(result.orchestratedTask).toBeUndefined();
         });
     });
 
@@ -664,14 +845,14 @@ describe("prepareJunieTask", () => {
             const issueContext = createMockContext({eventName: "issue_comment", isPR: false});
             const issueResult = await prepareJunieTask(issueContext, branchInfo, octokit);
             expect(issueResult).toBeDefined();
-            expect(issueResult.task).toBeDefined();
+            expect(issueResult.orchestratedTask).toBeDefined();
             expect(issueResult.mergeTask).toBeUndefined();
 
             // Test PR comment
             const prContext = createMockContext({eventName: "issue_comment", isPR: true});
             const prResult = await prepareJunieTask(prContext, branchInfo, octokit);
             expect(prResult).toBeDefined();
-            expect(prResult.task).toBeDefined();
+            expect(prResult.orchestratedTask).toBeDefined();
             expect(prResult.mergeTask).toBeUndefined();
 
             // Both should have been processed successfully
