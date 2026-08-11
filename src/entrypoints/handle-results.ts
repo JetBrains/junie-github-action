@@ -32,9 +32,14 @@ function getTriggeringEntityTitle(context: JunieExecutionContext): string | unde
     const payload = context.payload as {
         issue?: { title?: string };
         pull_request?: { title?: string };
+        issueSummary?: string;
+        issueTitle?: string;
     };
 
-    return payload.pull_request?.title || payload.issue?.title;
+    return payload.pull_request?.title
+        || payload.issue?.title
+        || payload.issueSummary
+        || payload.issueTitle;
 }
 
 export enum ActionType {
@@ -137,7 +142,9 @@ export async function handleResults() {
         // Sanitize and truncate to prevent ARG_MAX issues
         const title = truncateOutput(sanitizeJunieOutput(rawTitle, triggerPhrase), OUTPUT_SIZE_LIMITS.TITLE)
         const body = truncateOutput(sanitizeJunieOutput(rawBody, triggerPhrase), OUTPUT_SIZE_LIMITS.SUMMARY)
-        let issueId
+        const rawCommitTitle = junieJsonOutput.taskName?.trim() || rawTitle
+        const commitTitle = truncateOutput(sanitizeJunieOutput(rawCommitTitle, triggerPhrase), OUTPUT_SIZE_LIMITS.TITLE)
+        let issueId: number | undefined
         if (isTriggeredByUserInteraction(context)) {
             issueId = context.entityNumber
         }
@@ -145,8 +152,8 @@ export async function handleResults() {
         // Add co-author only for user-triggered events (issues, PRs, comments)
         // For system-triggered events (schedule, workflow_dispatch), skip co-author
         const addCoAuthor = isTriggeredByUserInteraction(context);
-        const commitMessage = COMMIT_MESSAGE_TEMPLATE(
-            title,
+        const buildCommitMessage = (subject: string) => COMMIT_MESSAGE_TEMPLATE(
+            subject,
             issueId,
             addCoAuthor ? context.actor : undefined,
             addCoAuthor ? context.actorEmail : undefined
@@ -161,14 +168,18 @@ export async function handleResults() {
                     title,
                     body,
                     durationMs,
-                    commitMessage,
+                    // The branch is new, so this is the pull request's only commit: the two
+                    // subjects should agree.
+                    buildCommitMessage(title),
                     prTitle,
                     prBody);
                 break;
             case ActionType.COMMIT_AND_PUSH:
+                exportResultsOutputs(title, body, durationMs, buildCommitMessage(title));
+                break;
             case ActionType.COMMIT_CHANGES:
             case ActionType.PUSH:
-                exportResultsOutputs(title, body, durationMs, commitMessage);
+                exportResultsOutputs(title, body, durationMs, buildCommitMessage(commitTitle));
                 break;
             case ActionType.WRITE_COMMENT:
             case ActionType.NOTHING:

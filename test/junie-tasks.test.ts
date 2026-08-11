@@ -862,6 +862,59 @@ describe("prepareJunieTask", () => {
             expect(core.setOutput).toHaveBeenCalledWith("ENTITY_TITLE", "Test PR");
         });
 
+        test("should export the Jira issue summary as the entity title", async () => {
+            // A Jira dispatch runs in goal mode but has no GitHub entity to fetch a title from,
+            // so without reading the payload the PR would be named after a sub-agent's step.
+            const context = createMockContext({
+                eventName: "workflow_dispatch" as any,
+                isPR: false,
+                entityNumber: undefined,
+                payload: {
+                    action: "jira_event",
+                    issueKey: "PROJ-42",
+                    issueSummary: "Users cannot export their data",
+                    issueDescription: "The export button does nothing",
+                    comments: [],
+                    attachments: [],
+                    repository: {
+                        owner: {login: "owner"},
+                        name: "repo"
+                    }
+                } as any
+            });
+            const octokit = createMockOctokit();
+
+            await prepareJunieTask(context, branchInfo, octokit);
+
+            expect(core.setOutput).toHaveBeenCalledWith("ENTITY_TITLE", "Users cannot export their data");
+        });
+
+        test("should export the YouTrack issue title as the entity title", async () => {
+            const context = createMockContext({
+                eventName: "workflow_dispatch" as any,
+                isPR: false,
+                entityNumber: undefined,
+                payload: {
+                    action: "youtrack_event",
+                    issueId: "PROJ-7",
+                    issueUrl: "https://youtrack.example.com/issue/PROJ-7",
+                    issueTitle: "Add CSV export to the users module",
+                    issueDescription: "Support exporting the user list",
+                    youtrackBaseUrl: "https://youtrack.example.com",
+                    youtrackToken: "token",
+                    repository: {
+                        owner: {login: "owner"},
+                        name: "repo"
+                    }
+                } as any
+            });
+            const octokit = createMockOctokit();
+
+            await prepareJunieTask(context, branchInfo, octokit);
+
+            expect(core.setOutput).toHaveBeenCalledWith("ENTITY_TITLE", "Add CSV export to the users module");
+        });
+
         test("should use goal mode for a fix-ci run", async () => {
             const context = createMockContext({
                 eventName: "workflow_run" as any,

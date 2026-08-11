@@ -19,7 +19,15 @@
  *
  * Single words that also occur in legitimate titles ("Add review widget") are matched only
  * at the start, which is where a step name lands; unambiguous phrases are matched anywhere.
+ *
+ * The bare stem of a process verb is left alone unless it stands like a step name, because
+ * imperative present is also how a person opens a change description: "Implement dark mode
+ * toggle" and "Complete migration to Kotlin 2.0" are real titles, while the sub-agents report
+ * their steps as past tense, gerunds or nouns ("Implemented export functionality",
+ * "Reviewing the plan", "Analysis of the parser").
  */
+const PROCESS_VERB_STEMS = "(re)?view|implement|validate|verify|plan|analy[sz]e|finalize|complete";
+
 const INTERNAL_WORKFLOW_PATTERNS: RegExp[] = [
     /\bstep\s*\d+/i,
     /\bstage\s*\d+/i,
@@ -30,15 +38,20 @@ const INTERNAL_WORKFLOW_PATTERNS: RegExp[] = [
     /\borchestrated?\b/i,
     /\bsub-?agent\b/i,
 
-    /^\s*(re)?view(s|ed|ing)?\b/i,
-    /^\s*implement(s|ed|ing|ation|ations)?\b/i,
-    /^\s*validat(e|es|ed|ing|ion|ions)\b/i,
-    /^\s*verif(y|ies|ied|ying|ication)\b/i,
-    /^\s*plan(s|ned|ning)?\b/i,
-    /^\s*analy[sz](e|es|ed|ing|is)\b/i,
+    // Inflected and nominal forms: never how a change is described.
+    /^\s*(re)?view(s|ed|ing)\b/i,
+    /^\s*implement(s|ed|ing|ation|ations)\b/i,
+    /^\s*validat(es|ed|ing|ion|ions)\b/i,
+    /^\s*verif(ies|ied|ying|ication)\b/i,
+    /^\s*plan(s|ned|ning)\b/i,
+    /^\s*analy[sz](es|ed|ing|is)\b/i,
     /^\s*summar(y|ies|ise|ize|ised|ized|ising|izing)\b/i,
-    /^\s*finaliz(e|es|ed|ing)\b/i,
-    /^\s*complet(e|es|ed|ing|ion)\b/i,
+    /^\s*finaliz(es|ed|ing)\b/i,
+    /^\s*complet(es|ed|ing|ion)\b/i,
+
+    // Bare stem standing alone or heading a noun phrase: "Verify", "Review: ...", "Review of ...".
+    new RegExp(`^\\s*(${PROCESS_VERB_STEMS})\\s*([:\\-–—]|$)`, "i"),
+    new RegExp(`^\\s*(${PROCESS_VERB_STEMS})\\s+of\\b`, "i"),
 ];
 
 /**

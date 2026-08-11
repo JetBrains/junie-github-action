@@ -48,6 +48,36 @@ describe("isInternalWorkflowTitle", () => {
         }
     });
 
+    test("accepts imperative present, which is how people write change titles", () => {
+        // The sub-agents report steps in past tense, gerunds or nouns; "Implement X" is a
+        // normal PR title and must not be thrown away in favour of the generic fallback.
+        const titles = [
+            "Implement dark mode toggle",
+            "Complete migration to Kotlin 2.0",
+            "Verify webhook signatures on ingest",
+            "Validate user input on the signup form",
+            "Plan B routing for the payment gateway",
+            "Finalize the export format",
+        ];
+
+        for (const title of titles) {
+            expect(isInternalWorkflowTitle(title)).toBe(false);
+        }
+    });
+
+    test("still rejects a bare process verb or one heading a noun phrase", () => {
+        const titles = [
+            "Implement",
+            "Review: the code changes",
+            "Verify - migration",
+            "Complete of the export work",
+        ];
+
+        for (const title of titles) {
+            expect(isInternalWorkflowTitle(title)).toBe(true);
+        }
+    });
+
     test("accepts process words that appear mid-title", () => {
         // Only a leading process verb signals a step name; these are real titles.
         expect(isInternalWorkflowTitle("Add review widget to the dashboard")).toBe(false);

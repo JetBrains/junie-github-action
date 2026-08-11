@@ -11,7 +11,9 @@ import {
     isPushEvent,
     isTriggeredByUserInteraction,
     isYouTrackWorkflowDispatchEvent,
-    JunieExecutionContext
+    JiraIssuePayload,
+    JunieExecutionContext,
+    YouTrackIssuePayload
 } from "../context";
 import * as core from "@actions/core";
 import * as fs from "node:fs";
@@ -104,6 +106,16 @@ const TITLE_FORMAT_NOTE =
     "Completeness' is exactly the kind of title that must never be produced.\n" +
     "- Do NOT prefix it with '[Junie]:' yourself: the workflow adds that.";
 
+function getExternalTrackerTitle(context: JunieExecutionContext): string | undefined {
+    if (isJiraWorkflowDispatchEvent(context)) {
+        return (context.payload as JiraIssuePayload).issueSummary;
+    }
+    if (isYouTrackWorkflowDispatchEvent(context)) {
+        return (context.payload as YouTrackIssuePayload).issueTitle;
+    }
+    return undefined;
+}
+
 function getTriggerTime(context: JunieExecutionContext): string | undefined {
     if (isIssueCommentEvent(context)) {
         return context.payload.comment.created_at;
@@ -149,7 +161,9 @@ export async function prepareJunieTask(
         // The results step titles the pull request from this. It is resolved here because
         // several event payloads (workflow_run for fix-CI, check_suite, schedule) carry the
         // entity number but not its title, and this is where the entity is already fetched.
-        const entityTitle = fetchedData.pullRequest?.title || fetchedData.issue?.title;
+        const entityTitle = fetchedData.pullRequest?.title
+            || fetchedData.issue?.title
+            || getExternalTrackerTitle(context);
         if (entityTitle) {
             core.setOutput(OUTPUT_VARS.ENTITY_TITLE, entityTitle);
         }
