@@ -29,7 +29,8 @@ describe("prepareJunieTask", () => {
             triggerPhrase: "@junie-agent",
             assigneeTrigger: "",
             labelTrigger: "",
-            allowedMcpServers: ""
+            allowedMcpServers: "",
+            junieVersion: "latest"
         };
 
         const { inputs: _, ...restOverrides } = overrides;
@@ -418,13 +419,14 @@ describe("prepareJunieTask", () => {
             });
             const octokit = createMockOctokit();
 
-            const result = await prepareJunieTask(context, branchInfo, octokit);
+            const result = await prepareJunieTask(context, branchInfo, octokit, ["mcp_github_inline_comment_server"]);
 
             expect(result).toBeDefined();
             expect(result.codeReviewTask).toBeDefined();
             expect(result.codeReviewTask?.diffCommand).toContain("git diff origin/main");
             expect(result.codeReviewTask?.fetchVcsInfo).toBe(true);
             expect(result.codeReviewTask?.reviewTarget).toEqual({type: "remoteRequest", number: 123});
+            expect(result.codeReviewTask?.description).not.toContain("post_inline_review_comment");
             expect(result.codeReviewTask?.description).toContain("<pull_request_info>");
             // Header should NOT contain "Your task is to:"
             expect(result.codeReviewTask?.description).toContain("You were triggered as a GitHub AI Assistant by pull_request action.");
@@ -432,6 +434,35 @@ describe("prepareJunieTask", () => {
             // For code review, user_instruction should not be attached at all
             expect(result.codeReviewTask?.description).not.toContain("<user_instruction>");
             expect(result.codeReviewTask?.description).not.toContain("code-review");
+        });
+
+        test("should not use reviewTarget on Junie versions without support", async () => {
+            const context = createMockContext({
+                eventName: "pull_request",
+                isPR: true,
+                entityNumber: 123,
+                inputs: {
+                    prompt: "code-review",
+                    junieVersion: "2698.3"
+                },
+                payload: {
+                    pull_request: {
+                        number: 123,
+                        title: "Test PR",
+                        updated_at: "2024-01-01T00:00:00Z"
+                    },
+                    repository: {
+                        owner: {login: "owner"},
+                        name: "repo"
+                    }
+                } as any
+            });
+            const octokit = createMockOctokit();
+
+            const result = await prepareJunieTask(context, branchInfo, octokit, ["mcp_github_inline_comment_server"]);
+
+            expect(result.codeReviewTask?.reviewTarget).toBeUndefined();
+            expect(result.codeReviewTask?.description).toContain("post_inline_review_comment");
         });
 
         test("should trigger codeReviewTask from comment when inputs.prompt is empty and code-review keyword is used", async () => {
