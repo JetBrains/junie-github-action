@@ -16,10 +16,19 @@ import {Octokits} from "../api/client";
 import {NewGitHubPromptFormatter} from "./new-prompt-formatter";
 import {GraphQLGitHubDataFetcher} from "../api/graphql-data-fetcher";
 import {FetchedData} from "../api/queries";
-import {CliInput, remoteRequestReviewTarget} from "./types/junie";
+import {CliInput} from "./types/junie";
 import {generateMcpToolsPrompt} from "../../mcp/mcp-prompts";
 import {junieArgsToString} from "../../utils/junie-args-parser";
 import {buildDiffCommand} from "../../constants/github";
+
+// First Junie build that understands `reviewTarget` in the code review task input.
+const MIN_BUILD_WITH_REVIEW_TARGET = 4000.1; // TODO: change to the real version
+
+function supportsReviewTarget(junieVersion: string | undefined): boolean {
+    if (junieVersion === "latest") return true;
+    const build = Number(junieVersion?.split(".")[0]);
+    return Number.isFinite(build) && build >= MIN_BUILD_WITH_REVIEW_TARGET;
+}
 
 function getTriggerTime(context: JunieExecutionContext): string | undefined {
     if (isIssueCommentEvent(context)) {
@@ -72,8 +81,13 @@ export async function prepareJunieTask(
             console.log(`Extracted custom junie args: ${customJunieArgs.join(' ')}`);
         }
 
-        // Append MCP tools information if any MCP servers are enabled
-        const mcpToolsPrompt = generateMcpToolsPrompt(enabledMcpServers);
+        // Append MCP tools information if any MCP servers are enabled.
+        // Junie posts review comments itself via `reviewTarget`, so the inline comment tool is not advertised for code review.
+        const useReviewTarget = isCodeReviewEvent(context) && supportsReviewTarget(context.inputs.junieVersion);
+        const mcpServersForPrompt = useReviewTarget
+            ? enabledMcpServers.filter(server => server !== "mcp_github_inline_comment_server")
+            : enabledMcpServers;
+        const mcpToolsPrompt = generateMcpToolsPrompt(mcpServersForPrompt);
         if (mcpToolsPrompt) {
             promptText = promptText + mcpToolsPrompt;
         }
@@ -81,8 +95,8 @@ export async function prepareJunieTask(
         // Note: Attachments are already processed in fetchIssueData/fetchPullRequestData
         if (isCodeReviewEvent(context)) {
             const diffPoint = branchInfo.prBaseBranch || branchInfo.baseBranch;
-            const prNumber = context.entityNumber;
-            if (!prNumber) {
+            const prNumber = context.isPR ? context.entityNumber : undefined;
+            if (useReviewTarget && !prNumber) {
                 throw new Error("Code review requires a Pull Request number, but none was found in the event context.");
             }
             const diffCommand = buildDiffCommand(diffPoint, branchInfo.mergeBaseSha);
@@ -90,7 +104,7 @@ export async function prepareJunieTask(
                 description: promptText,
                 diffCommand,
                 fetchVcsInfo: true,
-                reviewTarget: remoteRequestReviewTarget(prNumber),
+                ...(useReviewTarget ? {reviewTarget: {type: "remoteRequest" as const, number: prNumber!}} : {}),
             }
         } else {
             junieCLITask.task = promptText;

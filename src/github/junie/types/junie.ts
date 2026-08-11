@@ -13,22 +13,11 @@ export interface MergeTask {
     branch: string;
 }
 
-export interface RemoteRequestReviewTarget {
-    type: "remoteRequest";
-    number: number;
-}
-
-export type ReviewTarget = RemoteRequestReviewTarget;
-
-export function remoteRequestReviewTarget(prNumber: number): RemoteRequestReviewTarget {
-    return {type: "remoteRequest", number: prNumber};
-}
-
 export interface CodeReview {
     description?: string;
     diffCommand?: string;
     fetchVcsInfo?: boolean;
-    reviewTarget?: ReviewTarget;
+    reviewTarget?: { type: "remoteRequest"; number: number };
 }
 
 export interface CliOutput {
