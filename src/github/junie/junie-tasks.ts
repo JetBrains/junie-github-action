@@ -49,8 +49,31 @@ const PUBLISHING_POLICY_NOTE =
     "and every other field must be left exactly as they are. Do NOT rename, retitle, reword or " +
     "otherwise edit the pull request: only the code changes are yours to make, and the workflow " +
     "adds your summary on its own.\n" +
-    "- Do NOT create git worktrees and do NOT switch to another branch. Work on the branch " +
-    "that is currently checked out and leave the changes there.";
+    "- Do NOT create git worktrees. Work in the checkout you were given and leave the changes there.";
+
+function buildBranchPolicyNote(branchInfo: BranchInfo, context: JunieExecutionContext): string {
+    const branch = branchInfo.workingBranch;
+
+    const stayPut =
+        "\n\nBranch policy (must be followed exactly):\n" +
+        `- Branch '${branch}' is checked out and is the only place your changes belong. Commit them ` +
+        "there. Do NOT create, switch to or rename a branch.\n";
+
+    if (branchInfo.isNewBranch) {
+        return stayPut +
+            `- The workflow created '${branch}' for this run and opens a new pull request from it once ` +
+            "you finish. Do NOT open that pull request yourself.";
+    }
+
+    if (context.isPR) {
+        return stayPut +
+            `- '${branch}' is the branch of the pull request this run targets. The workflow pushes your ` +
+            "commits straight onto it, so do NOT open a new pull request under any circumstances.";
+    }
+
+    return stayPut +
+        "- The workflow decides what to publish once you finish. Do NOT open a pull request.";
+}
 
 const PLAN_ARTIFACT_NOTE =
     "\n\nDo not stage or commit your plan file or any other scratch file you create while " +
@@ -63,15 +86,23 @@ const SUMMARY_FORMAT_NOTE =
     "- Never paste code, diffs, file contents, command output or logs into it.";
 
 const TITLE_FORMAT_NOTE =
-    "\n\nTask name (it becomes the pull request title when a new pull request is opened):\n" +
-    "- Describe the actual code change or the business value it delivers, the way a developer " +
-    "would title the pull request, e.g. 'Add export functionality to users module' or " +
+    "\n\nTask name (the workflow titles the pull request from the issue or pull request that " +
+    "triggered this run; your name is used only when there is no such issue or pull request, " +
+    "so it still has to read like a title):\n" +
+    "- It names the CHANGE, not your work on it. Whenever you report a task name — at any " +
+    "point, from any step or sub-agent — give the name of the overall change this run delivers. " +
+    "Never name the step you just finished, the step you are in, or the stage of your own " +
+    "process. The reviewer sees only this one line and knows nothing about how you work.\n" +
+    "- Write what a developer would put on the pull request: the change or the business value " +
+    "it delivers, e.g. 'Add export functionality to users module' or " +
     "'Fix NPE in payment processing'.\n" +
-    "- One short line. No trailing period.\n" +
-    "- Never name your own process. The title must not mention steps, plans, reviews, " +
-    "deliverables or execution, and must not contain wording such as 'Step 1', " +
-    "'Implementation', 'Deliverables', 'Task execution', 'Orchestrated' or 'Final report'.\n" +
-    "- Do NOT prefix it with '[Junie]:' or any other tag: the workflow adds that itself.";
+    "- One short line, no trailing period.\n" +
+    "- Banned outright. The title must never contain 'Step', 'Stage', 'Review', " +
+    "'Implementation', 'Validation', 'Validation Completeness', 'Deliverables', " +
+    "'Task execution', 'Orchestrated', 'Final report', or any other word describing your " +
+    "internal process rather than the code. 'Review Step 1 Implementation and Validation " +
+    "Completeness' is exactly the kind of title that must never be produced.\n" +
+    "- Do NOT prefix it with '[Junie]:' yourself: the workflow adds that.";
 
 function getTriggerTime(context: JunieExecutionContext): string | undefined {
     if (isIssueCommentEvent(context)) {
@@ -115,6 +146,14 @@ export async function prepareJunieTask(
             fetchedData = await fetcher.fetchIssueData(owner, repo, context.entityNumber, triggerTime);
         }
 
+        // The results step titles the pull request from this. It is resolved here because
+        // several event payloads (workflow_run for fix-CI, check_suite, schedule) carry the
+        // entity number but not its title, and this is where the entity is already fetched.
+        const entityTitle = fetchedData.pullRequest?.title || fetchedData.issue?.title;
+        if (entityTitle) {
+            core.setOutput(OUTPUT_VARS.ENTITY_TITLE, entityTitle);
+        }
+
         const promptResult = await formatter.generatePrompt(context, fetchedData, branchInfo, context.inputs.attachGithubContextToCustomPrompt, isDefaultToken);
         let promptText = promptResult.prompt;
         customJunieArgs = promptResult.customJunieArgs;
@@ -145,8 +184,8 @@ export async function prepareJunieTask(
             addGitExcludePatterns(AGENT_ARTIFACT_PATTERNS);
 
             junieCLITask.orchestratedTask = {
-                task: promptText + PUBLISHING_POLICY_NOTE + PLAN_ARTIFACT_NOTE +
-                    SUMMARY_FORMAT_NOTE + TITLE_FORMAT_NOTE
+                task: promptText + PUBLISHING_POLICY_NOTE + buildBranchPolicyNote(branchInfo, context) +
+                    PLAN_ARTIFACT_NOTE + SUMMARY_FORMAT_NOTE + TITLE_FORMAT_NOTE
             };
         } else {
             junieCLITask.task = promptText;

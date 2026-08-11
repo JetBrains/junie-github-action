@@ -622,6 +622,84 @@ describe("prepareJunieTask", () => {
             expect(task).toContain("Do NOT create git worktrees");
         });
 
+        // The note must state whatever branch.ts already decided, for every outcome its
+        // rules can produce — the parameter, the PR author / token owner shortcuts, the
+        // closed-PR case and silent mode alike.
+        test("should pin the agent to the existing PR branch when branch.ts kept it", async () => {
+            const context = createMockContext({eventName: "issue_comment", isPR: true});
+            const octokit = createMockOctokit();
+
+            // create_new_branch_for_pr disabled, or actor is the PR author / token owner.
+            const existingPrBranch: BranchInfo = {
+                baseBranch: "main",
+                workingBranch: "contributor-feature",
+                isNewBranch: false
+            };
+
+            const result = await prepareJunieTask(context, existingPrBranch, octokit);
+
+            const task = result.orchestratedTask?.task ?? "";
+            expect(task).toContain("Branch 'contributor-feature' is checked out");
+            expect(task).toContain("'contributor-feature' is the branch of the pull request this run targets");
+            expect(task).toContain("do NOT open a new pull request under any circumstances");
+        });
+
+        test("should pin the agent to the new branch when branch.ts created one", async () => {
+            const context = createMockContext({eventName: "issues"});
+            const octokit = createMockOctokit();
+
+            // create_new_branch_for_pr enabled, an external contributor, or an issue run.
+            const freshBranch: BranchInfo = {
+                baseBranch: "main",
+                workingBranch: "junie/issue-123-456",
+                isNewBranch: true
+            };
+
+            const result = await prepareJunieTask(context, freshBranch, octokit);
+
+            const task = result.orchestratedTask?.task ?? "";
+            expect(task).toContain("Branch 'junie/issue-123-456' is checked out");
+            expect(task).toContain("opens a new pull request from it once you finish");
+            expect(task).toContain("Do NOT open that pull request yourself");
+        });
+
+        test("should not claim a pull request exists on a silent-mode issue run", async () => {
+            const context = createMockContext({eventName: "issues", isPR: false});
+            const octokit = createMockOctokit();
+
+            // Silent mode leaves the base branch checked out and never creates a branch.
+            const silentModeBranch: BranchInfo = {
+                baseBranch: "main",
+                workingBranch: "main",
+                isNewBranch: false
+            };
+
+            const result = await prepareJunieTask(context, silentModeBranch, octokit);
+
+            const task = result.orchestratedTask?.task ?? "";
+            expect(task).toContain("Branch 'main' is checked out");
+            expect(task).toContain("The workflow decides what to publish");
+            expect(task).not.toContain("the branch of the pull request this run targets");
+        });
+
+        test("should forbid creating branches and opening PRs in every branch mode", async () => {
+            const octokit = createMockOctokit();
+            const modes: BranchInfo[] = [
+                {baseBranch: "main", workingBranch: "existing-pr-branch", isNewBranch: false},
+                {baseBranch: "main", workingBranch: "junie/issue-1-2", isNewBranch: true},
+            ];
+
+            for (const mode of modes) {
+                const result = await prepareJunieTask(
+                    createMockContext({eventName: "issue_comment", isPR: true}), mode, octokit);
+
+                const task = result.orchestratedTask?.task ?? "";
+                expect(task).toContain("do NOT create or update a pull request");
+                expect(task).toContain("Do NOT create, switch to or rename a branch");
+                expect(task).toContain(`'${mode.workingBranch}'`);
+            }
+        });
+
         test("should forbid retitling or editing an existing pull request", async () => {
             const context = createMockContext({eventName: "issue_comment", isPR: true});
             const octokit = createMockOctokit();
@@ -641,8 +719,9 @@ describe("prepareJunieTask", () => {
             const result = await prepareJunieTask(context, branchInfo, octokit);
 
             const task = result.orchestratedTask?.task ?? "";
-            expect(task).toContain("it becomes the pull request title");
-            expect(task).toContain("Describe the actual code change or the business value");
+            expect(task).toContain("the workflow titles the pull request from the issue");
+            expect(task).toContain("It names the CHANGE, not your work on it");
+            expect(task).toContain("the change or the business value it delivers");
             expect(task).toContain("Add export functionality to users module");
             expect(task).toContain("Fix NPE in payment processing");
         });
@@ -654,10 +733,28 @@ describe("prepareJunieTask", () => {
             const result = await prepareJunieTask(context, branchInfo, octokit);
 
             const task = result.orchestratedTask?.task ?? "";
-            expect(task).toContain("Never name your own process");
-            for (const banned of ["Step 1", "Implementation", "Deliverables", "Task execution"]) {
-                expect(task).toContain(`'${banned}'`);
+            const banned = [
+                "Step", "Stage", "Review", "Implementation",
+                "Validation", "Validation Completeness", "Deliverables",
+                "Task execution", "Orchestrated", "Final report",
+            ];
+            for (const phrase of banned) {
+                expect(task).toContain(`'${phrase}'`);
             }
+        });
+
+        test("should tell every step to name the change, not the step it just finished", async () => {
+            const context = createMockContext({eventName: "issues"});
+            const octokit = createMockOctokit();
+
+            const result = await prepareJunieTask(context, branchInfo, octokit);
+
+            const task = result.orchestratedTask?.task ?? "";
+            // taskName is last-writer-wins across sub-agents, so the rule has to bind each
+            // report, not just the final one.
+            expect(task).toContain("at any point, from any step or sub-agent");
+            expect(task).toContain("Never name the step you just finished");
+            expect(task).toContain("Review Step 1 Implementation and Validation Completeness");
         });
 
         test("should tell the agent not to add the title prefix itself", async () => {
@@ -729,6 +826,40 @@ describe("prepareJunieTask", () => {
 
             expect(result.task).toBeDefined();
             expect(result.orchestratedTask).toBeUndefined();
+        });
+
+        test("should export the PR title on a fix-ci run, whose payload has no entity", async () => {
+            // workflow_run payloads carry only workflow_run.pull_requests[].number, so without
+            // this the results step has no title and falls back to a generic one.
+            const context = createMockContext({
+                eventName: "workflow_run" as any,
+                isPR: true,
+                entityNumber: 123,
+                inputs: {
+                    ...createMockContext().inputs,
+                    prompt: "fix-ci"
+                },
+                payload: {
+                    action: "completed",
+                    workflow_run: {
+                        id: 12345,
+                        name: "CI",
+                        head_branch: "feature-branch",
+                        head_sha: "abc123",
+                        conclusion: "failure",
+                        pull_requests: [{number: 123}]
+                    },
+                    repository: {
+                        owner: {login: "owner"},
+                        name: "repo"
+                    }
+                } as any
+            });
+            const octokit = createMockOctokit();
+
+            await prepareJunieTask(context, branchInfo, octokit);
+
+            expect(core.setOutput).toHaveBeenCalledWith("ENTITY_TITLE", "Test PR");
         });
 
         test("should use goal mode for a fix-ci run", async () => {

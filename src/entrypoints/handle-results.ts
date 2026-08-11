@@ -13,6 +13,29 @@ import * as fs from "node:fs";
 import type {CliOutput} from "../github/junie/types/junie";
 import {fetchCodeReviewFeedbackLink} from "../utils/code-review-feedback-link";
 import {formatJunieErrors, formatJunieExitCodeNote, resolveJunieOutputFile} from "../utils/junie-failure";
+import {resolvePrTitle} from "../utils/pr-title";
+
+/**
+ * Title of the issue or pull request the run was triggered from.
+ *
+ * The prepare step resolves it and passes it on, because several payloads carry only the
+ * entity number: a fix-CI run arrives as `workflow_run`, whose payload has no `issue` or
+ * `pull_request` at all, and the same holds for `check_suite` and `schedule`. Reading the
+ * payload is the fallback for events that do carry the entity inline.
+ */
+function getTriggeringEntityTitle(context: JunieExecutionContext): string | undefined {
+    const fromPrepare = process.env[OUTPUT_VARS.ENTITY_TITLE];
+    if (fromPrepare && fromPrepare.trim() !== "") {
+        return fromPrepare;
+    }
+
+    const payload = context.payload as {
+        issue?: { title?: string };
+        pull_request?: { title?: string };
+    };
+
+    return payload.pull_request?.title || payload.issue?.title;
+}
 
 export enum ActionType {
     WRITE_COMMENT = 'WRITE_COMMENT',
@@ -100,7 +123,14 @@ export async function handleResults() {
         exportJunieSessionOutputs(sessionId);
         await exportCodeReviewFeedbackLink(context, sessionId, actionToDo);
         // Sanitize Junie's output to prevent token leakage and self-triggering
-        const rawTitle = junieJsonOutput.taskName || (isResolveConflict ? `Resolve conflicts for ${context.entityNumber} PR` : 'Junie finished task successfully')
+        const defaultTitle = isResolveConflict
+            ? `Resolve conflicts for ${context.entityNumber} PR`
+            : 'Junie finished task successfully'
+        // taskName is a live session name the orchestrated sub-agents overwrite in turn, so the
+        // triggering issue or pull request title is preferred whenever there is one.
+        const rawTitle = isResolveConflict
+            ? (junieJsonOutput.taskName || defaultTitle)
+            : resolvePrTitle(junieJsonOutput.taskName, getTriggeringEntityTitle(context), defaultTitle)
         const rawBody = junieJsonOutput.result
         const triggerPhrase = context.inputs.triggerPhrase
 
