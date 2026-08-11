@@ -45,6 +45,10 @@ const PUBLISHING_POLICY_NOTE =
     "\n\nPublishing policy (must be followed exactly):\n" +
     "- Do NOT push to the remote, and do NOT create or update a pull request. The workflow " +
     "stages, commits, pushes and opens the pull request itself once the task is done.\n" +
+    "- If this run targets an existing pull request, its title, description, labels, reviewers " +
+    "and every other field must be left exactly as they are. Do NOT rename, retitle, reword or " +
+    "otherwise edit the pull request: only the code changes are yours to make, and the workflow " +
+    "adds your summary on its own.\n" +
     "- Do NOT create git worktrees and do NOT switch to another branch. Work on the branch " +
     "that is currently checked out and leave the changes there.";
 
@@ -57,6 +61,17 @@ const SUMMARY_FORMAT_NOTE =
     "- A few sentences: what changed and why, nothing else.\n" +
     "- Plain prose or a short bullet list. No headings, no per-step report.\n" +
     "- Never paste code, diffs, file contents, command output or logs into it.";
+
+const TITLE_FORMAT_NOTE =
+    "\n\nTask name (it becomes the pull request title when a new pull request is opened):\n" +
+    "- Describe the actual code change or the business value it delivers, the way a developer " +
+    "would title the pull request, e.g. 'Add export functionality to users module' or " +
+    "'Fix NPE in payment processing'.\n" +
+    "- One short line. No trailing period.\n" +
+    "- Never name your own process. The title must not mention steps, plans, reviews, " +
+    "deliverables or execution, and must not contain wording such as 'Step 1', " +
+    "'Implementation', 'Deliverables', 'Task execution', 'Orchestrated' or 'Final report'.\n" +
+    "- Do NOT prefix it with '[Junie]:' or any other tag: the workflow adds that itself.";
 
 function getTriggerTime(context: JunieExecutionContext): string | undefined {
     if (isIssueCommentEvent(context)) {
@@ -130,7 +145,8 @@ export async function prepareJunieTask(
             addGitExcludePatterns(AGENT_ARTIFACT_PATTERNS);
 
             junieCLITask.orchestratedTask = {
-                task: promptText + PUBLISHING_POLICY_NOTE + PLAN_ARTIFACT_NOTE + SUMMARY_FORMAT_NOTE
+                task: promptText + PUBLISHING_POLICY_NOTE + PLAN_ARTIFACT_NOTE +
+                    SUMMARY_FORMAT_NOTE + TITLE_FORMAT_NOTE
             };
         } else {
             junieCLITask.task = promptText;

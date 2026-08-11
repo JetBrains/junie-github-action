@@ -622,6 +622,54 @@ describe("prepareJunieTask", () => {
             expect(task).toContain("Do NOT create git worktrees");
         });
 
+        test("should forbid retitling or editing an existing pull request", async () => {
+            const context = createMockContext({eventName: "issue_comment", isPR: true});
+            const octokit = createMockOctokit();
+
+            const result = await prepareJunieTask(context, branchInfo, octokit);
+
+            const task = result.orchestratedTask?.task ?? "";
+            expect(task).toContain("its title, description, labels, reviewers");
+            expect(task).toContain("must be left exactly as they are");
+            expect(task).toContain("Do NOT rename, retitle, reword");
+        });
+
+        test("should require a descriptive task name for the pull request title", async () => {
+            const context = createMockContext({eventName: "issues"});
+            const octokit = createMockOctokit();
+
+            const result = await prepareJunieTask(context, branchInfo, octokit);
+
+            const task = result.orchestratedTask?.task ?? "";
+            expect(task).toContain("it becomes the pull request title");
+            expect(task).toContain("Describe the actual code change or the business value");
+            expect(task).toContain("Add export functionality to users module");
+            expect(task).toContain("Fix NPE in payment processing");
+        });
+
+        test("should ban internal workflow phrasing from the task name", async () => {
+            const context = createMockContext({eventName: "issues"});
+            const octokit = createMockOctokit();
+
+            const result = await prepareJunieTask(context, branchInfo, octokit);
+
+            const task = result.orchestratedTask?.task ?? "";
+            expect(task).toContain("Never name your own process");
+            for (const banned of ["Step 1", "Implementation", "Deliverables", "Task execution"]) {
+                expect(task).toContain(`'${banned}'`);
+            }
+        });
+
+        test("should tell the agent not to add the title prefix itself", async () => {
+            const context = createMockContext({eventName: "issues"});
+            const octokit = createMockOctokit();
+
+            const result = await prepareJunieTask(context, branchInfo, octokit);
+
+            expect(result.orchestratedTask?.task)
+                .toContain("Do NOT prefix it with '[Junie]:'");
+        });
+
         test("should tell the agent not to commit its plan file", async () => {
             const context = createMockContext({eventName: "issues"});
             const octokit = createMockOctokit();
