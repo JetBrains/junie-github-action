@@ -198,16 +198,15 @@ Description: ${yt.issueDescription}${commentsSection}
         const isCodeReview = isCodeReviewEvent(context)
 
         if (isFixCI) {
-            const branchName = branchInfo.prBaseBranch || branchInfo.baseBranch;
-            const diffPoint = context.isPR && context.entityNumber ? String(context.entityNumber) : branchName;
-            console.log(`Using FIX-CI prompt for diffPoint: ${diffPoint}`);
-            return createFixCIFailuresPrompt(diffPoint);
+            const diffPoint = branchInfo.prBaseBranch || branchInfo.baseBranch;
+            console.log(`Using FIX-CI prompt for diffPoint: ${diffPoint}, mergeBaseSha: ${branchInfo.mergeBaseSha || '(none)'}`);
+            return createFixCIFailuresPrompt(diffPoint, branchInfo.mergeBaseSha);
         } else if (isMinorFix) {
             const diffPoint = branchInfo.prBaseBranch || branchInfo.baseBranch;
             // Extract user request from comment (text after "minor-fix")
             const userRequest = this.extractMinorFixRequest(context);
-            console.log(`Using MINOR-FIX prompt for diffPoint: ${diffPoint}, userRequest: ${userRequest || '(none)'}`);
-            return createMinorFixPrompt(diffPoint, userRequest);
+            console.log(`Using MINOR-FIX prompt for diffPoint: ${diffPoint}, userRequest: ${userRequest || '(none)'}, mergeBaseSha: ${branchInfo.mergeBaseSha || '(none)'}`);
+            return createMinorFixPrompt(diffPoint, userRequest, branchInfo.mergeBaseSha);
         } else if (isCodeReview) {
             console.log(`Using CODE-REVIEW keyword detection`);
             return CODE_REVIEW_ACTION;

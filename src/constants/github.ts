@@ -48,8 +48,12 @@ export const DEFAULT_TRIGGER_PHRASE = "@junie-agent";
 // Templates and Messages
 // ============================================================================
 
-export function createFixCIFailuresPrompt(diffPoint: string): string {
-    const diffCommand = `git diff origin/${diffPoint}...`
+export function buildDiffCommand(diffPoint: string, mergeBaseSha?: string): string {
+    return mergeBaseSha ? `git diff ${mergeBaseSha} HEAD` : `git diff origin/${diffPoint}...`;
+}
+
+export function createFixCIFailuresPrompt(diffPoint: string, mergeBaseSha?: string): string {
+    const diffCommand = buildDiffCommand(diffPoint, mergeBaseSha)
     const issueDescriptionSection = `<issue_description>`;
     return `
 Your task is to analyze CI failures and fix them. Follow these steps:
@@ -95,8 +99,8 @@ IMPORTANT: Do NOT commit or push changes. The system will handle all git operati
 `;
 }
 
-export function createMinorFixPrompt(diffPoint: string, userRequest?: string): string {
-    const diffCommand = `git diff origin/${diffPoint}...`
+export function createMinorFixPrompt(diffPoint: string, userRequest?: string, mergeBaseSha?: string): string {
+    const diffCommand = buildDiffCommand(diffPoint, mergeBaseSha)
     const issueDescriptionSection = `<issue_description>`;
     const userRequestSection = userRequest 
         ? `\n### User Request\nThe user has specifically requested: "${userRequest}"\nFocus on addressing this request while following all the guidelines below.\n`
