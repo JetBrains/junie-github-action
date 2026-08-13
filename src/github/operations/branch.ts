@@ -142,11 +142,11 @@ export async function createNewBranch(baseBranch: string, branchName: string, pr
         if (await isRemoteTrackingRefLocal(baseBranch)) {
             console.log(`Remote-tracking ref origin/${baseBranch} already present locally; skipping fetch`);
         } else {
-            await $`git fetch origin ${baseBranch}:refs/remotes/origin/${baseBranch}`;
+            await $`git fetch --no-tags origin ${baseBranch}:refs/remotes/origin/${baseBranch}`;
         }
 
         console.log(`Checking whether remote branch ${newBranch} already exists`);
-        const existingBranchFetch = await $`git fetch origin +${newBranch}:refs/remotes/origin/${newBranch}`.nothrow();
+        const existingBranchFetch = await $`git fetch --no-tags origin +${newBranch}:refs/remotes/origin/${newBranch}`.nothrow();
 
         if (existingBranchFetch.exitCode === 0) {
             console.log(`Remote branch ${newBranch} already exists, overwriting it from ${baseBranch}`);
@@ -403,7 +403,7 @@ export async function ensureBranchHistory(branches: RemoteBranch[], scope: Histo
             if (shallow) flags.push(`--shallow-since=${scope.sinceIso}`);
         }
 
-        await $`git fetch origin ${flags} ${refspecs}`;
+        await $`git fetch --no-tags origin ${flags} ${refspecs}`;
         console.log(`✓ Successfully fetched history of [${names.join(", ")}]`);
     } catch (error) {
         throw new Error(
@@ -489,7 +489,7 @@ async function runFallbackLadder(
 
     for (const deepenBy of [256, 1024]) {
         console.log(`Deepening history by ${deepenBy} commits...`);
-        await $`git fetch origin --deepen=${deepenBy} ${branchRefspecs([base, head])}`.nothrow();
+        await $`git fetch --no-tags origin --deepen=${deepenBy} ${branchRefspecs([base, head])}`.nothrow();
         if (await isMergeBaseReachable(base.name, head.name)) {
             return `deepen=${deepenBy}`;
         }
