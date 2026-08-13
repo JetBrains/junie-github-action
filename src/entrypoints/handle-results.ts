@@ -15,14 +15,7 @@ import {fetchCodeReviewFeedbackLink} from "../utils/code-review-feedback-link";
 import {formatJunieErrors, formatJunieExitCodeNote, resolveJunieOutputFile} from "../utils/junie-failure";
 import {resolvePrTitle} from "../utils/pr-title";
 
-/**
- * Title of the issue or pull request the run was triggered from.
- *
- * The prepare step resolves it and passes it on, because several payloads carry only the
- * entity number: a fix-CI run arrives as `workflow_run`, whose payload has no `issue` or
- * `pull_request` at all, and the same holds for `check_suite` and `schedule`. Reading the
- * payload is the fallback for events that do carry the entity inline.
- */
+// Prefers the title resolved by the prepare step, falling back to the event payload.
 function getTriggeringEntityTitle(context: JunieExecutionContext): string | undefined {
     const fromPrepare = process.env[OUTPUT_VARS.ENTITY_TITLE];
     if (fromPrepare && fromPrepare.trim() !== "") {
@@ -131,8 +124,6 @@ export async function handleResults() {
         const defaultTitle = isResolveConflict
             ? `Resolve conflicts for ${context.entityNumber} PR`
             : 'Junie finished task successfully'
-        // taskName is a live session name the orchestrated sub-agents overwrite in turn, so the
-        // triggering issue or pull request title is preferred whenever there is one.
         const rawTitle = isResolveConflict
             ? (junieJsonOutput.taskName || defaultTitle)
             : resolvePrTitle(junieJsonOutput.taskName, getTriggeringEntityTitle(context), defaultTitle)
@@ -168,8 +159,6 @@ export async function handleResults() {
                     title,
                     body,
                     durationMs,
-                    // The branch is new, so this is the pull request's only commit: the two
-                    // subjects should agree.
                     buildCommitMessage(title),
                     prTitle,
                     prBody);

@@ -1,31 +1,4 @@
-/**
- * Chooses the title for a pull request the action opens.
- *
- * The title of the issue or pull request that triggered the run is preferred over anything
- * the agent reports. It is written by a person, it always describes the change rather than
- * the work, and it is the same on every run — which the agent's own name is not.
- *
- * The CLI has no field meaning "pull request title". `taskName` is a live session name:
- * `OutputWriter` overwrites it on every `AgentTaskNameUpdatedEvent`, and since the emitter
- * sits in `AbstractAgentWorker`, every orchestrated sub-agent (plan, code, review, git)
- * raises one as it finishes. Whichever ran last wins, so in goal mode `taskName` is that
- * sub-agent's summary of its own step — "Review Step 1 Implementation and Validation
- * Completeness". Wording varies per run, so no filter over it can be relied on; it is used
- * only when there is no issue or pull request to take a title from.
- */
-
-/**
- * Wording that describes the agent's process instead of the code.
- *
- * Single words that also occur in legitimate titles ("Add review widget") are matched only
- * at the start, which is where a step name lands; unambiguous phrases are matched anywhere.
- *
- * The bare stem of a process verb is left alone unless it stands like a step name, because
- * imperative present is also how a person opens a change description: "Implement dark mode
- * toggle" and "Complete migration to Kotlin 2.0" are real titles, while the sub-agents report
- * their steps as past tense, gerunds or nouns ("Implemented export functionality",
- * "Reviewing the plan", "Analysis of the parser").
- */
+// Wording that describes the agent's own process instead of the change.
 const PROCESS_VERB_STEMS = "(re)?view|implement|validate|verify|plan|analy[sz]e|finalize|complete";
 
 const INTERNAL_WORKFLOW_PATTERNS: RegExp[] = [
@@ -54,9 +27,6 @@ const INTERNAL_WORKFLOW_PATTERNS: RegExp[] = [
     new RegExp(`^\\s*(${PROCESS_VERB_STEMS})\\s+of\\b`, "i"),
 ];
 
-/**
- * Whether `title` names the agent's own process rather than the change.
- */
 export function isInternalWorkflowTitle(title: string | undefined | null): boolean {
     if (!title || title.trim() === "") {
         return true;
@@ -66,16 +36,8 @@ export function isInternalWorkflowTitle(title: string | undefined | null): boole
 }
 
 /**
- * Picks the title to publish, in order of trustworthiness.
- *
- * 1. The triggering issue or pull request title — human-written and stable.
- * 2. `taskName`, only when there is no such entity (for example a `workflow_dispatch` run
- *    driven by a bare prompt) and only if it does not describe the agent's own workflow.
- * 3. The caller's generic fallback.
- *
- * @param taskName - `taskName` from the CLI output
- * @param entityTitle - Title of the issue or pull request that triggered the run
- * @param fallback - Used when neither is usable
+ * Picks the title to publish: the triggering issue/pull request title first, then
+ * `taskName` (unless it names the agent's workflow), then the generic fallback.
  */
 export function resolvePrTitle(
     taskName: string | undefined,

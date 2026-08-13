@@ -2,20 +2,7 @@ import {execSync} from "child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-/**
- * Artifacts the agent writes into the checkout while it works, which must never
- * end up in a commit.
- *
- * Goal mode's planning sub-agent stores its plan as a markdown file under
- * `<project>/.junie/plans` (the CLI resolves that path against the project
- * directory, so it lands inside the repository the action commits from) and
- * picks a descriptive name per task, e.g. `add-export-feature.md`. The commit
- * step runs `git add .`, so without an exclude those plans are committed
- * alongside the real change.
- *
- * `.junie/memory` is written by the agent for the same reason and is equally
- * not part of the task's result.
- */
+// Agent scratch files written into the checkout; must never be committed.
 export const AGENT_ARTIFACT_PATTERNS = [
     ".junie/plans/",
     ".junie/memory/",
@@ -23,13 +10,7 @@ export const AGENT_ARTIFACT_PATTERNS = [
 
 const EXCLUDE_HEADER = "# junie-github-action: agent artifacts, not part of the task result";
 
-/**
- * Resolves the directory holding the repository metadata.
- *
- * `--git-common-dir` rather than `--git-dir`: in a linked worktree the latter
- * points at `.git/worktrees/<name>`, which has no `info/exclude` of its own,
- * while the common dir is shared by every worktree.
- */
+// Uses --git-common-dir so linked worktrees resolve to the shared info/exclude.
 function resolveGitCommonDir(cwd?: string): string | undefined {
     try {
         const gitDir = execSync("git rev-parse --git-common-dir", {
@@ -50,19 +31,8 @@ function resolveGitCommonDir(cwd?: string): string | undefined {
 }
 
 /**
- * Adds `patterns` to `.git/info/exclude` so the commit step's `git add .` skips them.
- *
- * `.git/info/exclude` is used rather than `.gitignore` on purpose: it is local to
- * the checkout and is itself never committed, so the action does not modify — and
- * cannot accidentally commit a change to — the consuming repository's ignore rules.
- *
- * Note this only keeps *untracked* files out of a commit. A file the repository
- * already tracks stays tracked; excludes do not apply to it.
- *
- * Writing is best-effort: a repository we cannot write the exclude file for should
- * not fail the run, so the failure is logged and the task proceeds.
- *
- * @returns the patterns that were newly appended (empty if all were already present)
+ * Appends `patterns` to `.git/info/exclude` (best-effort) so the commit step's
+ * `git add .` skips untracked agent artifacts. Returns the newly added patterns.
  */
 export function addGitExcludePatterns(patterns: string[], cwd?: string): string[] {
     if (patterns.length === 0) {

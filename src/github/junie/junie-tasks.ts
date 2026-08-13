@@ -158,9 +158,7 @@ export async function prepareJunieTask(
             fetchedData = await fetcher.fetchIssueData(owner, repo, context.entityNumber, triggerTime);
         }
 
-        // The results step titles the pull request from this. It is resolved here because
-        // several event payloads (workflow_run for fix-CI, check_suite, schedule) carry the
-        // entity number but not its title, and this is where the entity is already fetched.
+        // Resolved here (where the entity is already fetched) for the results step to title the PR.
         const entityTitle = fetchedData.pullRequest?.title
             || fetchedData.issue?.title
             || getExternalTrackerTitle(context);
