@@ -366,6 +366,7 @@ runs:
         WORKING_BRANCH: ${{ steps.prepare.outputs.WORKING_BRANCH }}
         BASE_BRANCH: ${{ steps.prepare.outputs.BASE_BRANCH }}
         IS_NEW_BRANCH: ${{ steps.prepare.outputs.IS_NEW_BRANCH }}
+        ENTITY_TITLE: ${{ steps.prepare.outputs.ENTITY_TITLE }}
         WORKING_DIR: ${{ inputs.junie_work_dir }}
         APP_TOKEN: ${{ inputs.junie_api_key }}
         CODE_REVIEW_FEEDBACK_API_BASE_URL: ${{ inputs.code_review_feedback_api_base_url }}

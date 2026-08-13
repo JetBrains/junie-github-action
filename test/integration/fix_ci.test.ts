@@ -72,7 +72,7 @@ async function testFixCi(repoName: string, fixCiInComment: (prNumber: number) =>
     await testClient.waitForPR(testClient.conditionIncludes(["Trigger test"]));
     await fixCiInComment(pr.number);
     await testClient.waitForJunieComment(pr.number, INIT_COMMENT_BODY);
-    const titleKeywords = ["ci", "fail", "fix", "workflow"]
+    const titleKeywords = ["ci", "fail", "fix", "workflow", "junie"]
 
     const foundPR = await testClient.waitForPR(testClient.conditionIncludes(titleKeywords));
     const result = await testClient.checkPRFiles(foundPR, testClient.conditionPRFilesInclude({[fileName]: "console.log('fail');"}));

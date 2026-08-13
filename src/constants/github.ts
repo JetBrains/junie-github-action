@@ -183,8 +183,17 @@ ${issueId ? `- 🔗 **Issue:** Fixes: #${issueId}` : ""}
 ${junieBody}
 `
 
-export const PR_TITLE_TEMPLATE = (junieTitle: string) =>
-    `[Junie]: ${junieTitle}`
+export const PR_TITLE_PREFIX = "[Junie]: "
+
+export const PR_TITLE_TEMPLATE = (junieTitle: string) => {
+    let title = junieTitle.trim()
+
+    while (title.toLowerCase().startsWith(PR_TITLE_PREFIX.toLowerCase().trim())) {
+        title = title.slice(PR_TITLE_PREFIX.trim().length).trim()
+    }
+
+    return `${PR_TITLE_PREFIX}${title}`
+}
 
 export const COMMIT_MESSAGE_TEMPLATE = (junieTitle: string, issueId?: number, actor?: string, actorEmail?: string) => {
     const baseMessage = `${issueId ? `[issue-${issueId}]\n\n` : ""}${junieTitle}`;

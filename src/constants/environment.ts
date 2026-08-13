@@ -62,6 +62,8 @@ export const OUTPUT_VARS = {
     EJ_MCP_CONFIG: "EJ_MCP_CONFIG",
     CUSTOM_JUNIE_ARGS: "CUSTOM_JUNIE_ARGS",
 
+    ENTITY_TITLE: "ENTITY_TITLE",
+
     // Exception handling
     EXCEPTION: "EXCEPTION",
 

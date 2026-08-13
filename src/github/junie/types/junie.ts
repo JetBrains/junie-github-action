@@ -26,8 +26,13 @@ export interface CliOutput {
     duration_ms?: number;
 }
 
+export interface OrchestratedTask {
+    task: string;
+}
+
 export interface CliInput {
     task?: string;
+    orchestratedTask?: OrchestratedTask;
     mergeTask?: MergeTask;
     codeReviewTask?: CodeReview;
 }

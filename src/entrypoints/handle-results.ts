@@ -13,6 +13,27 @@ import * as fs from "node:fs";
 import type {CliOutput} from "../github/junie/types/junie";
 import {fetchCodeReviewFeedbackLink} from "../utils/code-review-feedback-link";
 import {formatJunieErrors, formatJunieExitCodeNote, resolveJunieOutputFile} from "../utils/junie-failure";
+import {resolvePrTitle} from "../utils/pr-title";
+
+// Prefers the title resolved by the prepare step, falling back to the event payload.
+function getTriggeringEntityTitle(context: JunieExecutionContext): string | undefined {
+    const fromPrepare = process.env[OUTPUT_VARS.ENTITY_TITLE];
+    if (fromPrepare && fromPrepare.trim() !== "") {
+        return fromPrepare;
+    }
+
+    const payload = context.payload as {
+        issue?: { title?: string };
+        pull_request?: { title?: string };
+        issueSummary?: string;
+        issueTitle?: string;
+    };
+
+    return payload.pull_request?.title
+        || payload.issue?.title
+        || payload.issueSummary
+        || payload.issueTitle;
+}
 
 export enum ActionType {
     WRITE_COMMENT = 'WRITE_COMMENT',
@@ -100,14 +121,21 @@ export async function handleResults() {
         exportJunieSessionOutputs(sessionId);
         await exportCodeReviewFeedbackLink(context, sessionId, actionToDo);
         // Sanitize Junie's output to prevent token leakage and self-triggering
-        const rawTitle = junieJsonOutput.taskName || (isResolveConflict ? `Resolve conflicts for ${context.entityNumber} PR` : 'Junie finished task successfully')
+        const defaultTitle = isResolveConflict
+            ? `Resolve conflicts for ${context.entityNumber} PR`
+            : 'Junie finished task successfully'
+        const rawTitle = isResolveConflict
+            ? (junieJsonOutput.taskName || defaultTitle)
+            : resolvePrTitle(junieJsonOutput.taskName, getTriggeringEntityTitle(context), defaultTitle)
         const rawBody = junieJsonOutput.result
         const triggerPhrase = context.inputs.triggerPhrase
 
         // Sanitize and truncate to prevent ARG_MAX issues
         const title = truncateOutput(sanitizeJunieOutput(rawTitle, triggerPhrase), OUTPUT_SIZE_LIMITS.TITLE)
         const body = truncateOutput(sanitizeJunieOutput(rawBody, triggerPhrase), OUTPUT_SIZE_LIMITS.SUMMARY)
-        let issueId
+        const rawCommitTitle = junieJsonOutput.taskName?.trim() || rawTitle
+        const commitTitle = truncateOutput(sanitizeJunieOutput(rawCommitTitle, triggerPhrase), OUTPUT_SIZE_LIMITS.TITLE)
+        let issueId: number | undefined
         if (isTriggeredByUserInteraction(context)) {
             issueId = context.entityNumber
         }
@@ -115,8 +143,8 @@ export async function handleResults() {
         // Add co-author only for user-triggered events (issues, PRs, comments)
         // For system-triggered events (schedule, workflow_dispatch), skip co-author
         const addCoAuthor = isTriggeredByUserInteraction(context);
-        const commitMessage = COMMIT_MESSAGE_TEMPLATE(
-            title,
+        const buildCommitMessage = (subject: string) => COMMIT_MESSAGE_TEMPLATE(
+            subject,
             issueId,
             addCoAuthor ? context.actor : undefined,
             addCoAuthor ? context.actorEmail : undefined
@@ -131,14 +159,16 @@ export async function handleResults() {
                     title,
                     body,
                     durationMs,
-                    commitMessage,
+                    buildCommitMessage(title),
                     prTitle,
                     prBody);
                 break;
             case ActionType.COMMIT_AND_PUSH:
+                exportResultsOutputs(title, body, durationMs, buildCommitMessage(title));
+                break;
             case ActionType.COMMIT_CHANGES:
             case ActionType.PUSH:
-                exportResultsOutputs(title, body, durationMs, commitMessage);
+                exportResultsOutputs(title, body, durationMs, buildCommitMessage(commitTitle));
                 break;
             case ActionType.WRITE_COMMENT:
             case ActionType.NOTHING:
