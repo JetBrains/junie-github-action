@@ -259,7 +259,6 @@ runs:
         OPENROUTER_API_KEY: ${{ inputs.openrouter_api_key }}
         GOOGLE_API_KEY: ${{ inputs.google_api_key }}
         AUTO_COLLECT_FEEDBACK: ${{ inputs.auto_collect_feedback }}
-        JUNIE_VERSION: ${{ inputs.junie_version }}
 
 
     - name: Install Junie
