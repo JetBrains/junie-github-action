@@ -40,7 +40,7 @@ describe("Trigger Junie in Issue", () => {
 
         const foundPR = await testClient.waitForPR(testClient.conditionIncludes(titleKeywords));
 
-        const result = await testClient.checkPRFiles(foundPR, testClient.conditionPRFilesInclude({[functionFile]: `def ${functionName}:`, [requirementsFile]: ``}));
+        const result = await testClient.checkPRFiles(foundPR, testClient.conditionPRFilesInclude({[functionFile]: `def ${functionName}`, [requirementsFile]: ``}));
         expect(result, "PR files check failed - required content not found in files").toBe(true);
 
         await testClient.waitForJunieComment(issueNumber, SUCCESS_FEEDBACK_COMMENT);
