@@ -397,16 +397,19 @@ describe("prepareJunieTask", () => {
         });
 
         test("should create codeReviewTask when code-review prompt is provided", async () => {
+            // Deliberately different from the default entity number: the review target
+            // must carry the number of the reviewed PR, not a hardcoded value
+            const prNumber = 4242;
             const context = createMockContext({
                 eventName: "pull_request",
                 isPR: true,
-                entityNumber: 123,
+                entityNumber: prNumber,
                 inputs: {
                     prompt: "code-review"
                 },
                 payload: {
                     pull_request: {
-                        number: 123,
+                        number: prNumber,
                         title: "Test PR",
                         updated_at: "2024-01-01T00:00:00Z"
                     },
@@ -418,13 +421,25 @@ describe("prepareJunieTask", () => {
             });
             const octokit = createMockOctokit();
 
-            const result = await prepareJunieTask(context, branchInfo, octokit);
+            // Inline comments are posted by the CLI itself, so the inline comment MCP server
+            // must not be advertised in the prompt anymore even when it is enabled
+            const result = await prepareJunieTask(context, branchInfo, octokit, ["mcp_github_inline_comment_server"]);
 
             expect(result).toBeDefined();
+            expect(result.task).toBeUndefined();
+            expect(result.mergeTask).toBeUndefined();
             expect(result.codeReviewTask).toBeDefined();
+            // The Junie CLI parses the whole input strictly and rejects it on unknown fields,
+            // so the exact set of keys is part of the contract, not an implementation detail
+            expect(Object.keys(result.codeReviewTask!).sort()).toEqual([
+                "description",
+                "diffCommand",
+                "fetchVcsInfo",
+                "reviewTarget"
+            ]);
             expect(result.codeReviewTask?.diffCommand).toContain("git diff origin/main");
             expect(result.codeReviewTask?.fetchVcsInfo).toBe(true);
-            expect(result.codeReviewTask?.reviewTarget).toEqual({type: "remoteRequest", number: 123});
+            expect(result.codeReviewTask?.reviewTarget).toEqual({type: "remoteRequest", number: prNumber});
             expect(result.codeReviewTask?.description).toContain("<pull_request_info>");
             // Header should NOT contain "Your task is to:"
             expect(result.codeReviewTask?.description).toContain("You were triggered as a GitHub AI Assistant by pull_request action.");
@@ -432,6 +447,12 @@ describe("prepareJunieTask", () => {
             // For code review, user_instruction should not be attached at all
             expect(result.codeReviewTask?.description).not.toContain("<user_instruction>");
             expect(result.codeReviewTask?.description).not.toContain("code-review");
+            expect(result.codeReviewTask?.description).not.toContain("post_inline_review_comment");
+
+            // The CLI reads the task from the file, not from the returned object
+            const junieInputFile = `${process.env.WORKING_DIR}/junie_input.json`;
+            expect(core.setOutput).toHaveBeenCalledWith("JUNIE_INPUT_FILE", junieInputFile);
+            expect(JSON.parse(fs.readFileSync(junieInputFile, "utf-8"))).toEqual(result);
         });
 
         test("should trigger codeReviewTask from comment when inputs.prompt is empty and code-review keyword is used", async () => {
@@ -467,8 +488,15 @@ describe("prepareJunieTask", () => {
             const result = await prepareJunieTask(context, branchInfo, octokit);
 
             expect(result).toBeDefined();
+            expect(result.task).toBeUndefined();
             expect(result.codeReviewTask).toBeDefined();
             // Should detect code-review trigger from comment and create codeReviewTask
+            expect(Object.keys(result.codeReviewTask!).sort()).toEqual([
+                "description",
+                "diffCommand",
+                "fetchVcsInfo",
+                "reviewTarget"
+            ]);
             expect(result.codeReviewTask?.diffCommand).toContain("git diff origin/main");
             expect(result.codeReviewTask?.fetchVcsInfo).toBe(true);
             expect(result.codeReviewTask?.reviewTarget).toEqual({type: "remoteRequest", number: 123});
