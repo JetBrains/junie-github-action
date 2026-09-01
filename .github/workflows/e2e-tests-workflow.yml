@@ -45,8 +45,19 @@ jobs:
           exit_code=0
           for test_file in test/integration/*.test.ts; do
             test_name=$(basename "$test_file" .test.ts)
-            echo "Starting $test_file"
-            bun test "$test_file" 2>&1 | tee "test-results/$test_name.log" &
+
+            # Code review passes codeReviewTask.reviewTarget to the CLI. Released builds
+            # reject the whole input with "Cannot parse input JSON" (first build with
+            # reviewTarget support: 3056.1), so these tests need the nightly channel.
+            # Drop this override once reviewTarget ships in a release and the
+            # junie_version default in action.yml is bumped to it.
+            junie_version=""
+            if [ "$test_name" = "pr_code_review" ]; then
+              junie_version="latest"
+            fi
+
+            echo "Starting $test_file${junie_version:+ with Junie version $junie_version}"
+            JUNIE_VERSION="$junie_version" bun test "$test_file" 2>&1 | tee "test-results/$test_name.log" &
           done
           
           for job in $(jobs -p); do
