@@ -13,6 +13,9 @@ export const MCP_TOOL_PROMPTS = {
     jira: 'IMPORTANT: Do not post any comments - your summary will be automatically posted by system. And DO NOT update issue status if user did not request it. ALSO: do not look for other issues or any other external information unless explicitly requested by the user.',
 };
 
+/** Inline comment instructions for Junie CLI builds without `reviewTarget`: newer builds post comments themselves. */
+export const LEGACY_INLINE_COMMENT_TOOL_PROMPT = 'MANDATORY for code reviews: Use post_inline_review_comment to provide inline code review comments. IMPORTANT: If you are responding to a question in an existing review thread (user tagged you in <user_instruction> in review thread), DO NOT use this tool - your summary will be automatically posted as a reply in that thread.';
+
 /**
  * Generates a combined prompt section describing all enabled MCP tools
  */
