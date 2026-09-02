@@ -384,6 +384,26 @@ runs:
         if-no-files-found: warn
         include-hidden-files: true
 
+    - name: Exclude Junie service artifacts from commit
+      if: steps.prepare.outputs.SHOULD_SKIP != 'true' && inputs.silent_mode != 'true'
+      shell: bash
+      run: |
+        # Junie writes its own service directories (plans/memory) into the
+        # repository root. The commit step below stages everything ("git add ."),
+        # which would otherwise sweep these non-project artifacts into the PR.
+        # Add them to the repo-local .git/info/exclude so the blanket "git add ."
+        # ignores them, without touching the project's tracked .gitignore.
+        GIT_DIR="$(git rev-parse --git-dir)"
+        EXCLUDE_FILE="${GIT_DIR}/info/exclude"
+        mkdir -p "$(dirname "${EXCLUDE_FILE}")"
+        touch "${EXCLUDE_FILE}"
+        for artifact in ".junie/plans/" ".junie/memory/"; do
+          if ! grep -qxF "${artifact}" "${EXCLUDE_FILE}"; then
+            echo "${artifact}" >> "${EXCLUDE_FILE}"
+            echo "Excluded Junie artifact from commit: ${artifact}"
+          fi
+        done
+
     - uses: EndBug/add-and-commit@v9
       name: Commit changes
       id: commit
