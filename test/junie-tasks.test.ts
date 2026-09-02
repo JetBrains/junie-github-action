@@ -46,6 +46,9 @@ const REVIEW_TARGET_TYPES = ["localChanges", "remoteRequest"];
 /** The keys the action is expected to send for a code review, in the order `sort()` produces. */
 const EXPECTED_CODE_REVIEW_TASK_KEYS = ["description", "diffCommand", "fetchVcsInfo", "reviewTarget"];
 
+/** The keys CLI builds without `reviewTarget` support accept. */
+const LEGACY_CODE_REVIEW_TASK_KEYS = ["description", "diffCommand"];
+
 /** Asserts the payload carries nothing the CLI's strict parser would reject. */
 const expectParseableByJunieCli = (input: Record<string, any>) => {
     for (const key of Object.keys(input)) {
@@ -93,7 +96,8 @@ describe("prepareJunieTask", () => {
             triggerPhrase: "@junie-agent",
             assigneeTrigger: "",
             labelTrigger: "",
-            allowedMcpServers: ""
+            allowedMcpServers: "",
+            junieVersion: "latest"
         };
 
         const { inputs: _, ...restOverrides } = overrides;
@@ -517,6 +521,39 @@ describe("prepareJunieTask", () => {
             const writtenInput = readJunieInputFile();
             expect(writtenInput).toEqual(result);
             expectParseableByJunieCli(writtenInput);
+        });
+
+        test("should create codeReviewTask without reviewTarget when the CLI version does not support it", async () => {
+            const context = createMockContext({
+                eventName: "pull_request",
+                isPR: true,
+                entityNumber: 123,
+                inputs: {
+                    prompt: "code-review",
+                    // Released build without reviewTarget: sending it would abort the whole run
+                    // with "Cannot parse input JSON"
+                    junieVersion: "2929.5"
+                },
+                payload: {
+                    pull_request: {
+                        number: 123,
+                        title: "Test PR",
+                        updated_at: "2024-01-01T00:00:00Z"
+                    },
+                    repository: {
+                        owner: {login: "owner"},
+                        name: "repo"
+                    }
+                } as any
+            });
+            const octokit = createMockOctokit();
+
+            const result = await prepareJunieTask(context, branchInfo, octokit, ["mcp_github_inline_comment_server"]);
+
+            expect(Object.keys(result.codeReviewTask!).sort()).toEqual(LEGACY_CODE_REVIEW_TASK_KEYS);
+            // Such builds have no comment channel of their own, so the MCP tool has to be advertised
+            expect(result.codeReviewTask?.description).toContain("post_inline_review_comment");
+            expectParseableByJunieCli(readJunieInputFile());
         });
 
         test("should trigger codeReviewTask from comment when inputs.prompt is empty and code-review keyword is used", async () => {
