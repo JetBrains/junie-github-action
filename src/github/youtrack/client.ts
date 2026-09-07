@@ -3,6 +3,12 @@
 /**
  * YouTrack API client wrapper
  */
+
+// Id of the "jetbrains-team" YouTrack group. Hardcoded because the dynamic name->id
+// lookup via /api/groups never resolves this group, regardless of the token's
+// permissions - it is simply never returned by that listing endpoint.
+const JETBRAINS_TEAM_GROUP_ID = "10-3";
+
 class YouTrackClient {
 
     private readonly token: string;
@@ -33,17 +39,25 @@ class YouTrackClient {
      *
      * @param issueId - YouTrack issue ID (e.g., PROJ-123)
      * @param text - Comment text in Markdown
+     * @param restrictToJetBrainsTeam - If true, the comment is only visible to the jetbrains-team group
      * @returns comment ID if successful, null otherwise
      */
-    async addComment(issueId: string, text: string): Promise<string | null> {
+    async addComment(issueId: string, text: string, restrictToJetBrainsTeam = false): Promise<string | null> {
         try {
             console.log(`Adding comment to YouTrack issue ${issueId}`);
 
             const url = `${this.baseUrl}/api/issues/${issueId}/comments?fields=id`;
+            const body: Record<string, unknown> = { text };
+            if (restrictToJetBrainsTeam) {
+                body.visibility = {
+                    '$type': 'LimitedVisibility',
+                    permittedGroups: [{ id: JETBRAINS_TEAM_GROUP_ID }],
+                };
+            }
             const response = await fetch(url, {
                 method: 'POST',
                 headers: this.authHeaders,
-                body: JSON.stringify({ text }),
+                body: JSON.stringify(body),
             });
 
             if (!response.ok) {
