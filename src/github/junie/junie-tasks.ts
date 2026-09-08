@@ -16,10 +16,22 @@ import {Octokits} from "../api/client";
 import {NewGitHubPromptFormatter} from "./new-prompt-formatter";
 import {GraphQLGitHubDataFetcher} from "../api/graphql-data-fetcher";
 import {FetchedData} from "../api/queries";
-import {CliInput} from "./types/junie";
-import {generateMcpToolsPrompt} from "../../mcp/mcp-prompts";
+import {CliInput, remoteRequestReviewTarget} from "./types/junie";
+import {generateMcpToolsPrompt, LEGACY_INLINE_COMMENT_TOOL_PROMPT} from "../../mcp/mcp-prompts";
 import {junieArgsToString} from "../../utils/junie-args-parser";
 import {buildDiffCommand} from "../../constants/github";
+
+/**
+ * First Junie CLI build accepting `codeReviewTask.reviewTarget`. Older builds parse the input
+ * strictly and abort the run with "Cannot parse input JSON" on an unknown field, so they get
+ * the payload they shipped with and post inline comments through the MCP server instead.
+ */
+const MIN_VERSION_WITH_REVIEW_TARGET = 3056.1;
+
+/** `latest` installs the nightly channel; an unparseable version is assumed to be old. */
+function supportsReviewTarget(version: string): boolean {
+    return version.trim() === "latest" || parseFloat(version) >= MIN_VERSION_WITH_REVIEW_TARGET;
+}
 
 function getTriggerTime(context: JunieExecutionContext): string | undefined {
     if (isIssueCommentEvent(context)) {
@@ -81,10 +93,17 @@ export async function prepareJunieTask(
         // Note: Attachments are already processed in fetchIssueData/fetchPullRequestData
         if (isCodeReviewEvent(context)) {
             const diffPoint = branchInfo.prBaseBranch || branchInfo.baseBranch;
+            const prNumber = context.entityNumber;
+            if (!prNumber) {
+                throw new Error("Code review requires a Pull Request number, but none was found in the event context.");
+            }
             const diffCommand = buildDiffCommand(diffPoint, branchInfo.mergeBaseSha);
+            const legacyCli = !supportsReviewTarget(context.inputs.junieVersion);
+            const legacyInlineComments = legacyCli && enabledMcpServers.includes("mcp_github_inline_comment_server");
             junieCLITask.codeReviewTask = {
-                description: promptText,
-                diffCommand
+                description: legacyInlineComments ? `${promptText}\n\n${LEGACY_INLINE_COMMENT_TOOL_PROMPT}` : promptText,
+                diffCommand,
+                ...(legacyCli ? {} : {fetchVcsInfo: true, reviewTarget: remoteRequestReviewTarget(prNumber)}),
             }
         } else {
             junieCLITask.task = promptText;

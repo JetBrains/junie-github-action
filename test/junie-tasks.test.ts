@@ -15,6 +15,73 @@ mock.module("../src/github/junie/attachment-downloader", () => ({
     downloadAttachmentsAndRewriteText: mock((text: string) => Promise.resolve(text)),
 }));
 
+/**
+ * The input schema the Junie CLI accepts, mirrored from the CLI sources: `CliInput` and
+ * `CliCodeReviewTask` (api/Input.kt) and `ReviewTarget` (attachments/ReviewTarget.kt).
+ * The CLI decodes the input strictly, so a single unknown key or an unknown `reviewTarget.type`
+ * aborts the whole run with "Cannot parse input JSON" before any task starts.
+ */
+const CLI_INPUT_KEYS = [
+    "codeReviewTask",
+    "debugTask",
+    "mergeTask",
+    "orchestratedTask",
+    "rebaseTask",
+    "sessionId",
+    "task"
+];
+
+const CODE_REVIEW_TASK_KEYS = [
+    "description",
+    "diffCommand",
+    "fetchVcsInfo",
+    // Deprecated on the CLI side: superseded by reviewTarget, which also selects the comment
+    // channel. Sending it switches the review back to the external MCP comment tool.
+    "includeInlineCommentToolInstructions",
+    "reviewTarget"
+];
+
+const REVIEW_TARGET_TYPES = ["localChanges", "remoteRequest"];
+
+/** The keys the action is expected to send for a code review, in the order `sort()` produces. */
+const EXPECTED_CODE_REVIEW_TASK_KEYS = ["description", "diffCommand", "fetchVcsInfo", "reviewTarget"];
+
+/** The keys CLI builds without `reviewTarget` support accept. */
+const LEGACY_CODE_REVIEW_TASK_KEYS = ["description", "diffCommand"];
+
+/** Asserts the payload carries nothing the CLI's strict parser would reject. */
+const expectParseableByJunieCli = (input: Record<string, any>) => {
+    for (const key of Object.keys(input)) {
+        expect(CLI_INPUT_KEYS).toContain(key);
+    }
+
+    if (input.mergeTask) {
+        expect(Object.keys(input.mergeTask)).toEqual(["branch"]);
+        expect(typeof input.mergeTask.branch).toBe("string");
+    }
+
+    const codeReviewTask = input.codeReviewTask;
+    if (codeReviewTask) {
+        for (const key of Object.keys(codeReviewTask)) {
+            expect(CODE_REVIEW_TASK_KEYS).toContain(key);
+        }
+
+        const reviewTarget = codeReviewTask.reviewTarget;
+        if (reviewTarget) {
+            expect(REVIEW_TARGET_TYPES).toContain(reviewTarget.type);
+            if (reviewTarget.type === "remoteRequest") {
+                expect(Object.keys(reviewTarget).sort()).toEqual(["number", "type"]);
+                // Parsed into a Kotlin Int, so a float or a stringified number fails the parser
+                expect(Number.isInteger(reviewTarget.number)).toBe(true);
+            }
+        }
+    }
+};
+
+/** Reads back the file the CLI is actually fed, instead of the object `prepareJunieTask` returns. */
+const readJunieInputFile = (): Record<string, any> =>
+    JSON.parse(fs.readFileSync(`${process.env.WORKING_DIR}/junie_input.json`, "utf-8"));
+
 describe("prepareJunieTask", () => {
     const createMockContext = (overrides: Partial<JunieExecutionContext> = {}): JunieExecutionContext => {
         const defaultInputs = {
@@ -29,7 +96,8 @@ describe("prepareJunieTask", () => {
             triggerPhrase: "@junie-agent",
             assigneeTrigger: "",
             labelTrigger: "",
-            allowedMcpServers: ""
+            allowedMcpServers: "",
+            junieVersion: "latest"
         };
 
         const { inputs: _, ...restOverrides } = overrides;
@@ -397,12 +465,74 @@ describe("prepareJunieTask", () => {
         });
 
         test("should create codeReviewTask when code-review prompt is provided", async () => {
+            // Deliberately different from the default entity number: the review target
+            // must carry the number of the reviewed PR, not a hardcoded value
+            const prNumber = 4242;
+            const context = createMockContext({
+                eventName: "pull_request",
+                isPR: true,
+                entityNumber: prNumber,
+                inputs: {
+                    prompt: "code-review"
+                },
+                payload: {
+                    pull_request: {
+                        number: prNumber,
+                        title: "Test PR",
+                        updated_at: "2024-01-01T00:00:00Z"
+                    },
+                    repository: {
+                        owner: {login: "owner"},
+                        name: "repo"
+                    }
+                } as any
+            });
+            const octokit = createMockOctokit();
+
+            // Inline comments are posted by the CLI itself, so the inline comment MCP server
+            // must not be advertised in the prompt anymore even when it is enabled
+            const result = await prepareJunieTask(context, branchInfo, octokit, ["mcp_github_inline_comment_server"]);
+
+            expect(result).toBeDefined();
+            expect(result.task).toBeUndefined();
+            expect(result.mergeTask).toBeUndefined();
+            expect(result.codeReviewTask).toBeDefined();
+            // The Junie CLI parses the whole input strictly and rejects it on unknown fields,
+            // so the exact set of keys is part of the contract, not an implementation detail
+            expect(Object.keys(result.codeReviewTask!).sort()).toEqual(EXPECTED_CODE_REVIEW_TASK_KEYS);
+            // reviewTarget alone must select the comment channel: the deprecated flag would
+            // pin the review to the external MCP comment tool instead of the CLI's own one
+            expect(result.codeReviewTask).not.toHaveProperty("includeInlineCommentToolInstructions");
+            // The base ref the CLI derives from the command must stay resolvable
+            expect(result.codeReviewTask?.diffCommand).toContain("git diff origin/main");
+            expect(result.codeReviewTask?.fetchVcsInfo).toBe(true);
+            expect(result.codeReviewTask?.reviewTarget).toEqual({type: "remoteRequest", number: prNumber});
+            expect(result.codeReviewTask?.description).toContain("<pull_request_info>");
+            // Header should NOT contain "Your task is to:"
+            expect(result.codeReviewTask?.description).toContain("You were triggered as a GitHub AI Assistant by pull_request action.");
+            expect(result.codeReviewTask?.description).not.toContain("Your task is to:");
+            // For code review, user_instruction should not be attached at all
+            expect(result.codeReviewTask?.description).not.toContain("<user_instruction>");
+            expect(result.codeReviewTask?.description).not.toContain("code-review");
+            expect(result.codeReviewTask?.description).not.toContain("post_inline_review_comment");
+
+            // The CLI reads the task from the file, not from the returned object
+            expect(core.setOutput).toHaveBeenCalledWith("JUNIE_INPUT_FILE", `${process.env.WORKING_DIR}/junie_input.json`);
+            const writtenInput = readJunieInputFile();
+            expect(writtenInput).toEqual(result);
+            expectParseableByJunieCli(writtenInput);
+        });
+
+        test("should create codeReviewTask without reviewTarget when the CLI version does not support it", async () => {
             const context = createMockContext({
                 eventName: "pull_request",
                 isPR: true,
                 entityNumber: 123,
                 inputs: {
-                    prompt: "code-review"
+                    prompt: "code-review",
+                    // Released build without reviewTarget: sending it would abort the whole run
+                    // with "Cannot parse input JSON"
+                    junieVersion: "2929.5"
                 },
                 payload: {
                     pull_request: {
@@ -418,18 +548,12 @@ describe("prepareJunieTask", () => {
             });
             const octokit = createMockOctokit();
 
-            const result = await prepareJunieTask(context, branchInfo, octokit);
+            const result = await prepareJunieTask(context, branchInfo, octokit, ["mcp_github_inline_comment_server"]);
 
-            expect(result).toBeDefined();
-            expect(result.codeReviewTask).toBeDefined();
-            expect(result.codeReviewTask?.diffCommand).toContain("git diff origin/main");
-            expect(result.codeReviewTask?.description).toContain("<pull_request_info>");
-            // Header should NOT contain "Your task is to:"
-            expect(result.codeReviewTask?.description).toContain("You were triggered as a GitHub AI Assistant by pull_request action.");
-            expect(result.codeReviewTask?.description).not.toContain("Your task is to:");
-            // For code review, user_instruction should not be attached at all
-            expect(result.codeReviewTask?.description).not.toContain("<user_instruction>");
-            expect(result.codeReviewTask?.description).not.toContain("code-review");
+            expect(Object.keys(result.codeReviewTask!).sort()).toEqual(LEGACY_CODE_REVIEW_TASK_KEYS);
+            // Such builds have no comment channel of their own, so the MCP tool has to be advertised
+            expect(result.codeReviewTask?.description).toContain("post_inline_review_comment");
+            expectParseableByJunieCli(readJunieInputFile());
         });
 
         test("should trigger codeReviewTask from comment when inputs.prompt is empty and code-review keyword is used", async () => {
@@ -465,15 +589,45 @@ describe("prepareJunieTask", () => {
             const result = await prepareJunieTask(context, branchInfo, octokit);
 
             expect(result).toBeDefined();
+            expect(result.task).toBeUndefined();
             expect(result.codeReviewTask).toBeDefined();
             // Should detect code-review trigger from comment and create codeReviewTask
+            expect(Object.keys(result.codeReviewTask!).sort()).toEqual(EXPECTED_CODE_REVIEW_TASK_KEYS);
             expect(result.codeReviewTask?.diffCommand).toContain("git diff origin/main");
+            expect(result.codeReviewTask?.fetchVcsInfo).toBe(true);
+            expect(result.codeReviewTask?.reviewTarget).toEqual({type: "remoteRequest", number: 123});
             expect(result.codeReviewTask?.description).toContain("<pull_request_info>");
             // Header should NOT contain "Your task is to:"
             expect(result.codeReviewTask?.description).toContain("You were triggered as a GitHub AI Assistant by pull_request_review action.");
             expect(result.codeReviewTask?.description).not.toContain("Your task is to:");
             // For code review, user_instruction should not be attached
             expect(result.codeReviewTask?.description).not.toContain("<user_instruction>");
+
+            const writtenInput = readJunieInputFile();
+            expect(writtenInput).toEqual(result);
+            expectParseableByJunieCli(writtenInput);
+        });
+
+        test("should fail to create codeReviewTask when PR number is not available", async () => {
+            const context = createMockContext({
+                eventName: "workflow_dispatch" as any,
+                isPR: false,
+                entityNumber: undefined,
+                inputs: {
+                    prompt: "code-review"
+                },
+                payload: {
+                    repository: {
+                        owner: {login: "owner"},
+                        name: "repo"
+                    }
+                } as any
+            });
+            const octokit = createMockOctokit();
+
+            await expect(prepareJunieTask(context, branchInfo, octokit)).rejects.toThrow(
+                "Code review requires a Pull Request number"
+            );
         });
 
         test("should not trigger fix CI prompt when workflow_run event has success conclusion", async () => {
@@ -596,6 +750,7 @@ describe("prepareJunieTask", () => {
             expect(result.mergeTask).toBeDefined();
             expect(result.task).toBeUndefined();
             expect(result.mergeTask?.branch).toBe("main");
+            expectParseableByJunieCli(readJunieInputFile());
         });
 
         test("should set merge task when comment has resolve trigger phrase", async () => {
@@ -628,6 +783,7 @@ describe("prepareJunieTask", () => {
             expect(result.mergeTask).toBeDefined();
             expect(result.task).toBeUndefined();
             expect(result.mergeTask?.branch).toBe("main");
+            expectParseableByJunieCli(readJunieInputFile());
         });
     });
 
@@ -653,6 +809,7 @@ describe("prepareJunieTask", () => {
             expect(result).toBeDefined();
             expect(core.setOutput).toHaveBeenCalledWith("JUNIE_INPUT_FILE", expect.any(String));
             expect(core.setOutput).toHaveBeenCalledWith("CUSTOM_JUNIE_ARGS", expect.any(String));
+            expectParseableByJunieCli(readJunieInputFile());
         });
     });
 
