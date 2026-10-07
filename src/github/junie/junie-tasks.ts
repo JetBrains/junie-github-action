@@ -16,21 +16,20 @@ import {Octokits} from "../api/client";
 import {NewGitHubPromptFormatter} from "./new-prompt-formatter";
 import {GraphQLGitHubDataFetcher} from "../api/graphql-data-fetcher";
 import {FetchedData} from "../api/queries";
-import {CliInput, remoteRequestReviewTarget} from "./types/junie";
-import {generateMcpToolsPrompt, LEGACY_INLINE_COMMENT_TOOL_PROMPT} from "../../mcp/mcp-prompts";
+import {CliInput} from "./types/junie";
+import {generateMcpToolsPrompt} from "../../mcp/mcp-prompts";
 import {junieArgsToString} from "../../utils/junie-args-parser";
 import {buildDiffCommand} from "../../constants/github";
 
 /**
- * First Junie CLI build accepting `codeReviewTask.reviewTarget`. Older builds parse the input
- * strictly and abort the run with "Cannot parse input JSON" on an unknown field, so they get
- * the payload they shipped with and post inline comments through the MCP server instead.
+ * First Junie CLI build that can review a remote Pull Request (`codeReviewTask.reviewTarget`) and post
+ * inline comments itself. Older builds reject unknown input fields, so they keep using the MCP comment tool.
  */
-const MIN_VERSION_WITH_REVIEW_TARGET = 3056.1;
+const MIN_REMOTE_REVIEW_VERSION = 3419;
 
-/** `latest` installs the nightly channel; an unparseable version is assumed to be old. */
-function supportsReviewTarget(version: string): boolean {
-    return version.trim() === "latest" || parseFloat(version) >= MIN_VERSION_WITH_REVIEW_TARGET;
+/** `latest` installs the nightly build; an unparseable version is treated as an old one. */
+function supportsRemoteReview(version: string): boolean {
+    return version.trim() === "latest" || parseInt(version, 10) >= MIN_REMOTE_REVIEW_VERSION;
 }
 
 function getTriggerTime(context: JunieExecutionContext): string | undefined {
@@ -84,8 +83,14 @@ export async function prepareJunieTask(
             console.log(`Extracted custom junie args: ${customJunieArgs.join(' ')}`);
         }
 
+        // In a remote review the CLI posts inline comments itself, so the MCP comment tool is not advertised
+        const isRemoteReview = isCodeReviewEvent(context) && supportsRemoteReview(context.inputs.junieVersion);
+        const promptMcpServers = isRemoteReview
+            ? enabledMcpServers.filter(server => server !== "mcp_github_inline_comment_server")
+            : enabledMcpServers;
+
         // Append MCP tools information if any MCP servers are enabled
-        const mcpToolsPrompt = generateMcpToolsPrompt(enabledMcpServers);
+        const mcpToolsPrompt = generateMcpToolsPrompt(promptMcpServers);
         if (mcpToolsPrompt) {
             promptText = promptText + mcpToolsPrompt;
         }
@@ -93,17 +98,17 @@ export async function prepareJunieTask(
         // Note: Attachments are already processed in fetchIssueData/fetchPullRequestData
         if (isCodeReviewEvent(context)) {
             const diffPoint = branchInfo.prBaseBranch || branchInfo.baseBranch;
-            const prNumber = context.entityNumber;
-            if (!prNumber) {
-                throw new Error("Code review requires a Pull Request number, but none was found in the event context.");
-            }
             const diffCommand = buildDiffCommand(diffPoint, branchInfo.mergeBaseSha);
-            const legacyCli = !supportsReviewTarget(context.inputs.junieVersion);
-            const legacyInlineComments = legacyCli && enabledMcpServers.includes("mcp_github_inline_comment_server");
             junieCLITask.codeReviewTask = {
-                description: legacyInlineComments ? `${promptText}\n\n${LEGACY_INLINE_COMMENT_TOOL_PROMPT}` : promptText,
-                diffCommand,
-                ...(legacyCli ? {} : {fetchVcsInfo: true, reviewTarget: remoteRequestReviewTarget(prNumber)}),
+                description: promptText,
+                diffCommand
+            }
+            if (isRemoteReview) {
+                if (!context.isPR || !context.entityNumber) {
+                    throw new Error("Code review requires a Pull Request number, but none was found in the event context.");
+                }
+                junieCLITask.codeReviewTask.fetchVcsInfo = true;
+                junieCLITask.codeReviewTask.reviewTarget = {type: "remoteRequest", number: context.entityNumber};
             }
         } else {
             junieCLITask.task = promptText;
