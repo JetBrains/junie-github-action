@@ -16,6 +16,8 @@ export interface MergeTask {
 export interface CodeReview {
     description?: string;
     diffCommand?: string;
+    fetchVcsInfo?: boolean;
+    reviewTarget?: {type: "remoteRequest"; number: number};
 }
 
 export interface CliOutput {

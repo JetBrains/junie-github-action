@@ -29,7 +29,8 @@ describe("prepareJunieTask", () => {
             triggerPhrase: "@junie-agent",
             assigneeTrigger: "",
             labelTrigger: "",
-            allowedMcpServers: ""
+            allowedMcpServers: "",
+            junieVersion: "latest"
         };
 
         const { inputs: _, ...restOverrides } = overrides;
@@ -474,6 +475,55 @@ describe("prepareJunieTask", () => {
             expect(result.codeReviewTask?.description).not.toContain("Your task is to:");
             // For code review, user_instruction should not be attached
             expect(result.codeReviewTask?.description).not.toContain("<user_instruction>");
+        });
+
+        test.each([
+            ["latest", true],
+            ["3419", true],
+            ["3418.9", false],
+            ["", false],
+        ])("should choose the code review payload for Junie '%s' (remote: %p)", async (junieVersion, remote) => {
+            const context = createMockContext({
+                eventName: "pull_request",
+                isPR: true,
+                entityNumber: 123,
+                inputs: {prompt: "code-review", junieVersion},
+                payload: {
+                    pull_request: {number: 123, title: "Test PR", updated_at: "2024-01-01T00:00:00Z"},
+                    repository: {owner: {login: "owner"}, name: "repo"}
+                } as any
+            });
+
+            const result = await prepareJunieTask(context, branchInfo, createMockOctokit(), ["mcp_github_inline_comment_server"]);
+
+            // Older CLI builds reject unknown fields and post inline comments via the MCP tool
+            expect(Object.keys(result.codeReviewTask!)).toEqual(
+                remote ? ["description", "diffCommand", "fetchVcsInfo", "reviewTarget"] : ["description", "diffCommand"]
+            );
+            expect(result.codeReviewTask?.reviewTarget).toEqual(remote ? {type: "remoteRequest", number: 123} : undefined);
+            expect(result.codeReviewTask?.description?.includes("post_inline_review_comment")).toBe(!remote);
+        });
+
+        test("should fail to create codeReviewTask when PR number is not available", async () => {
+            const context = createMockContext({
+                eventName: "workflow_dispatch" as any,
+                isPR: false,
+                entityNumber: undefined,
+                inputs: {
+                    prompt: "code-review"
+                },
+                payload: {
+                    repository: {
+                        owner: {login: "owner"},
+                        name: "repo"
+                    }
+                } as any
+            });
+            const octokit = createMockOctokit();
+
+            await expect(prepareJunieTask(context, branchInfo, octokit)).rejects.toThrow(
+                "Code review requires a Pull Request number"
+            );
         });
 
         test("should not trigger fix CI prompt when workflow_run event has success conclusion", async () => {
