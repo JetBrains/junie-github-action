@@ -20,17 +20,7 @@ import {CliInput} from "./types/junie";
 import {generateMcpToolsPrompt} from "../../mcp/mcp-prompts";
 import {junieArgsToString} from "../../utils/junie-args-parser";
 import {buildDiffCommand} from "../../constants/github";
-
-/**
- * First Junie CLI build that can review a remote Pull Request (`codeReviewTask.reviewTarget`) and post
- * inline comments itself. Older builds reject unknown input fields, so they keep using the MCP comment tool.
- */
-const MIN_REMOTE_REVIEW_VERSION = 3419;
-
-/** `latest` installs the nightly build; an unparseable version is treated as an old one. */
-function supportsRemoteReview(version: string): boolean {
-    return version.trim() === "latest" || parseInt(version, 10) >= MIN_REMOTE_REVIEW_VERSION;
-}
+import {isRemoteReview as isRemoteReviewEvent} from "./remote-review";
 
 function getTriggerTime(context: JunieExecutionContext): string | undefined {
     if (isIssueCommentEvent(context)) {
@@ -84,7 +74,7 @@ export async function prepareJunieTask(
         }
 
         // In a remote review the CLI posts inline comments itself, so the MCP comment tool is not advertised
-        const isRemoteReview = isCodeReviewEvent(context) && supportsRemoteReview(context.inputs.junieVersion);
+        const isRemoteReview = isRemoteReviewEvent(context);
         const promptMcpServers = isRemoteReview
             ? enabledMcpServers.filter(server => server !== "mcp_github_inline_comment_server")
             : enabledMcpServers;

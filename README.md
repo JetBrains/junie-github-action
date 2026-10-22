@@ -178,7 +178,7 @@ junie-args: --model=opus
     model: "opus"  # Optional: specify which model to use
 ```
 
-**Note**: The `mcp_github_inline_comment_server` is automatically enabled for `pull_request` events - no manual configuration needed.
+**Note**: The `mcp_github_inline_comment_server` is automatically enabled for `pull_request` events - no manual configuration needed. Code review runs with `junie_version` `latest` or 3419+ skip it, because Junie CLI posts inline comments with its own tool.
 
 #### Advanced Features
 

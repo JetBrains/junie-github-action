@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Shared Junie CLI flag assembly (CUSTOM_JUNIE_ARGS + MODEL + BYOK keys).
+# Shared Junie CLI flag assembly (CUSTOM_JUNIE_ARGS + MODEL + BRAVE + BYOK keys).
 # Used by "Run Junie" and "Auto-collect code review feedback" steps.
 #
 # Expects env:
-#   CUSTOM_JUNIE_ARGS, MODEL,
+#   CUSTOM_JUNIE_ARGS, MODEL, BRAVE_MODE,
 #   OPENAI_API_KEY, ANTHROPIC_API_KEY, GROK_API_KEY, OPENROUTER_API_KEY, GOOGLE_API_KEY
 #
 # Prints flags on stdout (may be empty / leading-space trimmed by caller if needed).
@@ -11,6 +11,9 @@
 set -euo pipefail
 
 JUNIE_FLAGS="${CUSTOM_JUNIE_ARGS:-}"
+
+# Add brave mode flag if enabled
+[ "${BRAVE_MODE:-}" = "true" ] && JUNIE_FLAGS="${JUNIE_FLAGS} --brave"
 
 # If no custom --model flag in CUSTOM_JUNIE_ARGS, use MODEL input
 if [ -n "${MODEL:-}" ] && ! echo "${CUSTOM_JUNIE_ARGS:-}" | grep -q -E '(^|[[:space:]])--model([=[:space:]]|$)'; then
