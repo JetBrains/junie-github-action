@@ -98,6 +98,10 @@ inputs:
   allowed_mcp_servers:
     description: "Comma-separated list of github MCP servers to use. Allowed server names: mcp_github_checks_server, mcp_github_inline_comment_server. Note: inline comment server is automatically enabled for pull requests."
     required: false
+  brave_mode:
+    description: "Enable brave mode - allows Junie to make changes without asking for confirmation"
+    required: false
+    default: "false"
 
   # Jira integration configuration (for workflow_dispatch events)
   jira_base_url:
@@ -260,6 +264,7 @@ runs:
         GOOGLE_API_KEY: ${{ inputs.google_api_key }}
         AUTO_COLLECT_FEEDBACK: ${{ inputs.auto_collect_feedback }}
         JUNIE_VERSION: ${{ inputs.junie_version }}
+        BRAVE_MODE: ${{ inputs.brave_mode }}
 
 
     - name: Install Junie
@@ -290,6 +295,7 @@ runs:
         CODE_REVIEW_FEEDBACK_API_BASE_URL: ${{ inputs.code_review_feedback_api_base_url }}
         CUSTOM_JUNIE_ARGS: ${{ steps.prepare.outputs.CUSTOM_JUNIE_ARGS }}
         MODEL: ${{ inputs.model }}
+        BRAVE_MODE: ${{ inputs.brave_mode }}
         OPENAI_API_KEY: ${{ inputs.openai_api_key }}
         ANTHROPIC_API_KEY: ${{ inputs.anthropic_api_key }}
         GROK_API_KEY: ${{ inputs.grok_api_key }}
@@ -312,6 +318,7 @@ runs:
         WORKING_DIR: ${{ inputs.junie_work_dir }}
         MODEL: ${{ inputs.model }}
         CUSTOM_JUNIE_ARGS: ${{ steps.prepare.outputs.CUSTOM_JUNIE_ARGS }}
+        BRAVE_MODE: ${{ inputs.brave_mode }}
         OPENAI_API_KEY: ${{ inputs.openai_api_key }}
         ANTHROPIC_API_KEY: ${{ inputs.anthropic_api_key }}
         GROK_API_KEY: ${{ inputs.grok_api_key }}

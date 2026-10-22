@@ -6,6 +6,7 @@ import {join} from "path";
 import {homedir} from 'os';
 import {BranchInfo} from "../github/operations/branch";
 import {isFixCIEvent, isJiraWorkflowDispatchEvent, isYouTrackWorkflowDispatchEvent, JunieExecutionContext} from "../github/context";
+import {isRemoteReview} from "../github/junie/remote-review";
 
 type PrepareConfigParams = {
     context: JunieExecutionContext;
@@ -41,8 +42,10 @@ export async function prepareMcpConfig(
     // Track which servers are actually enabled
     const enabledServers: string[] = [];
 
-    // Automatically enable inline comment server for PRs
-    if (prNumber && commitSha) {
+    // Automatically enable inline comment server for PRs, except remote reviews where the CLI posts comments itself
+    if (prNumber && commitSha && isRemoteReview(context)) {
+        console.log(`Skipping GitHub Inline Comment MCP Server for PR #${prNumber}: Junie CLI posts review comments itself`);
+    } else if (prNumber && commitSha) {
         console.log(`Enabling GitHub Inline Comment MCP Server for PR #${prNumber}`);
         baseMcpConfig.mcpServers.github_inline_comment = {
             command: "bun",
