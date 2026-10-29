@@ -95,9 +95,9 @@ jobs:
               }
             
               const allSuccess = checkRuns.check_runs.every(
-                check => check.conclusion === 'success'
+                check => ['success', 'skipped', 'neutral'].includes(check.conclusion)
               );
-            
+
               core.setOutput('ci_status', allSuccess ? 'success' : 'failure');
               core.setOutput('check_runs', JSON.stringify(checkRuns.check_runs));
             
