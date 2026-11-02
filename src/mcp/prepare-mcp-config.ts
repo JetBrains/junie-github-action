@@ -6,13 +6,16 @@ import {join} from "path";
 import {homedir} from 'os';
 import {BranchInfo} from "../github/operations/branch";
 import {isFixCIEvent, isJiraWorkflowDispatchEvent, isYouTrackWorkflowDispatchEvent, JunieExecutionContext} from "../github/context";
+import {isRemoteReview} from "../github/junie/remote-review";
 
 type PrepareConfigParams = {
     context: JunieExecutionContext;
     githubToken: string;
     branchInfo: BranchInfo;
     allowedMcpServers: string[];
+    prNumber?: number;
     commitSha?: string;
+    configDir?: string;
 };
 
 
@@ -24,7 +27,9 @@ export async function prepareMcpConfig(
         githubToken,
         branchInfo,
         allowedMcpServers,
+        prNumber,
         commitSha,
+        configDir = join(homedir(), '.junie', 'mcp'),
     } = params;
     const owner = context.payload.repository.owner.login
     const repo = context.payload.repository.name
@@ -38,6 +43,28 @@ export async function prepareMcpConfig(
 
     // Track which servers are actually enabled
     const enabledServers: string[] = [];
+
+    // A remote review CLI posts inline comments itself; older builds still need the MCP comment tool
+    if (prNumber && commitSha && !isRemoteReview(context)) {
+        console.log(`Enabling GitHub Inline Comment MCP Server for PR #${prNumber}`);
+        baseMcpConfig.mcpServers.github_inline_comment = {
+            command: "bun",
+            args: [
+                "run",
+                `${process.env.GITHUB_ACTION_PATH}/src/mcp/github-inline-comment-server.ts`,
+            ],
+            env: {
+                GITHUB_API_URL: GITHUB_API_URL,
+                GITHUB_TOKEN: githubToken,
+                REPO_OWNER: owner,
+                REPO_NAME: repo,
+                PR_NUMBER: String(prNumber),
+                COMMIT_SHA: commitSha,
+                GITHUB_RUN_ID: process.env.GITHUB_RUN_ID || "",
+            },
+        };
+        enabledServers.push('mcp_github_inline_comment_server');
+    }
 
     const isFixCI = isFixCIEvent(context);
 
@@ -108,11 +135,10 @@ export async function prepareMcpConfig(
     core.setOutput(OUTPUT_VARS.EJ_MCP_CONFIG, configJsonString);
 
     // Create ~/.junie directory if it doesn't exist
-    const junieCMPDir = join(homedir(), '.junie', 'mcp');
-    await mkdir(junieCMPDir, {recursive: true});
+    await mkdir(configDir, {recursive: true});
 
     // Write mcp.json config file to ~/.junie/mcp.json
-    const mcpConfigPath = join(junieCMPDir, 'mcp.json');
+    const mcpConfigPath = join(configDir, 'mcp.json');
     await writeFile(mcpConfigPath, configJsonString, 'utf-8');
 
     console.log(`Enabled MCP servers: ${enabledServers.join(', ')}`);
