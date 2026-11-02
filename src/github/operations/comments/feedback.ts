@@ -28,6 +28,7 @@ import {
     CODE_REVIEW_FEEDBACK_AUTO_COLLECT_MARKER_ONLY,
 } from "../../../constants/github";
 import type {FailureFeedbackData, FinishFeedbackData, SuccessFeedbackData} from "./types";
+import {isReviewSummaryPublishedByAgent} from "./agent-review-summary";
 import {getJiraClient} from "../../jira/client";
 import {convertMarkdownToADF} from "../../jira/markdown-to-jira";
 import {getYouTrackClient} from "../../youtrack/client";
@@ -445,11 +446,21 @@ export async function postJunieCompletionComment(
 
     const initCommentId = +data.initCommentId;
 
-    // Drop the review summary text, but keep a marker/token comment for EAP auto-collect.
-    if (!data.isJobFailed && shouldSkipReviewSummary(data)) {
+    const skipConfiguredReviewSummary = !data.isJobFailed && shouldSkipReviewSummary(data);
+    const agentReviewSummaryPublished = !data.isJobFailed
+        && !skipConfiguredReviewSummary
+        && !isPullRequestReviewCommentEvent(data.parsedContext)
+        && isCodeReviewEvent(data.parsedContext)
+        && await isReviewSummaryPublishedByAgent(octokit, data.parsedContext, initCommentId);
+
+    // Drop a duplicate review summary, but keep a marker/token comment for EAP auto-collect.
+    if (skipConfiguredReviewSummary || agentReviewSummaryPublished) {
+        const skipReason = skipConfiguredReviewSummary
+            ? "skip_review_summary"
+            : "agent review summary already published";
         const anchorBody = buildSkipReviewSummaryAnchor(data.successData!, workflowName);
         if (anchorBody) {
-            console.log('skip_review_summary: keeping feedback marker comment (no review summary)');
+            console.log(`${skipReason}: keeping feedback marker comment (no review summary)`);
             try {
                 await updateExistingComment(
                     octokit,
@@ -466,7 +477,7 @@ export async function postJunieCompletionComment(
             return;
         }
 
-        console.log('skip_review_summary enabled - not posting the code review summary comment');
+        console.log(`${skipReason} - not posting the code review summary comment`);
         try {
             await deleteExistingComment(octokit, data.parsedContext, initCommentId, ownerLogin, name);
         } catch (error) {

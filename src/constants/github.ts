@@ -227,6 +227,11 @@ export const SUCCESS_FEEDBACK_COMMENT_WITH_RESULT = (junieTitle: string, junieBo
 export const CODE_REVIEW_FEEDBACK_LINK_SECTION = (feedbackLink: string) =>
     `\n\n---\n\n**Help us improve Junie code review (EAP):** [Share feedback](${feedbackLink})`
 
+export const AGENT_CODE_REVIEW_SUMMARY_MARKERS = [
+    "<!-- junie-code-review-issue-summary -->",
+    "<!-- junie-code-review-summary -->",
+] as const;
+
 /** Hidden marker for correlating review sessions on PR close. */
 export function createCodeReviewFeedbackMarker(
     sessionId: string,

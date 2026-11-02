@@ -21,6 +21,7 @@ describe("Comment Feedback Operations", () => {
   let updateCommentSpy: any;
   let deleteCommentSpy: any;
   let listCommentsSpy: any;
+  let getCommentSpy: any;
   let listReviewCommentsSpy: any;
   let createReplyForReviewCommentSpy: any;
   let updateReviewCommentSpy: any;
@@ -35,6 +36,7 @@ describe("Comment Feedback Operations", () => {
           createComment: mock(async () => ({ data: { id: 12345 } })),
           updateComment: mock(async () => ({ data: { id: 12345 } })),
           listComments: mock(async () => ({ data: [] })),
+          getComment: mock(async () => ({ data: { updated_at: "2026-01-01T00:00:00Z" } })),
           deleteComment: mock(async () => ({ data: {} })),
         },
         pulls: {
@@ -53,6 +55,7 @@ describe("Comment Feedback Operations", () => {
     updateCommentSpy = mockOctokit.rest.issues.updateComment;
     deleteCommentSpy = mockOctokit.rest.issues.deleteComment;
     listCommentsSpy = mockOctokit.rest.issues.listComments;
+    getCommentSpy = mockOctokit.rest.issues.getComment;
     createReplyForReviewCommentSpy = mockOctokit.rest.pulls.createReplyForReviewComment;
     updateReviewCommentSpy = mockOctokit.rest.pulls.updateReviewComment;
     listReviewCommentsSpy = mockOctokit.rest.pulls.listReviewComments;
@@ -372,6 +375,10 @@ describe("Comment Feedback Operations", () => {
       initCommentId: "12345",
       parsedContext: mockIssueCommentContext,
     };
+    const codeReviewContext = {
+      ...mockIssueCommentContext,
+      inputs: {...mockIssueCommentContext.inputs, prompt: "code-review"},
+    } as JunieExecutionContext;
 
     test("should update comment with success for COMMIT_CHANGES", async () => {
       const data: FinishFeedbackData = {
@@ -504,6 +511,161 @@ describe("Comment Feedback Operations", () => {
       expect(body).toContain("https://junie.example.com/code-review-feedback?token=abc");
       expect(body).not.toContain("Junie successfully finished!");
       expect(body).not.toContain("Analysis complete");
+    });
+
+    test("should keep only the agent review summary and preserve the feedback marker", async () => {
+      const data: FinishFeedbackData = {
+        ...baseFinishData,
+        parsedContext: codeReviewContext,
+        isJobFailed: false,
+        successData: {
+          actionToDo: "WRITE_COMMENT",
+          junieTitle: "Analysis complete",
+          junieSummary: "Here are my findings...",
+          isCodeReview: true,
+          codeReviewFeedbackLink: "https://junie.example.com/code-review-feedback?token=abc",
+          junieSessionId: "session-1",
+          githubRunId: "99",
+        },
+      };
+      listCommentsSpy.mockResolvedValue({
+        data: [{
+          body: "<!-- junie-code-review-summary -->\nHere are my findings...",
+          updated_at: "2026-01-01T00:00:01Z",
+        }],
+      });
+
+      await postJunieCompletionComment(mockOctokit, data);
+
+      expect(deleteCommentSpy).not.toHaveBeenCalled();
+      expect(updateCommentSpy).toHaveBeenCalledTimes(1);
+      const body = updateCommentSpy.mock.calls[0][0].body as string;
+      expect(body).toContain("<!-- junie-feedback:session=session-1;run=99;token=abc -->");
+      expect(body).not.toContain("Here are my findings...");
+    });
+
+    test("should delete the working comment when agent summary exists without a feedback link", async () => {
+      const data: FinishFeedbackData = {
+        ...baseFinishData,
+        parsedContext: codeReviewContext,
+        isJobFailed: false,
+        successData: {
+          actionToDo: "WRITE_COMMENT",
+          junieTitle: "Analysis complete",
+          junieSummary: "Here are my findings...",
+          isCodeReview: true,
+        },
+      };
+      listCommentsSpy.mockResolvedValue({
+        data: [{
+          body: "<!-- junie-code-review-issue-summary -->\nHere are my findings...",
+          updated_at: "2026-01-01T00:00:01Z",
+        }],
+      });
+
+      await postJunieCompletionComment(mockOctokit, data);
+
+      expect(updateCommentSpy).not.toHaveBeenCalled();
+      expect(deleteCommentSpy).toHaveBeenCalledWith({
+        owner: "test-owner",
+        repo: "test-repo",
+        comment_id: 12345,
+      });
+    });
+
+    test("should not look for an agent summary for review comment events", async () => {
+      const reviewCommentContext = {
+        ...mockPullRequestReviewCommentContext,
+        inputs: {...mockPullRequestReviewCommentContext.inputs, prompt: "code-review"},
+      } as JunieExecutionContext;
+      const data: FinishFeedbackData = {
+        ...baseFinishData,
+        initCommentId: "666",
+        parsedContext: reviewCommentContext,
+        isJobFailed: false,
+        successData: {
+          actionToDo: "WRITE_COMMENT",
+          junieTitle: "Analysis complete",
+          junieSummary: "Here are my findings...",
+          isCodeReview: true,
+        },
+      };
+
+      await postJunieCompletionComment(mockOctokit, data);
+
+      expect(getCommentSpy).not.toHaveBeenCalled();
+      expect(listCommentsSpy).not.toHaveBeenCalled();
+      expect(updateReviewCommentSpy).toHaveBeenCalledWith(expect.objectContaining({
+        comment_id: 666,
+        body: expect.stringContaining("Here are my findings..."),
+      }));
+    });
+
+    test("should write the summary when no agent summary exists", async () => {
+      const data: FinishFeedbackData = {
+        ...baseFinishData,
+        parsedContext: codeReviewContext,
+        isJobFailed: false,
+        successData: {
+          actionToDo: "WRITE_COMMENT",
+          junieTitle: "Analysis complete",
+          junieSummary: "Here are my findings...",
+          isCodeReview: true,
+        },
+      };
+
+      await postJunieCompletionComment(mockOctokit, data);
+
+      expect(updateCommentSpy).toHaveBeenCalledWith(expect.objectContaining({
+        body: expect.stringContaining("Here are my findings..."),
+      }));
+    });
+
+    test("should write the summary when the agent summary is stale", async () => {
+      const data: FinishFeedbackData = {
+        ...baseFinishData,
+        parsedContext: codeReviewContext,
+        isJobFailed: false,
+        successData: {
+          actionToDo: "WRITE_COMMENT",
+          junieTitle: "Analysis complete",
+          junieSummary: "Here are my findings...",
+          isCodeReview: true,
+        },
+      };
+      listCommentsSpy.mockResolvedValue({
+        data: [{
+          body: "<!-- junie-code-review-summary -->\nOld findings",
+          updated_at: "2025-12-31T23:59:59Z",
+        }],
+      });
+
+      await postJunieCompletionComment(mockOctokit, data);
+
+      expect(updateCommentSpy).toHaveBeenCalledWith(expect.objectContaining({
+        body: expect.stringContaining("Here are my findings..."),
+      }));
+    });
+
+    test("should write the summary when listing comments fails", async () => {
+      const data: FinishFeedbackData = {
+        ...baseFinishData,
+        parsedContext: codeReviewContext,
+        isJobFailed: false,
+        successData: {
+          actionToDo: "WRITE_COMMENT",
+          junieTitle: "Analysis complete",
+          junieSummary: "Here are my findings...",
+          isCodeReview: true,
+        },
+      };
+      listCommentsSpy.mockRejectedValue(new Error("API Error"));
+
+      await postJunieCompletionComment(mockOctokit, data);
+
+      expect(updateCommentSpy).toHaveBeenCalledWith(expect.objectContaining({
+        body: expect.stringContaining("Here are my findings..."),
+      }));
     });
 
     test("should delete working status comment when skip_review_summary and no EAP feedback link", async () => {
