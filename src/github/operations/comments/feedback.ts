@@ -28,7 +28,7 @@ import {
     CODE_REVIEW_FEEDBACK_AUTO_COLLECT_MARKER_ONLY,
 } from "../../../constants/github";
 import type {FailureFeedbackData, FinishFeedbackData, SuccessFeedbackData} from "./types";
-import {isReviewSummaryPublishedByAgent} from "./agent-review-summary";
+import {isRemoteReview} from "../../junie/remote-review";
 import {getJiraClient} from "../../jira/client";
 import {convertMarkdownToADF} from "../../jira/markdown-to-jira";
 import {getYouTrackClient} from "../../youtrack/client";
@@ -447,17 +447,13 @@ export async function postJunieCompletionComment(
     const initCommentId = +data.initCommentId;
 
     const skipConfiguredReviewSummary = !data.isJobFailed && shouldSkipReviewSummary(data);
-    const agentReviewSummaryPublished = !data.isJobFailed
-        && !skipConfiguredReviewSummary
-        && !isPullRequestReviewCommentEvent(data.parsedContext)
-        && isCodeReviewEvent(data.parsedContext)
-        && await isReviewSummaryPublishedByAgent(octokit, data.parsedContext, initCommentId);
+    const remoteReview = !data.isJobFailed && isRemoteReview(data.parsedContext);
 
-    // Drop a duplicate review summary, but keep a marker/token comment for EAP auto-collect.
-    if (skipConfiguredReviewSummary || agentReviewSummaryPublished) {
+    // Drop the review summary text, but keep a marker/token comment for EAP auto-collect.
+    if (skipConfiguredReviewSummary || remoteReview) {
         const skipReason = skipConfiguredReviewSummary
             ? "skip_review_summary"
-            : "agent review summary already published";
+            : "remote review publishes its own summary";
         const anchorBody = buildSkipReviewSummaryAnchor(data.successData!, workflowName);
         if (anchorBody) {
             console.log(`${skipReason}: keeping feedback marker comment (no review summary)`);

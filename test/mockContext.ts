@@ -28,6 +28,7 @@ const defaultInputs = {
     baseBranch: "main",
     targetBranch: undefined,
     allowedMcpServers: undefined,
+    junieVersion: "",
 };
 
 // Default repository info

@@ -21,7 +21,6 @@ describe("Comment Feedback Operations", () => {
   let updateCommentSpy: any;
   let deleteCommentSpy: any;
   let listCommentsSpy: any;
-  let getCommentSpy: any;
   let listReviewCommentsSpy: any;
   let createReplyForReviewCommentSpy: any;
   let updateReviewCommentSpy: any;
@@ -36,7 +35,6 @@ describe("Comment Feedback Operations", () => {
           createComment: mock(async () => ({ data: { id: 12345 } })),
           updateComment: mock(async () => ({ data: { id: 12345 } })),
           listComments: mock(async () => ({ data: [] })),
-          getComment: mock(async () => ({ data: { updated_at: "2026-01-01T00:00:00Z" } })),
           deleteComment: mock(async () => ({ data: {} })),
         },
         pulls: {
@@ -55,7 +53,6 @@ describe("Comment Feedback Operations", () => {
     updateCommentSpy = mockOctokit.rest.issues.updateComment;
     deleteCommentSpy = mockOctokit.rest.issues.deleteComment;
     listCommentsSpy = mockOctokit.rest.issues.listComments;
-    getCommentSpy = mockOctokit.rest.issues.getComment;
     createReplyForReviewCommentSpy = mockOctokit.rest.pulls.createReplyForReviewComment;
     updateReviewCommentSpy = mockOctokit.rest.pulls.updateReviewComment;
     listReviewCommentsSpy = mockOctokit.rest.pulls.listReviewComments;
@@ -375,10 +372,10 @@ describe("Comment Feedback Operations", () => {
       initCommentId: "12345",
       parsedContext: mockIssueCommentContext,
     };
-    const codeReviewContext = {
+    const codeReviewContext = (junieVersion: string) => ({
       ...mockIssueCommentContext,
-      inputs: {...mockIssueCommentContext.inputs, prompt: "code-review"},
-    } as JunieExecutionContext;
+      inputs: {...mockIssueCommentContext.inputs, prompt: "code-review", junieVersion},
+    } as JunieExecutionContext);
 
     test("should update comment with success for COMMIT_CHANGES", async () => {
       const data: FinishFeedbackData = {
@@ -513,10 +510,10 @@ describe("Comment Feedback Operations", () => {
       expect(body).not.toContain("Analysis complete");
     });
 
-    test("should keep only the agent review summary and preserve the feedback marker", async () => {
+    test("should keep only the feedback marker for a remote review", async () => {
       const data: FinishFeedbackData = {
         ...baseFinishData,
-        parsedContext: codeReviewContext,
+        parsedContext: codeReviewContext("3419"),
         isJobFailed: false,
         successData: {
           actionToDo: "WRITE_COMMENT",
@@ -528,12 +525,6 @@ describe("Comment Feedback Operations", () => {
           githubRunId: "99",
         },
       };
-      listCommentsSpy.mockResolvedValue({
-        data: [{
-          body: "<!-- junie-code-review-summary -->\nHere are my findings...",
-          updated_at: "2026-01-01T00:00:01Z",
-        }],
-      });
 
       await postJunieCompletionComment(mockOctokit, data);
 
@@ -544,10 +535,10 @@ describe("Comment Feedback Operations", () => {
       expect(body).not.toContain("Here are my findings...");
     });
 
-    test("should delete the working comment when agent summary exists without a feedback link", async () => {
+    test("should delete the working comment for a remote review without a feedback link", async () => {
       const data: FinishFeedbackData = {
         ...baseFinishData,
-        parsedContext: codeReviewContext,
+        parsedContext: codeReviewContext("latest"),
         isJobFailed: false,
         successData: {
           actionToDo: "WRITE_COMMENT",
@@ -556,12 +547,6 @@ describe("Comment Feedback Operations", () => {
           isCodeReview: true,
         },
       };
-      listCommentsSpy.mockResolvedValue({
-        data: [{
-          body: "<!-- junie-code-review-issue-summary -->\nHere are my findings...",
-          updated_at: "2026-01-01T00:00:01Z",
-        }],
-      });
 
       await postJunieCompletionComment(mockOctokit, data);
 
@@ -573,15 +558,16 @@ describe("Comment Feedback Operations", () => {
       });
     });
 
-    test("should not look for an agent summary for review comment events", async () => {
-      const reviewCommentContext = {
-        ...mockPullRequestReviewCommentContext,
-        inputs: {...mockPullRequestReviewCommentContext.inputs, prompt: "code-review"},
-      } as JunieExecutionContext;
+    test.each([
+      ["3419", false],
+      ["latest", false],
+      ["3418", true],
+      ["", true],
+      ["unknown", true],
+    ])("should publish the code review summary for Junie '%s': %p", async (junieVersion, published) => {
       const data: FinishFeedbackData = {
         ...baseFinishData,
-        initCommentId: "666",
-        parsedContext: reviewCommentContext,
+        parsedContext: codeReviewContext(junieVersion),
         isJobFailed: false,
         successData: {
           actionToDo: "WRITE_COMMENT",
@@ -593,78 +579,28 @@ describe("Comment Feedback Operations", () => {
 
       await postJunieCompletionComment(mockOctokit, data);
 
-      expect(getCommentSpy).not.toHaveBeenCalled();
-      expect(listCommentsSpy).not.toHaveBeenCalled();
-      expect(updateReviewCommentSpy).toHaveBeenCalledWith(expect.objectContaining({
-        comment_id: 666,
-        body: expect.stringContaining("Here are my findings..."),
-      }));
+      expect(updateCommentSpy).toHaveBeenCalledTimes(published ? 1 : 0);
+      expect(deleteCommentSpy).toHaveBeenCalledTimes(published ? 0 : 1);
+      if (published) {
+        expect(updateCommentSpy.mock.calls[0][0].body).toContain("Here are my findings...");
+      }
     });
 
-    test("should write the summary when no agent summary exists", async () => {
+    test("should still report failures for a remote review", async () => {
       const data: FinishFeedbackData = {
         ...baseFinishData,
-        parsedContext: codeReviewContext,
-        isJobFailed: false,
-        successData: {
-          actionToDo: "WRITE_COMMENT",
-          junieTitle: "Analysis complete",
-          junieSummary: "Here are my findings...",
-          isCodeReview: true,
+        parsedContext: codeReviewContext("3419"),
+        isJobFailed: true,
+        failureData: {
+          error: "Something went wrong",
         },
       };
 
       await postJunieCompletionComment(mockOctokit, data);
 
+      expect(deleteCommentSpy).not.toHaveBeenCalled();
       expect(updateCommentSpy).toHaveBeenCalledWith(expect.objectContaining({
-        body: expect.stringContaining("Here are my findings..."),
-      }));
-    });
-
-    test("should write the summary when the agent summary is stale", async () => {
-      const data: FinishFeedbackData = {
-        ...baseFinishData,
-        parsedContext: codeReviewContext,
-        isJobFailed: false,
-        successData: {
-          actionToDo: "WRITE_COMMENT",
-          junieTitle: "Analysis complete",
-          junieSummary: "Here are my findings...",
-          isCodeReview: true,
-        },
-      };
-      listCommentsSpy.mockResolvedValue({
-        data: [{
-          body: "<!-- junie-code-review-summary -->\nOld findings",
-          updated_at: "2025-12-31T23:59:59Z",
-        }],
-      });
-
-      await postJunieCompletionComment(mockOctokit, data);
-
-      expect(updateCommentSpy).toHaveBeenCalledWith(expect.objectContaining({
-        body: expect.stringContaining("Here are my findings..."),
-      }));
-    });
-
-    test("should write the summary when listing comments fails", async () => {
-      const data: FinishFeedbackData = {
-        ...baseFinishData,
-        parsedContext: codeReviewContext,
-        isJobFailed: false,
-        successData: {
-          actionToDo: "WRITE_COMMENT",
-          junieTitle: "Analysis complete",
-          junieSummary: "Here are my findings...",
-          isCodeReview: true,
-        },
-      };
-      listCommentsSpy.mockRejectedValue(new Error("API Error"));
-
-      await postJunieCompletionComment(mockOctokit, data);
-
-      expect(updateCommentSpy).toHaveBeenCalledWith(expect.objectContaining({
-        body: expect.stringContaining("Here are my findings..."),
+        body: expect.stringContaining("Something went wrong"),
       }));
     });
 
