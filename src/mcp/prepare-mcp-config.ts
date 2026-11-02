@@ -12,7 +12,6 @@ type PrepareConfigParams = {
     githubToken: string;
     branchInfo: BranchInfo;
     allowedMcpServers: string[];
-    prNumber?: number;
     commitSha?: string;
 };
 
@@ -25,7 +24,6 @@ export async function prepareMcpConfig(
         githubToken,
         branchInfo,
         allowedMcpServers,
-        prNumber,
         commitSha,
     } = params;
     const owner = context.payload.repository.owner.login
@@ -41,27 +39,6 @@ export async function prepareMcpConfig(
     // Track which servers are actually enabled
     const enabledServers: string[] = [];
 
-    // Automatically enable inline comment server for PRs
-    if (prNumber && commitSha) {
-        console.log(`Enabling GitHub Inline Comment MCP Server for PR #${prNumber}`);
-        baseMcpConfig.mcpServers.github_inline_comment = {
-            command: "bun",
-            args: [
-                "run",
-                `${process.env.GITHUB_ACTION_PATH}/src/mcp/github-inline-comment-server.ts`,
-            ],
-            env: {
-                GITHUB_API_URL: GITHUB_API_URL,
-                GITHUB_TOKEN: githubToken,
-                REPO_OWNER: owner,
-                REPO_NAME: repo,
-                PR_NUMBER: String(prNumber),
-                COMMIT_SHA: commitSha,
-                GITHUB_RUN_ID: process.env.GITHUB_RUN_ID || "",
-            },
-        };
-        enabledServers.push('mcp_github_inline_comment_server');
-    }
     const isFixCI = isFixCIEvent(context);
 
     // Auto-enable checks server for fix-ci action or when explicitly requested
