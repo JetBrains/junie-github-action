@@ -99,16 +99,20 @@ export async function prepareJunieTask(
         if (isCodeReviewEvent(context)) {
             const diffPoint = branchInfo.prBaseBranch || branchInfo.baseBranch;
             const diffCommand = buildDiffCommand(diffPoint, branchInfo.mergeBaseSha);
-            junieCLITask.codeReviewTask = {
+            const codeReviewTask: NonNullable<CliInput["codeReviewTask"]> = {
                 description: promptText,
                 diffCommand
-            }
+            };
+            junieCLITask.codeReviewTask = codeReviewTask;
             if (isRemoteReview) {
                 if (!context.isPR || !context.entityNumber) {
                     throw new Error("Code review requires a Pull Request number, but none was found in the event context.");
                 }
-                junieCLITask.codeReviewTask.fetchVcsInfo = true;
-                junieCLITask.codeReviewTask.reviewTarget = {type: "remoteRequest", number: context.entityNumber};
+                codeReviewTask.fetchVcsInfo = true;
+                codeReviewTask.reviewTarget = {type: "remoteRequest", number: context.entityNumber};
+                if (!context.inputs.allowApprove) {
+                    codeReviewTask.allowApprove = false;
+                }
             }
         } else {
             junieCLITask.task = promptText;
