@@ -18,6 +18,7 @@ export interface CodeReview {
     diffCommand?: string;
     fetchVcsInfo?: boolean;
     reviewTarget?: {type: "remoteRequest"; number: number};
+    allowApprove?: boolean;
 }
 
 export interface CliOutput {

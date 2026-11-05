@@ -15,7 +15,7 @@ import {
     WorkflowRunEvent,
 } from "@octokit/webhooks-types";
 import type {TokenOwner} from "./operations/auth";
-import {OUTPUT_VARS} from "../constants/environment";
+import {ENV_VARS, OUTPUT_VARS} from "../constants/environment";
 import {
     CODE_REVIEW_ACTION,
     DEFAULT_TRIGGER_PHRASE,
@@ -119,6 +119,7 @@ type JunieWorkflowContext = {
         createNewBranchForPR: boolean;
         silentMode: boolean;
         skipReviewSummary: boolean;
+        allowApprove: boolean;
         skipPr: boolean;
         outputBranch?: string;
         useSingleComment: boolean;
@@ -191,6 +192,7 @@ export function extractJunieWorkflowContext(tokenOwner: TokenOwner): JunieExecut
             createNewBranchForPR: process.env.CREATE_NEW_BRANCH_FOR_PR == "true",
             silentMode: process.env.SILENT_MODE == "true",
             skipReviewSummary: process.env.SKIP_REVIEW_SUMMARY == "true",
+            allowApprove: process.env[ENV_VARS.ALLOW_APPROVE] !== "false",
             skipPr: process.env.SKIP_PR == "true",
             outputBranch: process.env.OUTPUT_BRANCH || undefined,
             useSingleComment: process.env.USE_SINGLE_COMMENT == "true",

@@ -21,6 +21,7 @@ describe("prepareJunieTask", () => {
             resolveConflicts: false,
             createNewBranchForPR: false,
             silentMode: false,
+            allowApprove: true,
             useSingleComment: false,
             attachGithubContextToCustomPrompt: true,
             junieWorkingDir: "/tmp",
@@ -502,6 +503,23 @@ describe("prepareJunieTask", () => {
             );
             expect(result.codeReviewTask?.reviewTarget).toEqual(remote ? {type: "remoteRequest", number: 123} : undefined);
             expect(result.codeReviewTask?.description?.includes("post_inline_review_comment")).toBe(!remote);
+        });
+
+        test("should disable remote approval when allowApprove is false", async () => {
+            const context = createMockContext({
+                eventName: "pull_request",
+                isPR: true,
+                entityNumber: 123,
+                inputs: {prompt: "code-review", allowApprove: false},
+                payload: {
+                    pull_request: {number: 123, title: "Test PR", updated_at: "2024-01-01T00:00:00Z"},
+                    repository: {owner: {login: "owner"}, name: "repo"}
+                } as any
+            });
+
+            const result = await prepareJunieTask(context, branchInfo, createMockOctokit());
+
+            expect(result.codeReviewTask?.allowApprove).toBe(false);
         });
 
         test("should fail to create codeReviewTask when PR number is not available", async () => {
