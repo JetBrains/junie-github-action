@@ -16,6 +16,14 @@ inputs:
     description: "The label that triggers the action (e.g. junie)"
     required: false
     default: "junie"
+  allowed_bots:
+    description: >
+      Comma-separated list of bot actors (GitHub Apps) allowed to trigger Junie on user events
+      (issues, comments, pull requests, pushes), e.g. "dependabot[bot], renovate". The "[bot]" suffix is optional.
+      Use "*" to allow all bots. Empty (default) means no bots can trigger Junie - only human users with
+      write access. Applies to both trigger-phrase mode and workflows with a fixed `prompt`.
+    required: false
+    default: ""
   base_branch:
     description: "The branch to use as the source when creating junie working branch"
     required: false
@@ -238,6 +246,7 @@ runs:
         TRIGGER_PHRASE: ${{ inputs.trigger_phrase }}
         ASSIGNEE_TRIGGER: ${{ inputs.assignee_trigger }}
         LABEL_TRIGGER: ${{ inputs.label_trigger }}
+        ALLOWED_BOTS: ${{ inputs.allowed_bots }}
         BASE_BRANCH: ${{ inputs.base_branch || github.base_ref || github.ref_name }}
         TARGET_BRANCH: ${{ github.head_ref }}
         OVERRIDE_GITHUB_TOKEN: ${{ inputs.custom_github_token }}

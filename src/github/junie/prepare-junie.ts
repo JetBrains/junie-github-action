@@ -1,6 +1,7 @@
 import * as core from "@actions/core";
 import {
     JunieExecutionContext,
+    UserInitiatedEventContext,
     isTriggeredByUserInteraction,
     isPushEvent,
     isJiraWorkflowDispatchEvent,
@@ -35,9 +36,9 @@ export async function initializeJunieExecution({
 
     if (shouldAutoCollectFeedback(context)) {
         if (isTriggeredByUserInteraction(context)) {
-            const hasWritePermissions = await verifyRepositoryAccess(octokit.rest, context);
-            if (!hasWritePermissions) {
-                console.log("No write permissions, skipping auto-collect feedback");
+            const isAuthorized = await verifyActorAuthorization(context, octokit);
+            if (!isAuthorized) {
+                console.log("Actor is not authorized, skipping auto-collect feedback");
                 core.setOutput(OUTPUT_VARS.SHOULD_SKIP, 'true');
                 core.setOutput(OUTPUT_VARS.AUTO_COLLECT_FEEDBACK, 'false');
                 return;
@@ -140,14 +141,10 @@ export async function initializeJunieExecution({
     await prepareJunieTask(context, branchInfo, octokit, mcpConfig.enabledServers, tokenConfig.isDefaultToken())
 }
 
-async function shouldHandle(context: JunieExecutionContext, octokit: Octokits): Promise<boolean> {
+export async function shouldHandle(context: JunieExecutionContext, octokit: Octokits): Promise<boolean> {
     if (isTriggeredByUserInteraction(context)) {
-        const hasWritePermissions = await verifyRepositoryAccess(
-            octokit.rest,
-            context,
-        );
-        if (!hasWritePermissions) {
-            console.log("No write permissions, skipping junie");
+        const isAuthorized = await verifyActorAuthorization(context, octokit);
+        if (!isAuthorized) {
             return false;
         }
     }
@@ -168,7 +165,34 @@ async function shouldHandle(context: JunieExecutionContext, octokit: Octokits): 
         return true;
     }
 
-    return isTriggeredByUserInteraction(context) && detectJunieTriggerPhrase(context) && checkHumanActor(octokit.rest, context);
+    return isTriggeredByUserInteraction(context) && detectJunieTriggerPhrase(context);
+}
+
+/**
+ * Security gate for every user-triggered event (issues, comments, PRs, pushes), regardless of
+ * whether Junie runs in trigger-phrase mode or with a fixed `prompt`.
+ *
+ * Both checks are required and the order matters:
+ * 1. `verifyRepositoryAccess` - human actors must have write/admin access. Actors ending with
+ *    "[bot]" bypass this check because GitHub Apps cannot be looked up via the collaborator API.
+ * 2. `checkHumanActor` - the actor must be a real user, or a bot explicitly listed in
+ *    `allowed_bots`. This closes the "[bot]" bypass above: without it, any GitHub App installed on
+ *    a fork could push to a PR branch and run Junie on the base repository's runner (JUNIE-5036).
+ */
+async function verifyActorAuthorization(context: UserInitiatedEventContext, octokit: Octokits): Promise<boolean> {
+    const hasWritePermissions = await verifyRepositoryAccess(octokit.rest, context);
+    if (!hasWritePermissions) {
+        console.log("No write permissions, skipping junie");
+        return false;
+    }
+
+    const isHumanOrAllowedBot = await checkHumanActor(octokit.rest, context);
+    if (!isHumanOrAllowedBot) {
+        console.log("Actor is neither a human user nor an allowed bot, skipping junie");
+        return false;
+    }
+
+    return true;
 }
 
 async function shouldResolveConflicts(context: JunieExecutionContext, octokit: Octokits): Promise<boolean> {
