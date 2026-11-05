@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach, spyOn } from "bun:test";
-import { checkHumanActor } from "../src/github/validation/actor";
+import { checkHumanActor, isAllowedBot } from "../src/github/validation/actor";
 import { mockIssueCommentContext } from "./mockContext";
 import type { Octokit } from "@octokit/rest";
 import type { UserInitiatedEventContext } from "../src/github/context";
@@ -92,6 +92,81 @@ describe("Actor Validation", () => {
       expect(result).toBe(false);
     });
 
+    describe("allowed_bots allow-list", () => {
+      const botContext = (actor: string, allowedBots: string) =>
+        ({
+          ...mockIssueCommentContext,
+          actor,
+          inputs: { ...mockIssueCommentContext.inputs, allowedBots },
+        }) as UserInitiatedEventContext;
+
+      test("should reject bots by default (empty allowed_bots)", async () => {
+        getUserByUsernameSpy = spyOn(mockOctokit.users, "getByUsername").mockResolvedValue({
+          data: { type: "Bot", login: "evil-app[bot]" },
+        } as any);
+
+        expect(await checkHumanActor(mockOctokit, botContext("evil-app[bot]", ""))).toBe(false);
+      });
+
+      test("should allow a bot listed in allowed_bots", async () => {
+        getUserByUsernameSpy = spyOn(mockOctokit.users, "getByUsername").mockResolvedValue({
+          data: { type: "Bot", login: "dependabot[bot]" },
+        } as any);
+
+        expect(await checkHumanActor(mockOctokit, botContext("dependabot[bot]", "dependabot[bot]"))).toBe(true);
+      });
+
+      test("should allow a bot listed without the [bot] suffix and with different casing", async () => {
+        getUserByUsernameSpy = spyOn(mockOctokit.users, "getByUsername").mockResolvedValue({
+          data: { type: "Bot", login: "Dependabot[bot]" },
+        } as any);
+
+        expect(await checkHumanActor(mockOctokit, botContext("Dependabot[bot]", "renovate, DEPENDABOT"))).toBe(true);
+      });
+
+      test("should reject a bot that is not in a non-empty allowed_bots list", async () => {
+        getUserByUsernameSpy = spyOn(mockOctokit.users, "getByUsername").mockResolvedValue({
+          data: { type: "Bot", login: "evil-app[bot]" },
+        } as any);
+
+        expect(await checkHumanActor(mockOctokit, botContext("evil-app[bot]", "dependabot, renovate[bot]"))).toBe(false);
+      });
+
+      test("should allow any bot when allowed_bots is '*'", async () => {
+        getUserByUsernameSpy = spyOn(mockOctokit.users, "getByUsername").mockResolvedValue({
+          data: { type: "Bot", login: "evil-app[bot]" },
+        } as any);
+
+        expect(await checkHumanActor(mockOctokit, botContext("evil-app[bot]", "*"))).toBe(true);
+      });
+
+      test("should never consult allowed_bots for human users", async () => {
+        getUserByUsernameSpy = spyOn(mockOctokit.users, "getByUsername").mockResolvedValue({
+          data: { type: "User", login: "alice" },
+        } as any);
+
+        expect(await checkHumanActor(mockOctokit, botContext("alice", ""))).toBe(true);
+      });
+
+      test("should treat 404 as a GitHub App and honour allowed_bots", async () => {
+        getUserByUsernameSpy = spyOn(mockOctokit.users, "getByUsername").mockRejectedValue({
+          status: 404,
+          message: "Not Found",
+        });
+
+        expect(await checkHumanActor(mockOctokit, botContext("my-app[bot]", "my-app"))).toBe(true);
+        expect(await checkHumanActor(mockOctokit, botContext("my-app[bot]", "other-app"))).toBe(false);
+      });
+
+      test("should not allow bots on non-404 API errors even with '*'", async () => {
+        getUserByUsernameSpy = spyOn(mockOctokit.users, "getByUsername").mockRejectedValue(
+          new Error("API rate limit exceeded")
+        );
+
+        expect(await checkHumanActor(mockOctokit, botContext("my-app[bot]", "*"))).toBe(false);
+      });
+    });
+
     test("should work with different actor names", async () => {
       const actors = ["john-doe", "jane_smith", "user123", "test-user-42"];
 
@@ -106,6 +181,35 @@ describe("Actor Validation", () => {
 
         getUserByUsernameSpy.mockRestore();
       }
+    });
+  });
+
+  describe("isAllowedBot", () => {
+    test("empty or whitespace list allows nobody", () => {
+      expect(isAllowedBot("dependabot[bot]", "")).toBe(false);
+      expect(isAllowedBot("dependabot[bot]", "   ")).toBe(false);
+      expect(isAllowedBot("dependabot[bot]", undefined)).toBe(false);
+    });
+
+    test("'*' allows every bot", () => {
+      expect(isAllowedBot("dependabot[bot]", "*")).toBe(true);
+      expect(isAllowedBot("anything[bot]", " * ")).toBe(true);
+    });
+
+    test("matches exact entries, ignoring case, spaces and the optional [bot] suffix", () => {
+      expect(isAllowedBot("dependabot[bot]", "dependabot")).toBe(true);
+      expect(isAllowedBot("dependabot[bot]", "Dependabot[bot]")).toBe(true);
+      expect(isAllowedBot("Renovate[bot]", " dependabot , renovate ")).toBe(true);
+      expect(isAllowedBot("github-actions[bot]", "dependabot,,renovate,")).toBe(false);
+    });
+
+    test("does not match partial names", () => {
+      expect(isAllowedBot("evil-dependabot[bot]", "dependabot")).toBe(false);
+      expect(isAllowedBot("dependabot[bot]", "dependabot-preview")).toBe(false);
+    });
+
+    test("'*' inside a list is not a wildcard", () => {
+      expect(isAllowedBot("evil-app[bot]", "dependabot,*")).toBe(false);
     });
   });
 });

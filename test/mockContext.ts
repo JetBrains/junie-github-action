@@ -23,6 +23,7 @@ const defaultInputs = {
     triggerPhrase: "@junie-agent",
     assigneeTrigger: "",
     labelTrigger: "junie",
+    allowedBots: "",
     baseBranch: "main",
     targetBranch: undefined,
     allowedMcpServers: undefined,

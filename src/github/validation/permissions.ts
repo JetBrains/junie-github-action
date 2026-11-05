@@ -6,7 +6,10 @@ import type {Octokit} from "@octokit/rest";
  * Verifies if the actor has repository access for triggering Junie workflows.
  *
  * Ensures only authorized users can trigger Junie, preventing unauthorized access.
- * GitHub Apps (actors ending with "[bot]") automatically bypass this check.
+ * GitHub Apps (actors ending with "[bot]") automatically bypass this check because the
+ * collaborator permission API always reports "none" for apps. This bypass is ONLY safe because
+ * `checkHumanActor` runs right after it and rejects every bot that is not listed in `allowed_bots`
+ * (see JUNIE-5036). Never call this function as the sole authorization gate.
  *
  * @param octokit - Octokit REST client for GitHub API calls
  * @param context - User-initiated event context containing actor and repository information
@@ -22,8 +25,9 @@ export async function verifyRepositoryAccess(
     try {
         core.info(`Checking permissions for actor: ${actor}`);
 
-        // GitHub Apps (ending with "[bot]") are trusted and bypass permission checks
-        // This includes github-actions[bot], dependabot[bot], etc.
+        // GitHub Apps (ending with "[bot]") cannot be checked via the collaborator API, so they
+        // skip this check. Whether a given bot is actually allowed to trigger Junie is decided by
+        // checkHumanActor() + the `allowed_bots` input, which must run after this function.
         if (actor.endsWith("[bot]")) {
             core.info(`Actor is a GitHub App: ${actor}`);
             return true;

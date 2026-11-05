@@ -139,6 +139,7 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 | `trigger_phrase` | Phrase to activate Junie in comments/issues. Redacted in Junie's output and replaced with "the assistant" to prevent self-triggering loops. | `@junie-agent` |
 | `assignee_trigger` | Username that triggers when assigned | - |
 | `label_trigger` | Label that triggers the action | `junie` |
+| `allowed_bots` | Comma-separated list of bot actors (GitHub Apps) allowed to trigger Junie on user events, e.g. `dependabot[bot], renovate`. The `[bot]` suffix is optional, matching is case-insensitive. `*` allows all bots. Empty means **no bots** can trigger Junie. See [Security Considerations](#security-considerations). | - |
 
 #### Branch Management
 
@@ -497,16 +498,13 @@ Notes:
 
 ## Security Considerations
 
-- **Permission Validation**: Only users with write access can trigger Junie (by default)
-- **Human Actor Verification**: Blocks bot-initiated workflows to prevent loops
-  - ✅ **Applies when**:
-    - Interactive events (issue comments, PR comments, PR reviews) with trigger phrase/label/assignee
-    - **AND** no custom `prompt` input is provided
-  - ❌ **Does NOT apply when**:
-    - Custom `prompt` input is provided (allows automation to trigger Junie)
-    - Automated workflows (scheduled, workflow_dispatch, workflow_run)
-    - Push events
-  - ⚠️ **Important**: When using custom prompts or automated workflows, ensure proper workflow permissions and conditions to prevent unintended execution
+- **Permission Validation**: Only users with write/admin access to the repository can trigger Junie
+- **Actor Verification** (`allowed_bots`): the actor must be a human user; bots are rejected unless explicitly allow-listed
+  - ✅ **Applies to all user-triggered events**: `issues`, `issue_comment`, `pull_request` / `pull_request_target`, `pull_request_review`, `pull_request_review_comment`, `push` — in trigger-phrase mode **and** when a fixed `prompt` is provided
+  - ❌ **Does NOT apply to** system-triggered events: `workflow_dispatch`, `schedule`, `workflow_run`, `repository_dispatch`, `check_suite` — secure those with workflow `permissions:` and `if:` conditions
+  - By default (`allowed_bots` empty) **no bot can trigger Junie**. GitHub Apps cannot be checked against repository collaborators, so an app installed only on a fork would otherwise be able to push to a PR branch and run Junie on your runner with your workflow's token and secrets
+  - To let trusted automation trigger Junie, list it explicitly: `allowed_bots: "dependabot[bot], renovate"`. Use `allowed_bots: "*"` only if you fully control who can produce events in your repository
+  - ⚠️ **`pull_request_target` + forks**: the workflow runs with the base repository's token while Junie checks out the fork's head. Only enable this for trusted contributors, keep `allowed_bots` empty, and avoid granting `contents: write` to such workflows
 - **Content Sanitization**: Protects against prompt injection by removing malicious instructions hidden in HTML comments, invisible characters, image alt text, link titles, and obfuscated entities
 - **Output Redaction**: Automatically redacts GitHub tokens and replaces trigger phrases (replaced with "the assistant") in Junie's responses to prevent accidental token exposure and self-triggering loops
 - **Token Management**: Supports custom GitHub tokens for enhanced security
@@ -519,6 +517,7 @@ Notes:
 - Verify the trigger phrase matches (default: `@junie-agent`)
 - Check workflow `if:` condition includes your event type
 - Ensure actor has write permissions
+- If the event was produced by a bot/GitHub App (e.g. `dependabot[bot]`), add it to `allowed_bots` — bots are rejected by default, even with a fixed `prompt`
 - Review GitHub Actions logs for validation errors
 
 ### Junie Fails to Execute

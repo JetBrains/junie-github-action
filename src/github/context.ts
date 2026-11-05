@@ -136,6 +136,7 @@ type JunieWorkflowContext = {
         triggerPhrase: string;
         assigneeTrigger: string;
         labelTrigger: string;
+        allowedBots: string;
         workingBranch?: string;
         allowedMcpServers?: string;
         autoCollectFeedback: boolean;
@@ -207,6 +208,7 @@ export function extractJunieWorkflowContext(tokenOwner: TokenOwner): JunieExecut
             triggerPhrase: process.env.TRIGGER_PHRASE ?? DEFAULT_TRIGGER_PHRASE,
             assigneeTrigger: process.env.ASSIGNEE_TRIGGER ?? "",
             labelTrigger: process.env.LABEL_TRIGGER ?? "",
+            allowedBots: process.env.ALLOWED_BOTS ?? "",
             baseBranch: process.env.BASE_BRANCH,
             targetBranch: process.env.TARGET_BRANCH,
             allowedMcpServers: process.env.ALLOWED_MCP_SERVERS,

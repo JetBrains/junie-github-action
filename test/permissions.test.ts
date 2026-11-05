@@ -100,6 +100,9 @@ describe("Permission Validation", () => {
       );
     });
 
+    // NOTE: this bypass is only safe because shouldHandle() always runs checkHumanActor()
+    // (with the `allowed_bots` allow-list) right after verifyRepositoryAccess().
+    // See test/should-handle.test.ts for the end-to-end JUNIE-5036 scenario.
     test("should bypass permission check for GitHub App bots", async () => {
       const context = {
         ...mockIssueCommentContext,
