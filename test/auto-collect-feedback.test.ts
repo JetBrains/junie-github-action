@@ -56,6 +56,71 @@ describe('feedback markers', () => {
         expect(parseInlineFeedbackRunId(body)).toBe('99');
     });
 
+    test('collects agent inline comments for the latest earlier feedback session', async () => {
+        const sessions = await collectSessionFeedbackSignalsWithFetchers(
+            [
+                {
+                    id: 1,
+                    body: '<!-- junie-feedback:session=s1;run=r1 -->',
+                    userLogin: 'junie-agent',
+                    createdAt: '2026-01-01T00:00:10Z',
+                },
+                {
+                    id: 2,
+                    body: '<!-- junie-feedback:session=s2;run=r2 -->',
+                    userLogin: 'junie-agent',
+                    createdAt: '2026-01-01T00:00:20Z',
+                },
+            ],
+            [
+                {
+                    id: 10,
+                    body: 'Before any session\n\n<!-- junie-review-comment -->',
+                    userLogin: 'junie-agent',
+                    createdAt: '2026-01-01T00:00:05Z',
+                    path: 'early.ts',
+                },
+                {
+                    id: 11,
+                    body: 'First review finding\n\n<!-- junie-review-comment -->',
+                    userLogin: 'junie-agent',
+                    createdAt: '2026-01-01T00:00:15Z',
+                    path: 'first.ts',
+                },
+                {
+                    id: 12,
+                    body: 'Second review finding\n\n<!-- junie-review-comment -->',
+                    userLogin: 'junie-agent',
+                    createdAt: '2026-01-01T00:00:25Z',
+                    path: 'second.ts',
+                },
+                {
+                    id: 13,
+                    body: 'Reply to agent comment',
+                    userLogin: 'alice',
+                    createdAt: '2026-01-01T00:00:26Z',
+                    inReplyToId: 12,
+                },
+                {
+                    id: 14,
+                    body: `Legacy run marker\n\n${createInlineFeedbackMarker('r2')}`,
+                    userLogin: 'junie-agent',
+                    createdAt: '2026-01-01T00:00:27Z',
+                    path: 'legacy.ts',
+                },
+            ],
+            async () => [],
+        );
+
+        const firstSession = sessions.find(session => session.sessionId === 's1');
+        const secondSession = sessions.find(session => session.sessionId === 's2');
+        expect(firstSession?.comments.map(comment => comment.id)).toContain(11);
+        expect(firstSession?.comments.map(comment => comment.id)).not.toContain(10);
+        expect(firstSession?.comments.map(comment => comment.id)).not.toContain(12);
+        expect(secondSession?.comments.map(comment => comment.id).sort((a, b) => a - b)).toEqual([2, 12, 13, 14]);
+        expect(secondSession?.comments.find(comment => comment.id === 13)?.kind).toBe('reply');
+    });
+
     test('recovers sid/rid from feedback token JWT payload', () => {
         const payload = Buffer.from(JSON.stringify({
             sid: 'session-260727-151332-1bxm',

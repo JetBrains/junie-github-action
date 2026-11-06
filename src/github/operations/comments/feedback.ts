@@ -28,6 +28,7 @@ import {
     CODE_REVIEW_FEEDBACK_AUTO_COLLECT_MARKER_ONLY,
 } from "../../../constants/github";
 import type {FailureFeedbackData, FinishFeedbackData, SuccessFeedbackData} from "./types";
+import {isRemoteReview} from "../../junie/remote-review";
 import {getJiraClient} from "../../jira/client";
 import {convertMarkdownToADF} from "../../jira/markdown-to-jira";
 import {getYouTrackClient} from "../../youtrack/client";
@@ -445,11 +446,17 @@ export async function postJunieCompletionComment(
 
     const initCommentId = +data.initCommentId;
 
+    const skipConfiguredReviewSummary = !data.isJobFailed && shouldSkipReviewSummary(data);
+    const remoteReview = !data.isJobFailed && isRemoteReview(data.parsedContext);
+
     // Drop the review summary text, but keep a marker/token comment for EAP auto-collect.
-    if (!data.isJobFailed && shouldSkipReviewSummary(data)) {
+    if (skipConfiguredReviewSummary || remoteReview) {
+        const skipReason = skipConfiguredReviewSummary
+            ? "skip_review_summary"
+            : "remote review publishes its own summary";
         const anchorBody = buildSkipReviewSummaryAnchor(data.successData!, workflowName);
         if (anchorBody) {
-            console.log('skip_review_summary: keeping feedback marker comment (no review summary)');
+            console.log(`${skipReason}: keeping feedback marker comment (no review summary)`);
             try {
                 await updateExistingComment(
                     octokit,
@@ -466,7 +473,7 @@ export async function postJunieCompletionComment(
             return;
         }
 
-        console.log('skip_review_summary enabled - not posting the code review summary comment');
+        console.log(`${skipReason} - not posting the code review summary comment`);
         try {
             await deleteExistingComment(octokit, data.parsedContext, initCommentId, ownerLogin, name);
         } catch (error) {

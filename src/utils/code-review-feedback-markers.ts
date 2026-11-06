@@ -89,3 +89,7 @@ export function parseFeedbackTokenClaims(token: string): FeedbackTokenClaims | u
 export function hasJunieBotCommentMarker(body: string): boolean {
     return /<!--\s*junie-bot-comment:/i.test(body);
 }
+
+export function hasAgentReviewCommentMarker(body: string): boolean {
+    return body.trimEnd().endsWith('<!-- junie-review-comment -->');
+}
