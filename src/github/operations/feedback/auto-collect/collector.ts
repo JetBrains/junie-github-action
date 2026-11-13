@@ -2,6 +2,7 @@ import {createHash} from 'crypto';
 import type {Octokit} from '@octokit/rest';
 import {
     extractFeedbackTokenFromBody,
+    hasAgentReviewCommentMarker,
     parseFeedbackMarker,
     parseFeedbackTokenClaims,
     parseInlineFeedbackRunId,
@@ -13,6 +14,65 @@ import type {
 } from './types';
 
 type ListReactionsFn = (commentId: number, kind: 'issue' | 'review') => Promise<CollectedReaction[]>;
+
+interface ReviewSessionStart {
+    runId: string;
+    startedAt?: number;
+}
+
+interface ReviewCommentForSessionCorrelation {
+    body?: string | null;
+    created_at?: string;
+    createdAt?: string;
+    in_reply_to_id?: number;
+    inReplyToId?: number;
+}
+
+function associateAgentReviewCommentsByRunId<T extends ReviewCommentForSessionCorrelation>(
+    reviewComments: readonly T[],
+    sessions: readonly ReviewSessionStart[],
+): Map<string, T[]> {
+    const commentsByRunId = new Map<string, T[]>();
+    const knownSessions = sessions.filter(session => session.runId !== 'unknown' && session.startedAt !== undefined);
+
+    for (const comment of reviewComments) {
+        const body = comment.body || '';
+        if (
+            comment.in_reply_to_id
+            || comment.inReplyToId
+            || parseInlineFeedbackRunId(body)
+            || !hasAgentReviewCommentMarker(body)
+        ) {
+            continue;
+        }
+
+        const createdAt = Date.parse(comment.created_at || comment.createdAt || '');
+        if (!Number.isFinite(createdAt)) {
+            continue;
+        }
+
+        let matchingSession: ReviewSessionStart | undefined;
+        for (const session of knownSessions) {
+            const sessionStartedAt = session.startedAt;
+            const matchingSessionStartedAt = matchingSession?.startedAt;
+            if (
+                sessionStartedAt !== undefined
+                && sessionStartedAt <= createdAt
+                && (matchingSessionStartedAt === undefined || sessionStartedAt > matchingSessionStartedAt)
+            ) {
+                matchingSession = session;
+            }
+        }
+
+        if (matchingSession) {
+            const comments = commentsByRunId.get(matchingSession.runId) || [];
+            comments.push(comment);
+            commentsByRunId.set(matchingSession.runId, comments);
+        }
+    }
+
+    return commentsByRunId;
+}
 
 async function listIssueCommentReactions(
     octokit: Octokit,
@@ -131,6 +191,7 @@ export async function collectSessionFeedbackSignals(
     ]);
 
     const sessionsByKey = new Map<string, SessionFeedbackSignals>();
+    const sessionStartedAtByKey = new Map<string, number>();
 
     // Index review comments for O(N) lookup
     const reviewCommentsByRunId = new Map<string, typeof reviewComments>();
@@ -159,6 +220,11 @@ export async function collectSessionFeedbackSignals(
         }
 
         const key = `${identity.sessionId}::${identity.runId}`;
+        const createdAt = Date.parse(comment.created_at);
+        const startedAt = sessionStartedAtByKey.get(key);
+        if (Number.isFinite(createdAt) && (startedAt === undefined || createdAt < startedAt)) {
+            sessionStartedAtByKey.set(key, createdAt);
+        }
 
         const existing = sessionsByKey.get(key) || {
             sessionId: identity.sessionId,
@@ -187,6 +253,19 @@ export async function collectSessionFeedbackSignals(
         });
 
         sessionsByKey.set(key, existing);
+    }
+
+    const agentCommentsByRunId = associateAgentReviewCommentsByRunId(
+        reviewComments,
+        Array.from(sessionsByKey, ([key, session]) => ({
+            runId: session.runId,
+            startedAt: sessionStartedAtByKey.get(key),
+        })),
+    );
+    for (const [runId, comments] of agentCommentsByRunId) {
+        const commentsForRun = reviewCommentsByRunId.get(runId) || [];
+        commentsForRun.push(...comments);
+        reviewCommentsByRunId.set(runId, commentsForRun);
     }
 
     for (const session of sessionsByKey.values()) {
@@ -254,7 +333,14 @@ export async function collectSessionFeedbackSignals(
 
 /** Test helper: build reactions fetcher overrides without hitting GitHub. */
 export async function collectSessionFeedbackSignalsWithFetchers(
-    issueComments: Array<{ id: number; body: string; userLogin: string; userType?: string; htmlUrl?: string }>,
+    issueComments: Array<{
+        id: number;
+        body: string;
+        userLogin: string;
+        userType?: string;
+        htmlUrl?: string;
+        createdAt?: string;
+    }>,
     reviewComments: Array<{
         id: number;
         body: string;
@@ -263,10 +349,12 @@ export async function collectSessionFeedbackSignalsWithFetchers(
         htmlUrl?: string;
         path?: string;
         inReplyToId?: number;
+        createdAt?: string;
     }>,
     listReactions: ListReactionsFn,
 ): Promise<SessionFeedbackSignals[]> {
     const sessionsByKey = new Map<string, SessionFeedbackSignals>();
+    const sessionStartedAtByKey = new Map<string, number>();
 
     const reviewCommentsByRunId = new Map<string, typeof reviewComments>();
     const reviewCommentsByReplyId = new Map<number, typeof reviewComments>();
@@ -293,6 +381,11 @@ export async function collectSessionFeedbackSignalsWithFetchers(
             continue;
         }
         const key = `${identity.sessionId}::${identity.runId}`;
+        const createdAt = Date.parse(comment.createdAt || '');
+        const startedAt = sessionStartedAtByKey.get(key);
+        if (Number.isFinite(createdAt) && (startedAt === undefined || createdAt < startedAt)) {
+            sessionStartedAtByKey.set(key, createdAt);
+        }
         const existing = sessionsByKey.get(key) || {
             sessionId: identity.sessionId,
             runId: identity.runId,
@@ -318,6 +411,19 @@ export async function collectSessionFeedbackSignalsWithFetchers(
         });
 
         sessionsByKey.set(key, existing);
+    }
+
+    const agentCommentsByRunId = associateAgentReviewCommentsByRunId(
+        reviewComments,
+        Array.from(sessionsByKey, ([key, session]) => ({
+            runId: session.runId,
+            startedAt: sessionStartedAtByKey.get(key),
+        })),
+    );
+    for (const [runId, comments] of agentCommentsByRunId) {
+        const commentsForRun = reviewCommentsByRunId.get(runId) || [];
+        commentsForRun.push(...comments);
+        reviewCommentsByRunId.set(runId, commentsForRun);
     }
 
     for (const session of sessionsByKey.values()) {

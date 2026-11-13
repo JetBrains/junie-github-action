@@ -114,7 +114,7 @@ export async function initializeJunieExecution({
 
     // Get PR-specific info for MCP servers
     const prNumber = context.isPR ? context.entityNumber : undefined;
-    
+
     // For workflow_run events, use the workflow run's head_sha (the commit that was tested)
     // This is critical for the checks server to find the correct check runs
     let commitSha = branchInfo.headSha;
@@ -127,7 +127,7 @@ export async function initializeJunieExecution({
     }
 
     // Prepare MCP configuration with automatic server activation
-    // - Inline comment server: enabled for PRs (requires commitSha)
+    // - Inline comment server: enabled for PRs (requires commitSha), except remote reviews
     // - Checks server: enabled for fix-ci action or when explicitly requested
     const mcpConfig = await prepareMcpConfig({
         context: context,

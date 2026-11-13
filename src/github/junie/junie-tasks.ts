@@ -20,17 +20,7 @@ import {CliInput} from "./types/junie";
 import {generateMcpToolsPrompt} from "../../mcp/mcp-prompts";
 import {junieArgsToString} from "../../utils/junie-args-parser";
 import {buildDiffCommand} from "../../constants/github";
-
-/**
- * First Junie CLI build that can review a remote Pull Request (`codeReviewTask.reviewTarget`) and post
- * inline comments itself. Older builds reject unknown input fields, so they keep using the MCP comment tool.
- */
-const MIN_REMOTE_REVIEW_VERSION = 3419;
-
-/** `latest` installs the nightly build; an unparseable version is treated as an old one. */
-function supportsRemoteReview(version: string): boolean {
-    return version.trim() === "latest" || parseInt(version, 10) >= MIN_REMOTE_REVIEW_VERSION;
-}
+import {isRemoteReview} from "./remote-review";
 
 function getTriggerTime(context: JunieExecutionContext): string | undefined {
     if (isIssueCommentEvent(context)) {
@@ -83,14 +73,8 @@ export async function prepareJunieTask(
             console.log(`Extracted custom junie args: ${customJunieArgs.join(' ')}`);
         }
 
-        // In a remote review the CLI posts inline comments itself, so the MCP comment tool is not advertised
-        const isRemoteReview = isCodeReviewEvent(context) && supportsRemoteReview(context.inputs.junieVersion);
-        const promptMcpServers = isRemoteReview
-            ? enabledMcpServers.filter(server => server !== "mcp_github_inline_comment_server")
-            : enabledMcpServers;
-
         // Append MCP tools information if any MCP servers are enabled
-        const mcpToolsPrompt = generateMcpToolsPrompt(promptMcpServers);
+        const mcpToolsPrompt = generateMcpToolsPrompt(enabledMcpServers);
         if (mcpToolsPrompt) {
             promptText = promptText + mcpToolsPrompt;
         }
@@ -104,7 +88,7 @@ export async function prepareJunieTask(
                 diffCommand
             };
             junieCLITask.codeReviewTask = codeReviewTask;
-            if (isRemoteReview) {
+            if (isRemoteReview(context)) {
                 if (!context.isPR || !context.entityNumber) {
                     throw new Error("Code review requires a Pull Request number, but none was found in the event context.");
                 }
