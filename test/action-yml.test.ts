@@ -25,4 +25,89 @@ describe("action.yml", () => {
         expect(commitIndex).toBeGreaterThan(-1);
         expect(excludeIndex).toBeLessThan(commitIndex);
     });
+
+    /**
+     * JUNIE-5037: the Junie API key used to be passed as `--auth=<key>` in argv. Older CLI builds
+     * logged the full argv to ~/.junie/logs, which was uploaded as a workflow artifact readable by
+     * anyone with read access to the repository.
+     */
+    describe("JUNIE-5037: credentials never reach argv or artifacts", () => {
+        const getStep = (name: string) =>
+            actionYaml.match(new RegExp(`- name: ${name}[\\s\\S]*?(?=\\n\\s{4}(?:#[^\\n]*\\n\\s{4})*- (?:name|uses):)`))?.[0] ?? "";
+
+        test("Run Junie step passes the API key via JUNIE_API_KEY env, not --auth", () => {
+            const runStep = getStep("Run Junie");
+
+            expect(runStep).toContain("JUNIE_API_KEY: ${{ steps.prepare.outputs.EJ_CLI_TOKEN }}");
+            expect(runStep).not.toContain("--auth");
+            expect(runStep).not.toContain("CLI_TOKEN: ${{");
+        });
+
+        test("Run Junie step passes BYOK keys via JUNIE_*_API_KEY env only", () => {
+            const runStep = getStep("Run Junie");
+
+            for (const provider of ["OPENAI", "ANTHROPIC", "GROK", "OPENROUTER", "GOOGLE"]) {
+                expect(runStep).toContain(`JUNIE_${provider}_API_KEY: \${{ inputs.${provider.toLowerCase()}_api_key }}`);
+                // The un-prefixed variables fed the flag builder, which turned them into argv flags
+                expect(runStep).not.toMatch(new RegExp(`^\\s+${provider}_API_KEY:`, "m"));
+            }
+        });
+
+        test("Auto-collect step passes BYOK keys via JUNIE_*_API_KEY env only", () => {
+            const step = getStep("Auto-collect code review feedback");
+
+            expect(step).toContain("JUNIE_OPENAI_API_KEY: ${{ inputs.openai_api_key }}");
+            expect(step).not.toMatch(/^\s+OPENAI_API_KEY:/m);
+        });
+
+        test("no step puts an API key into the Junie CLI argv", () => {
+            expect(actionYaml).not.toMatch(/--auth[= ]/);
+            expect(actionYaml).not.toMatch(/--[a-z]+-api-key[= ]/);
+        });
+
+        test("CLI logs and session transcripts are not uploaded unless upload_junie_logs is enabled", () => {
+            const uploadStep = getStep("Upload Junie artifacts");
+
+            expect(uploadStep).toContain("inputs.upload_artifacts == 'true'");
+            expect(uploadStep).toContain("${{ inputs.junie_work_dir }}");
+            expect(uploadStep).toContain("${{ inputs.upload_junie_logs == 'true' && '~/.junie/logs' || '' }}");
+            expect(uploadStep).toContain("${{ inputs.upload_junie_logs == 'true' && '~/.junie/sessions' || '' }}");
+            expect(uploadStep).not.toMatch(/^\s+~\/\.junie\/(logs|sessions)\s*$/m);
+        });
+
+        test("upload_junie_logs is opt-in and upload_artifacts can be disabled", () => {
+            const logsInput = actionYaml.match(/ {2}upload_junie_logs:[\s\S]*?default: "(\w+)"/);
+            const artifactsInput = actionYaml.match(/ {2}upload_artifacts:[\s\S]*?default: "(\w+)"/);
+
+            expect(logsInput?.[1]).toBe("false");
+            expect(artifactsInput?.[1]).toBe("true");
+        });
+
+        test("secrets are redacted from artifacts before they are uploaded", () => {
+            const redactStep = getStep("Redact secrets from Junie artifacts");
+
+            expect(redactStep).toContain("src/scripts/redact-junie-artifacts.sh");
+            expect(redactStep).toContain("if: always()");
+            for (const secret of [
+                "inputs.junie_api_key",
+                "inputs.openai_api_key",
+                "inputs.anthropic_api_key",
+                "inputs.grok_api_key",
+                "inputs.openrouter_api_key",
+                "inputs.google_api_key",
+                "inputs.custom_github_token",
+                "inputs.jira_api_token",
+                "inputs.youtrack_token",
+                "steps.prepare.outputs.EJ_AUTH_GITHUB_TOKEN",
+                "github.token",
+            ]) {
+                expect(redactStep).toContain(`\${{ ${secret} }}`);
+            }
+
+            const redactIndex = actionYaml.indexOf("- name: Redact secrets from Junie artifacts");
+            const uploadIndex = actionYaml.indexOf("- name: Upload Junie artifacts");
+            expect(redactIndex).toBeGreaterThan(-1);
+            expect(redactIndex).toBeLessThan(uploadIndex);
+        });
+    });
 });

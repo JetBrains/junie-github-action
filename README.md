@@ -156,6 +156,8 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 | `junie_version` | Junie CLI version to install | `4020.10`        |
 | `model` | Model to use for the primary agent. Available: `sonnet`, `opus`, `gpt`, `gpt-codex`, `gemini-pro`, `gemini-flash`, `grok` | -          |
 | `junie_work_dir` | Working directory for Junie files | `/tmp/junie-work` |
+| `upload_artifacts` | Upload `junie_work_dir` (task input, CLI output JSON) as the `junie-artifacts` workflow artifact for troubleshooting. Known secrets are redacted before upload. See [Security Considerations](#security-considerations). | `true` |
+| `upload_junie_logs` | ⚠️ Additionally include Junie CLI logs and full session transcripts (`~/.junie/logs`, `~/.junie/sessions`) in the artifact. Transcripts contain everything the agent saw and ran. Enable only temporarily for debugging. | `false` |
 | `junie_guidelines_filename` | Filename of the guidelines file (should be in `<project-root>/.junie` dir) | `guidelines.md` |
 | `allowed_mcp_servers` | Comma-separated list of MCP servers to use (e.g., `mcp_github_checks_server`). Note: inline comment server is automatically enabled for PRs. | -          |
 
@@ -509,7 +511,11 @@ Notes:
 - **Content Sanitization**: Protects against prompt injection by removing malicious instructions hidden in HTML comments, invisible characters, image alt text, link titles, and obfuscated entities
 - **Output Redaction**: Automatically redacts GitHub tokens and replaces trigger phrases (replaced with "the assistant") in Junie's responses to prevent accidental token exposure and self-triggering loops
 - **Token Management**: Supports custom GitHub tokens for enhanced security
-- **Artifact Retention**: Working directory uploaded as artifact (7-day retention)
+- **Credentials never reach the command line**: `junie_api_key` and BYOK keys are handed to the Junie CLI exclusively through environment variables (`JUNIE_API_KEY`, `JUNIE_<PROVIDER>_API_KEY`). Argv is readable by every process on the runner (including MCP servers and project scripts started by the agent), and Junie CLI builds `<= 3419.x` logged it to `~/.junie/logs`
+- **Workflow artifacts** (`upload_artifacts`, `upload_junie_logs`): artifacts can be downloaded by **anyone with read access** to the repository (7-day retention), so treat them as semi-public
+  - By default only `junie_work_dir` (task input and CLI output JSON) is uploaded; Junie CLI logs and session transcripts are **not**
+  - Before upload, all known secrets (`junie_api_key`, BYOK keys, GitHub/Jira/YouTrack tokens) and common credential shapes (`--auth=…`, `Bearer …`, `ghp_…`, `sk-…`) are redacted from every uploaded file. This is a safety net, not a substitute for keeping secrets out of logs
+  - Set `upload_junie_logs: "true"` only for short-lived debugging: session transcripts include the output of every command Junie ran in your repository (e.g. `env`, `cat .env`). Set `upload_artifacts: "false"` to disable uploads entirely
 
 ## Troubleshooting
 
@@ -525,7 +531,7 @@ Notes:
 
 - Verify that either `junie_api_key` or a BYOK key (`openai_api_key`, `anthropic_api_key`, `grok_api_key`, `openrouter_api_key`, `google_api_key`) is set correctly in your repository secrets
 - Check Junie version compatibility (`junie_version` input)
-- Review uploaded artifacts for Junie working directory logs
+- Review the `junie-artifacts` artifact (`junie_output.json` contains the CLI error). For deeper debugging temporarily set `upload_junie_logs: "true"` to include CLI logs and session transcripts — see [Security Considerations](#security-considerations) before doing so in a repository with many read-access users
 - Ensure runner has internet access for API calls
 
 ### No PR Created

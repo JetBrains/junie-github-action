@@ -115,6 +115,45 @@ export interface RunAgentFeedbackOptions {
     junieFlags?: string;
 }
 
+/** Environment variable the Junie CLI reads the API key from (equivalent of `--auth`). */
+export const JUNIE_API_KEY_ENV = 'JUNIE_API_KEY';
+
+/**
+ * Builds the environment for the Junie CLI child process.
+ *
+ * The API key is passed via `JUNIE_API_KEY` instead of the `--auth` flag: argv is readable by every
+ * process on the runner and older CLI builds wrote it to `~/.junie/logs`, which leaked the key via
+ * the uploaded workflow artifact (JUNIE-5037). BYOK keys (`JUNIE_*_API_KEY`) are inherited from
+ * the step environment set in action.yml.
+ */
+export function buildJunieCliEnv(
+    cliToken: string | undefined,
+    baseEnv: NodeJS.ProcessEnv = process.env,
+): Record<string, string | undefined> {
+    const env: Record<string, string | undefined> = { ...baseEnv };
+    if (cliToken) {
+        env[JUNIE_API_KEY_ENV] = cliToken;
+    }
+    return env;
+}
+
+/**
+ * Builds the Junie CLI argument list. Must never contain credentials, see {@link buildJunieCliEnv}.
+ */
+export function buildJunieCliArgs(sessionDir: string, outputPath: string, junieFlags = ''): string[] {
+    const args = [
+        '--cache-dir', sessionDir,
+        '--output-format', 'json',
+        '--input-format', 'json',
+        '--json-output-file', outputPath,
+    ];
+    if (junieFlags.trim()) {
+        const matches = junieFlags.trim().match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [];
+        args.push(...matches.map((arg) => arg.replace(/^([^=]+=)?["'](.*)["']$/, '$1$2')));
+    }
+    return args;
+}
+
 /**
  * Runs Junie CLI with a focused prompt to resolve ambiguous / text-only feedback.
  * Returns undefined if Junie is unavailable or output cannot be parsed.
@@ -131,19 +170,7 @@ export async function runAgentFeedbackEnrichment(
     const outputPath = join(sessionDir, 'output.json');
     const prompt = buildAgentPrompt(signals, verdict);
 
-    const args = [
-        '--cache-dir', sessionDir,
-        '--output-format', 'json',
-        '--input-format', 'json',
-        '--json-output-file', outputPath,
-    ];
-    if (cliToken) {
-        args.push('--auth', cliToken);
-    }
-    if (junieFlags.trim()) {
-        const matches = junieFlags.trim().match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [];
-        args.push(...matches.map((arg) => arg.replace(/^([^=]+=)?["'](.*)["']$/, '$1$2')));
-    }
+    const args = buildJunieCliArgs(sessionDir, outputPath, junieFlags);
 
     console.log(
         `Running Junie agent enrichment for session ${signals.sessionId} ` +
@@ -157,6 +184,7 @@ export async function runAgentFeedbackEnrichment(
             stdout: 'pipe',
             stderr: 'pipe',
             cwd: sessionDir,
+            env: buildJunieCliEnv(cliToken),
         });
 
         const stdoutPromise = new Response(proc.stdout).text();

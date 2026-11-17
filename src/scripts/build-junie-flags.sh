@@ -1,10 +1,19 @@
 #!/usr/bin/env bash
-# Shared Junie CLI flag assembly (CUSTOM_JUNIE_ARGS + MODEL + BYOK keys).
+# Shared Junie CLI flag assembly (CUSTOM_JUNIE_ARGS + MODEL).
 # Used by "Run Junie" and "Auto-collect code review feedback" steps.
 #
 # Expects env:
-#   CUSTOM_JUNIE_ARGS, MODEL,
-#   OPENAI_API_KEY, ANTHROPIC_API_KEY, GROK_API_KEY, OPENROUTER_API_KEY, GOOGLE_API_KEY
+#   CUSTOM_JUNIE_ARGS, MODEL
+#
+# SECURITY (JUNIE-5037): credentials must NEVER be emitted as CLI flags.
+# Anything returned by this script ends up in the process argv (visible via `ps`
+# / /proc/<pid>/cmdline to every process on the runner, including MCP servers and
+# project scripts spawned by the agent) and is echoed to the step log. Older Junie
+# CLI builds (<= 3419.x) also wrote the full argv into ~/.junie/logs, which used to
+# be uploaded as a workflow artifact. The Junie API key and BYOK provider keys are
+# therefore passed to the CLI exclusively through environment variables
+# (JUNIE_API_KEY, JUNIE_OPENAI_API_KEY, JUNIE_ANTHROPIC_API_KEY, JUNIE_GROK_API_KEY,
+# JUNIE_OPENROUTER_API_KEY, JUNIE_GOOGLE_API_KEY), see action.yml.
 #
 # Prints flags on stdout (may be empty / leading-space trimmed by caller if needed).
 
@@ -16,13 +25,6 @@ JUNIE_FLAGS="${CUSTOM_JUNIE_ARGS:-}"
 if [ -n "${MODEL:-}" ] && ! echo "${CUSTOM_JUNIE_ARGS:-}" | grep -q -E '(^|[[:space:]])--model([=[:space:]]|$)'; then
   JUNIE_FLAGS="${JUNIE_FLAGS} --model=${MODEL}"
 fi
-
-# Add BYOK API key flags if provided
-[ -n "${OPENAI_API_KEY:-}" ] && JUNIE_FLAGS="${JUNIE_FLAGS} --openai-api-key=${OPENAI_API_KEY}"
-[ -n "${ANTHROPIC_API_KEY:-}" ] && JUNIE_FLAGS="${JUNIE_FLAGS} --anthropic-api-key=${ANTHROPIC_API_KEY}"
-[ -n "${GROK_API_KEY:-}" ] && JUNIE_FLAGS="${JUNIE_FLAGS} --grok-api-key=${GROK_API_KEY}"
-[ -n "${OPENROUTER_API_KEY:-}" ] && JUNIE_FLAGS="${JUNIE_FLAGS} --openrouter-api-key=${OPENROUTER_API_KEY}"
-[ -n "${GOOGLE_API_KEY:-}" ] && JUNIE_FLAGS="${JUNIE_FLAGS} --google-api-key=${GOOGLE_API_KEY}"
 
 # Trim leading whitespace
 JUNIE_FLAGS="${JUNIE_FLAGS#"${JUNIE_FLAGS%%[![:space:]]*}"}"
