@@ -65,14 +65,28 @@ describe("action.yml", () => {
             expect(actionYaml).not.toMatch(/--[a-z]+-api-key[= ]/);
         });
 
-        test("CLI logs and session transcripts are not uploaded unless upload_junie_logs is enabled", () => {
+        test("only the redacted stage copy is uploaded, never the live files", () => {
             const uploadStep = getStep("Upload Junie artifacts");
+            const redactStep = getStep("Stage and redact Junie artifacts");
 
             expect(uploadStep).toContain("inputs.upload_artifacts == 'true'");
-            expect(uploadStep).toContain("${{ inputs.junie_work_dir }}");
-            expect(uploadStep).toContain("${{ inputs.upload_junie_logs == 'true' && '~/.junie/logs' || '' }}");
-            expect(uploadStep).toContain("${{ inputs.upload_junie_logs == 'true' && '~/.junie/sessions' || '' }}");
-            expect(uploadStep).not.toMatch(/^\s+~\/\.junie\/(logs|sessions)\s*$/m);
+            expect(uploadStep).toMatch(/^\s+path: \$\{\{ runner\.temp \}\}\/junie-artifacts\s*$/m);
+            expect(uploadStep).not.toContain("inputs.junie_work_dir");
+            expect(uploadStep).not.toContain(".junie/");
+
+            expect(redactStep).toContain("STAGE_DIR: ${{ runner.temp }}/junie-artifacts");
+            expect(redactStep).toContain('redact-junie-artifacts.sh" "${STAGE_DIR}" "${PATHS[@]}"');
+        });
+
+        test("CLI logs and session transcripts are staged only when upload_junie_logs is enabled", () => {
+            const redactStep = getStep("Stage and redact Junie artifacts");
+
+            expect(redactStep).toContain('PATHS=("${WORKING_DIR}")');
+            expect(redactStep).toMatch(/if \[ "\$\{UPLOAD_JUNIE_LOGS\}" == "true" \]; then[\s\S]*PATHS\+=\("\$\{HOME\}\/\.junie\/logs" "\$\{HOME\}\/\.junie\/sessions"\)/);
+        });
+
+        test("exposes the CLI output path as an output", () => {
+            expect(actionYaml).toMatch(/ {2}junie_output_file:\n\s+description: .*\n\s+value: \$\{\{ steps\.junie-run\.outputs\.json_output_file \}\}/);
         });
 
         test("upload_junie_logs is opt-in and upload_artifacts can be disabled", () => {
@@ -84,7 +98,7 @@ describe("action.yml", () => {
         });
 
         test("secrets are redacted from artifacts before they are uploaded", () => {
-            const redactStep = getStep("Redact secrets from Junie artifacts");
+            const redactStep = getStep("Stage and redact Junie artifacts");
 
             expect(redactStep).toContain("src/scripts/redact-junie-artifacts.sh");
             expect(redactStep).toContain("if: always()");
@@ -104,14 +118,14 @@ describe("action.yml", () => {
                 expect(redactStep).toContain(`\${{ ${secret} }}`);
             }
 
-            const redactIndex = actionYaml.indexOf("- name: Redact secrets from Junie artifacts");
+            const redactIndex = actionYaml.indexOf("- name: Stage and redact Junie artifacts");
             const uploadIndex = actionYaml.indexOf("- name: Upload Junie artifacts");
             expect(redactIndex).toBeGreaterThan(-1);
             expect(redactIndex).toBeLessThan(uploadIndex);
         });
 
         test("artifact upload fails closed when redaction did not succeed", () => {
-            const redactStep = getStep("Redact secrets from Junie artifacts");
+            const redactStep = getStep("Stage and redact Junie artifacts");
             const uploadStep = getStep("Upload Junie artifacts");
 
             // `continue-on-error` keeps the job alive, so the upload must be gated on the step outcome

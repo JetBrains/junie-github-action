@@ -1,5 +1,5 @@
 import {afterEach, beforeEach, describe, expect, test} from "bun:test";
-import {chmodSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync} from "node:fs";
+import {chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync} from "node:fs";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {buildJunieCliArgs, buildJunieCliEnv, JUNIE_API_KEY_ENV} from "../src/github/operations/feedback/auto-collect/agent";
@@ -93,19 +93,31 @@ describe("auto-collect agent Junie CLI invocation", () => {
 });
 
 describe("redact-junie-artifacts.sh", () => {
-    let dir: string;
+    // Running as root ignores file permissions, so the permission based fail-closed test cannot fail there
+    const isRoot = process.getuid?.() === 0;
+    let root: string;
+    let src: string;
+    let stage: string;
 
     beforeEach(() => {
-        dir = mkdtempSync(join(tmpdir(), "junie-redact-"));
+        // realpath: the script stages files under their physical path (/var -> /private/var on macOS)
+        root = realpathSync(mkdtempSync(join(tmpdir(), "junie-redact-")));
+        src = join(root, "src");
+        stage = join(root, "stage");
+        mkdirSync(src);
     });
 
     afterEach(() => {
-        rmSync(dir, {recursive: true, force: true});
+        rmSync(root, {recursive: true, force: true});
     });
 
+    const redact = (paths: string[], secrets = "") => runScript(REDACT_SCRIPT, {REDACT_SECRETS: secrets}, [stage, ...paths]);
+    /** Reads the staged (uploaded) copy of a source file */
+    const staged = (path: string) => readFileSync(join(stage, path), "utf-8");
+
     test("removes exact secret values and well-known credential shapes from all files", () => {
-        const logsDir = join(dir, "logs");
-        const workDir = join(dir, "work");
+        const logsDir = join(src, "logs");
+        const workDir = join(src, "work");
         mkdirSync(logsDir);
         mkdirSync(workDir);
 
@@ -123,16 +135,15 @@ describe("redact-junie-artifacts.sh", () => {
             JSON.stringify({errors: ["OpenAI: Incorrect API key provided: sk-proj-abcdefghijklmnopqrstuvwxyz0123"], other: "p@ss+word/with=special"}),
         );
 
-        const {exitCode, stdout} = runScript(
-            REDACT_SCRIPT,
-            {REDACT_SECRETS: "eyJhbGciOiJIUzI1NiJ9.payload.sig\n\np@ss+word/with=special\n"},
-            [logsDir, workDir, join(dir, "does-not-exist")],
+        const {exitCode, stdout} = redact(
+            [logsDir, workDir, join(src, "does-not-exist")],
+            "eyJhbGciOiJIUzI1NiJ9.payload.sig\n\np@ss+word/with=special\n",
         );
 
         expect(exitCode).toBe(0);
         expect(stdout).toContain("Redaction complete");
 
-        const log = readFileSync(join(logsDir, "log-1.log"), "utf-8");
+        const log = staged(join(logsDir, "log-1.log"));
         expect(log).not.toContain("eyJhbGciOiJIUzI1NiJ9");
         expect(log).not.toContain("ghs_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789");
         expect(log).not.toContain("perm:dXNlcg==");
@@ -142,13 +153,77 @@ describe("redact-junie-artifacts.sh", () => {
         expect(log).toContain("Bearer ***REDACTED***");
         expect(log).toContain("regular line with $pecial [chars] (unchanged)");
 
-        const output = readFileSync(join(workDir, "junie_output.json"), "utf-8");
+        const output = staged(join(workDir, "junie_output.json"));
         expect(output).not.toContain("sk-proj-abcdefghijklmnopqrstuvwxyz0123");
         expect(output).not.toContain("p@ss+word/with=special");
         expect(JSON.parse(output)).toEqual({
             errors: ["OpenAI: Incorrect API key provided: ***REDACTED***"],
             other: "***REDACTED***",
         });
+    });
+
+    test("never modifies the live files, only the staged copy", () => {
+        // junie_work_dir is configurable and may be the checkout that is committed after the upload step
+        const file = join(src, "config.ts");
+        const content = 'export const example = "sk-proj-abcdefghijklmnopqrstuvwxyz0123"; // --auth=live-secret\n';
+        writeFileSync(file, content);
+
+        const {exitCode} = redact([src], "live-secret");
+
+        expect(exitCode).toBe(0);
+        expect(readFileSync(file, "utf-8")).toBe(content);
+        expect(staged(file)).toBe('export const example = "***REDACTED***"; // --auth=***REDACTED***\n');
+    });
+
+    test("drops symlinks from the staged copy so the uploader cannot follow them to unredacted files", () => {
+        // actions/upload-artifact follows symlinks, while the redaction only rewrites regular files
+        const outside = join(root, "outside");
+        mkdirSync(outside);
+        writeFileSync(join(outside, "mcp.json"), '{"GITHUB_TOKEN":"ghs_FAKE0123456789abcdefghijklmnopqrstuv","x":"live-secret"}');
+        writeFileSync(join(src, "regular.log"), "ok\n");
+        symlinkSync(join(outside, "mcp.json"), join(src, "linked-file.json"));
+        symlinkSync(outside, join(src, "linked-dir"));
+
+        const {exitCode, stdout} = redact([src], "live-secret");
+
+        expect(exitCode).toBe(0);
+        expect(stdout).toContain("Dropping symlinks and special files");
+        expect(existsSync(join(stage, src, "linked-file.json"))).toBe(false);
+        expect(existsSync(join(stage, src, "linked-dir"))).toBe(false);
+        expect(staged(join(src, "regular.log"))).toBe("ok\n");
+        // the link targets themselves are untouched
+        expect(readFileSync(join(outside, "mcp.json"), "utf-8")).toContain("live-secret");
+    });
+
+    test("follows a symlinked artifact root itself", () => {
+        const real = join(root, "real-work");
+        mkdirSync(real);
+        writeFileSync(join(real, "junie_output.json"), '{"e":"--auth=live-secret"}');
+        const link = join(src, "work-link");
+        symlinkSync(real, link);
+
+        const {exitCode} = redact([link]);
+
+        expect(exitCode).toBe(0);
+        expect(staged(join(link, "junie_output.json"))).toBe('{"e":"--auth=***REDACTED***"}');
+    });
+
+    test("redacts secrets in their JSON-escaped forms", () => {
+        // JSON serializers escape quotes/backslashes, optionally "/", and HTML-safe ones (Gson) write "=" as =
+        const quoted = 'prefix"sensitive\\token';
+        const base64 = "perm:dXNlcg==.c2VjcmV0/dmFsdWU=";
+        writeFileSync(
+            join(src, "out.json"),
+            JSON.stringify({a: quoted, b: base64}) + "\n" +
+            '{"gson":"perm:dXNlcg\\u003d\\u003d.c2VjcmV0/dmFsdWU\\u003d","slash":"perm:dXNlcg==.c2VjcmV0\\/dmFsdWU="}\n',
+        );
+
+        const {exitCode} = redact([src], `${quoted}\n${base64}`);
+
+        expect(exitCode).toBe(0);
+        const [first, second] = staged(join(src, "out.json")).trim().split("\n").map((line) => JSON.parse(line!));
+        expect(first).toEqual({a: "***REDACTED***", b: "***REDACTED***"});
+        expect(second).toEqual({gson: "***REDACTED***", slash: "***REDACTED***"});
     });
 
     test("keeps minified JSON valid: shape patterns stop at quotes and delimiters", () => {
@@ -162,13 +237,13 @@ describe("redact-junie-artifacts.sh", () => {
             exported: 'export JUNIE_API_KEY="quoted-secret"',
             text: "no secrets here",
         };
-        writeFileSync(join(dir, "junie_output.json"), JSON.stringify(sample));
-        writeFileSync(join(dir, "transcript.jsonl"), JSON.stringify(sample) + "\n" + JSON.stringify({text: "second"}) + "\n");
+        writeFileSync(join(src, "junie_output.json"), JSON.stringify(sample));
+        writeFileSync(join(src, "transcript.jsonl"), JSON.stringify(sample) + "\n" + JSON.stringify({text: "second"}) + "\n");
 
-        const {exitCode} = runScript(REDACT_SCRIPT, {REDACT_SECRETS: ""}, [dir]);
+        const {exitCode} = redact([src]);
 
         expect(exitCode).toBe(0);
-        const output = readFileSync(join(dir, "junie_output.json"), "utf-8");
+        const output = staged(join(src, "junie_output.json"));
         expect(JSON.parse(output)).toEqual({
             cmd: "junie --auth=***REDACTED*** --model=x",
             quoted: '--openai-api-key "***REDACTED***" --auth=\'***REDACTED***\' next',
@@ -178,48 +253,67 @@ describe("redact-junie-artifacts.sh", () => {
             text: "no secrets here",
         });
 
-        const lines = readFileSync(join(dir, "transcript.jsonl"), "utf-8").trim().split("\n");
+        const lines = staged(join(src, "transcript.jsonl")).trim().split("\n");
         expect(lines).toHaveLength(2);
         expect(JSON.parse(lines[0]!)).toEqual(JSON.parse(output));
         expect(JSON.parse(lines[1]!)).toEqual({text: "second"});
     });
 
     test("redacts files larger than 50 MB instead of skipping them", () => {
-        const big = join(dir, "big.log");
+        const big = join(src, "big.log");
         writeFileSync(big, "a".repeat(51 * 1024 * 1024) + "\n--auth=large-file-secret\n");
 
-        const {exitCode} = runScript(REDACT_SCRIPT, {REDACT_SECRETS: ""}, [dir]);
+        const {exitCode} = redact([src]);
 
         expect(exitCode).toBe(0);
-        const tail = readFileSync(big, "utf-8").slice(-64);
+        const tail = staged(big).slice(-64);
         expect(tail).not.toContain("large-file-secret");
         expect(tail).toContain("--auth=***REDACTED***");
     });
 
-    test("fails closed when a file cannot be rewritten", () => {
-        const roDir = join(dir, "ro");
+    test("redacts read-only source files (the copy is made writable)", () => {
+        const roDir = join(src, "ro");
         mkdirSync(roDir);
         writeFileSync(join(roDir, "log.log"), "--auth=secret\n");
-        writeFileSync(join(dir, "ok.log"), "--auth=secret\n");
+        chmodSync(join(roDir, "log.log"), 0o444);
         chmodSync(roDir, 0o555);
 
         try {
-            const {exitCode, stderr} = runScript(REDACT_SCRIPT, {REDACT_SECRETS: ""}, [dir]);
+            const {exitCode} = redact([src]);
 
-            // perl only warns about files it cannot edit in place; the script must turn that into a failure
-            // so that action.yml skips the upload (steps.redact-artifacts.outcome == 'success' gate)
-            expect(exitCode).not.toBe(0);
-            expect(stderr).toContain("inplace edit");
+            expect(exitCode).toBe(0);
+            expect(staged(join(roDir, "log.log"))).toBe("--auth=***REDACTED***\n");
         } finally {
             chmodSync(roDir, 0o755);
         }
     });
 
+    test.skipIf(isRoot)("fails closed and removes the stage when a file cannot be copied", () => {
+        const secretFile = join(src, "unreadable.log");
+        writeFileSync(secretFile, "--auth=secret\n");
+        writeFileSync(join(src, "ok.log"), "--auth=secret\n");
+        chmodSync(secretFile, 0o000);
+
+        try {
+            const {exitCode} = redact([src]);
+
+            // a non-zero exit makes action.yml skip the upload (steps.redact-artifacts.outcome == 'success' gate)
+            expect(exitCode).not.toBe(0);
+            expect(existsSync(stage)).toBe(false);
+        } finally {
+            chmodSync(secretFile, 0o644);
+        }
+    });
+
+    test("refuses a stage directory inside an artifact path", () => {
+        const {exitCode, stderr} = runScript(REDACT_SCRIPT, {REDACT_SECRETS: ""}, [join(src, "stage"), src]);
+
+        expect(exitCode).not.toBe(0);
+        expect(stderr).toContain("contains the stage directory");
+    });
+
     test("expands ~ and succeeds when none of the paths exist", () => {
-        const {exitCode, stdout} = runScript(REDACT_SCRIPT, {REDACT_SECRETS: ""}, [
-            join(dir, "missing"),
-            "~/.junie/definitely-not-there-junie-5037",
-        ]);
+        const {exitCode, stdout} = redact([join(src, "missing"), "~/.junie/definitely-not-there-junie-5037"]);
 
         expect(exitCode).toBe(0);
         expect(stdout).toContain("No artifact paths to redact");

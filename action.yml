@@ -107,7 +107,8 @@ inputs:
     description: >
       Upload the Junie working directory (`junie_work_dir`: task input, CLI output JSON) as the
       `junie-artifacts` workflow artifact for troubleshooting. Artifacts can be downloaded by anyone with
-      read access to the repository; known secrets are redacted before upload. Set to "false" to disable.
+      read access to the repository; files are copied and known secrets are redacted from the copy before
+      upload. Set to "false" to disable (the `junie_output_file` output still points to the CLI output).
     required: false
     default: "true"
   upload_junie_logs:
@@ -187,6 +188,9 @@ outputs:
   junie_session_id:
     description: "Junie session ID from CLI output (for analytics correlation)"
     value: ${{ steps.junie-run-results.outputs.JUNIE_SESSION_ID }}
+  junie_output_file:
+    description: "Path on the runner to the Junie CLI JSON output (junie_output.json). Not redacted: do not upload it as an artifact as-is"
+    value: ${{ steps.junie-run.outputs.json_output_file }}
   code_review_feedback_link:
     description: "Signed feedback link for EAP code review runs (JUNP only)"
     value: ${{ steps.junie-run-results.outputs.CODE_REVIEW_FEEDBACK_LINK }}
@@ -397,11 +401,12 @@ runs:
         APP_TOKEN: ${{ inputs.junie_api_key }}
         CODE_REVIEW_FEEDBACK_API_BASE_URL: ${{ inputs.code_review_feedback_api_base_url }}
 
-    # Artifacts are downloadable by anyone with read access to the repository, so secrets are
-    # redacted first and CLI logs / session transcripts are only included on explicit opt-in (JUNIE-5037).
+    # Artifacts are downloadable by anyone with read access to the repository, so uploading is opt-in,
+    # CLI logs / session transcripts need a second opt-in, and the files are copied to a stage directory
+    # and redacted there (the live work dir may be the checkout that is committed later) (JUNIE-5037).
     # Fail closed: the upload step below only runs when this step succeeded (`continue-on-error` keeps
     # the job alive, but `steps.redact-artifacts.outcome` still reports the failure).
-    - name: Redact secrets from Junie artifacts
+    - name: Stage and redact Junie artifacts
       id: redact-artifacts
       if: always() && steps.prepare.outputs.SHOULD_SKIP != 'true' && inputs.upload_artifacts == 'true'
       continue-on-error: true
@@ -421,19 +426,20 @@ runs:
           ${{ github.token }}
         WORKING_DIR: ${{ inputs.junie_work_dir }}
         UPLOAD_JUNIE_LOGS: ${{ inputs.upload_junie_logs }}
+        STAGE_DIR: ${{ runner.temp }}/junie-artifacts
       run: |
         PATHS=("${WORKING_DIR}")
         if [ "${UPLOAD_JUNIE_LOGS}" == "true" ]; then
-          echo "::warning::upload_junie_logs is enabled: Junie CLI logs and session transcripts will be uploaded as a workflow artifact and are visible to everyone with read access to this repository"
+          echo "::warning::upload_junie_logs is enabled: Junie CLI logs and session transcripts (which include the runner environment of the Junie process) will be uploaded as a workflow artifact and are visible to everyone with read access to this repository"
           PATHS+=("${HOME}/.junie/logs" "${HOME}/.junie/sessions")
         fi
-        bash "${GITHUB_ACTION_PATH}/src/scripts/redact-junie-artifacts.sh" "${PATHS[@]}"
+        bash "${GITHUB_ACTION_PATH}/src/scripts/redact-junie-artifacts.sh" "${STAGE_DIR}" "${PATHS[@]}"
 
     - name: Skip artifact upload (redaction failed)
       if: always() && steps.redact-artifacts.outcome == 'failure'
       shell: bash
       run: |
-        echo "::warning::Secret redaction failed, Junie artifacts were NOT uploaded to avoid leaking credentials. See the 'Redact secrets from Junie artifacts' step for details."
+        echo "::warning::Secret redaction failed, Junie artifacts were NOT uploaded to avoid leaking credentials. See the 'Stage and redact Junie artifacts' step for details."
 
     - name: Upload Junie artifacts
       if: always() && steps.prepare.outputs.SHOULD_SKIP != 'true' && inputs.upload_artifacts == 'true' && steps.redact-artifacts.outcome == 'success'
@@ -441,10 +447,8 @@ runs:
       uses: actions/upload-artifact@v4
       with:
         name: junie-artifacts
-        path: |
-          ${{ inputs.junie_work_dir }}
-          ${{ inputs.upload_junie_logs == 'true' && '~/.junie/logs' || '' }}
-          ${{ inputs.upload_junie_logs == 'true' && '~/.junie/sessions' || '' }}
+        # Only the redacted copy, never the live files
+        path: ${{ runner.temp }}/junie-artifacts
         retention-days: 7
         if-no-files-found: warn
         include-hidden-files: true
