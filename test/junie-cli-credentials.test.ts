@@ -1,5 +1,5 @@
 import {afterEach, beforeEach, describe, expect, test} from "bun:test";
-import {mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync} from "node:fs";
+import {chmodSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync} from "node:fs";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {buildJunieCliArgs, buildJunieCliEnv, JUNIE_API_KEY_ENV} from "../src/github/operations/feedback/auto-collect/agent";
@@ -149,6 +149,70 @@ describe("redact-junie-artifacts.sh", () => {
             errors: ["OpenAI: Incorrect API key provided: ***REDACTED***"],
             other: "***REDACTED***",
         });
+    });
+
+    test("keeps minified JSON valid: shape patterns stop at quotes and delimiters", () => {
+        // junie_output.json / session transcripts are single-line JSON; a greedy \S+ used to swallow
+        // everything up to the next whitespace, i.e. the rest of the document.
+        const sample = {
+            cmd: "junie --auth=eyJabc.def.ghi --model=x",
+            quoted: '--openai-api-key "sk-x" --auth=\'y\' next',
+            headers: {Authorization: "Bearer perm:dXNlcg==.NTYtMA==.abcdefghijklmnop"},
+            env: "JUNIE_API_KEY=secretvalue;GH_TOKEN=zzz,tail",
+            exported: 'export JUNIE_API_KEY="quoted-secret"',
+            text: "no secrets here",
+        };
+        writeFileSync(join(dir, "junie_output.json"), JSON.stringify(sample));
+        writeFileSync(join(dir, "transcript.jsonl"), JSON.stringify(sample) + "\n" + JSON.stringify({text: "second"}) + "\n");
+
+        const {exitCode} = runScript(REDACT_SCRIPT, {REDACT_SECRETS: ""}, [dir]);
+
+        expect(exitCode).toBe(0);
+        const output = readFileSync(join(dir, "junie_output.json"), "utf-8");
+        expect(JSON.parse(output)).toEqual({
+            cmd: "junie --auth=***REDACTED*** --model=x",
+            quoted: '--openai-api-key "***REDACTED***" --auth=\'***REDACTED***\' next',
+            headers: {Authorization: "Bearer ***REDACTED***"},
+            env: "JUNIE_API_KEY=***REDACTED***;GH_TOKEN=***REDACTED***,tail",
+            exported: 'export JUNIE_API_KEY="***REDACTED***"',
+            text: "no secrets here",
+        });
+
+        const lines = readFileSync(join(dir, "transcript.jsonl"), "utf-8").trim().split("\n");
+        expect(lines).toHaveLength(2);
+        expect(JSON.parse(lines[0]!)).toEqual(JSON.parse(output));
+        expect(JSON.parse(lines[1]!)).toEqual({text: "second"});
+    });
+
+    test("redacts files larger than 50 MB instead of skipping them", () => {
+        const big = join(dir, "big.log");
+        writeFileSync(big, "a".repeat(51 * 1024 * 1024) + "\n--auth=large-file-secret\n");
+
+        const {exitCode} = runScript(REDACT_SCRIPT, {REDACT_SECRETS: ""}, [dir]);
+
+        expect(exitCode).toBe(0);
+        const tail = readFileSync(big, "utf-8").slice(-64);
+        expect(tail).not.toContain("large-file-secret");
+        expect(tail).toContain("--auth=***REDACTED***");
+    });
+
+    test("fails closed when a file cannot be rewritten", () => {
+        const roDir = join(dir, "ro");
+        mkdirSync(roDir);
+        writeFileSync(join(roDir, "log.log"), "--auth=secret\n");
+        writeFileSync(join(dir, "ok.log"), "--auth=secret\n");
+        chmodSync(roDir, 0o555);
+
+        try {
+            const {exitCode, stderr} = runScript(REDACT_SCRIPT, {REDACT_SECRETS: ""}, [dir]);
+
+            // perl only warns about files it cannot edit in place; the script must turn that into a failure
+            // so that action.yml skips the upload (steps.redact-artifacts.outcome == 'success' gate)
+            expect(exitCode).not.toBe(0);
+            expect(stderr).toContain("inplace edit");
+        } finally {
+            chmodSync(roDir, 0o755);
+        }
     });
 
     test("expands ~ and succeeds when none of the paths exist", () => {

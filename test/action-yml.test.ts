@@ -109,5 +109,22 @@ describe("action.yml", () => {
             expect(redactIndex).toBeGreaterThan(-1);
             expect(redactIndex).toBeLessThan(uploadIndex);
         });
+
+        test("artifact upload fails closed when redaction did not succeed", () => {
+            const redactStep = getStep("Redact secrets from Junie artifacts");
+            const uploadStep = getStep("Upload Junie artifacts");
+
+            // `continue-on-error` keeps the job alive, so the upload must be gated on the step outcome
+            expect(redactStep).toMatch(/^\s+id: redact-artifacts\s*$/m);
+            expect(redactStep).toContain("continue-on-error: true");
+
+            const uploadIf = uploadStep.match(/^\s+if: (.*)$/m)?.[1] ?? "";
+            expect(uploadIf).toContain("steps.redact-artifacts.outcome == 'success'");
+            expect(uploadIf).toContain("inputs.upload_artifacts == 'true'");
+
+            const skipStep = getStep("Skip artifact upload \\(redaction failed\\)");
+            expect(skipStep).toContain("steps.redact-artifacts.outcome == 'failure'");
+            expect(skipStep).toContain("::warning::");
+        });
     });
 });

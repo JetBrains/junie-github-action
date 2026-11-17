@@ -399,7 +399,10 @@ runs:
 
     # Artifacts are downloadable by anyone with read access to the repository, so secrets are
     # redacted first and CLI logs / session transcripts are only included on explicit opt-in (JUNIE-5037).
+    # Fail closed: the upload step below only runs when this step succeeded (`continue-on-error` keeps
+    # the job alive, but `steps.redact-artifacts.outcome` still reports the failure).
     - name: Redact secrets from Junie artifacts
+      id: redact-artifacts
       if: always() && steps.prepare.outputs.SHOULD_SKIP != 'true' && inputs.upload_artifacts == 'true'
       continue-on-error: true
       shell: bash
@@ -426,8 +429,14 @@ runs:
         fi
         bash "${GITHUB_ACTION_PATH}/src/scripts/redact-junie-artifacts.sh" "${PATHS[@]}"
 
+    - name: Skip artifact upload (redaction failed)
+      if: always() && steps.redact-artifacts.outcome == 'failure'
+      shell: bash
+      run: |
+        echo "::warning::Secret redaction failed, Junie artifacts were NOT uploaded to avoid leaking credentials. See the 'Redact secrets from Junie artifacts' step for details."
+
     - name: Upload Junie artifacts
-      if: always() && steps.prepare.outputs.SHOULD_SKIP != 'true' && inputs.upload_artifacts == 'true'
+      if: always() && steps.prepare.outputs.SHOULD_SKIP != 'true' && inputs.upload_artifacts == 'true' && steps.redact-artifacts.outcome == 'success'
       continue-on-error: true
       uses: actions/upload-artifact@v4
       with:
