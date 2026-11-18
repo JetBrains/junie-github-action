@@ -4,7 +4,7 @@ import {
     verifyCodeReviewFeedbackToken,
 } from '../../../../utils/code-review-feedback-link';
 import {runAgentFeedbackEnrichment} from './agent';
-import {collectSessionFeedbackSignals} from './collector';
+import {collectSessionFeedbackSignals, tokenDerivedSessionId} from './collector';
 import {buildAutoCollectedComment, evaluateCollectorVerdict} from './mapping';
 import {postAutoCollectNotification} from './notify';
 import type {SessionCollectOutcome, SessionFeedbackSignals} from './types';
@@ -20,7 +20,7 @@ export interface AutoCollectOptions {
     junieFlags?: string;
 }
 
-async function processSession(
+export async function processSession(
     signals: SessionFeedbackSignals,
     options: AutoCollectOptions,
 ): Promise<SessionCollectOutcome> {
@@ -37,6 +37,13 @@ async function processSession(
         const verify = await verifyCodeReviewFeedbackToken(signals.token, options.apiBaseUrl);
         if (!verify.valid) {
             return { ...base, status: 'skipped_invalid_token', detail: 'token invalid or expired' };
+        }
+        // The marker is not signed: a valid token must not lend its validity to a session id taken
+        // from an arbitrary PR comment (JUNIE-5625). Only the id derived from the token itself needs
+        // no binding; any other id must be the one the server issued the token for.
+        const isDerivedFromToken = signals.sessionId === tokenDerivedSessionId(signals.token);
+        if (!isDerivedFromToken && verify.sessionId !== signals.sessionId) {
+            return { ...base, status: 'skipped_invalid_token', detail: 'token was issued for another session' };
         }
         if (verify.alreadySubmitted) {
             return { ...base, status: 'already_submitted' };

@@ -90,6 +90,11 @@ async function paginateReviewComments(
     });
 }
 
+/** Session id used for a token whose comment has neither a marker nor readable claims. */
+export function tokenDerivedSessionId(token: string): string {
+    return `token-${createHash('sha256').update(token).digest('hex').slice(0, 16)}`;
+}
+
 export function resolveSessionIdentity(body: string): {
     sessionId: string;
     runId: string;
@@ -104,7 +109,7 @@ export function resolveSessionIdentity(body: string): {
     if (!sessionId || !runId) {
         if (token) {
             return {
-                sessionId: `token-${createHash('sha256').update(token).digest('hex').slice(0, 16)}`,
+                sessionId: tokenDerivedSessionId(token),
                 runId: 'unknown',
                 token,
             };

@@ -16,13 +16,23 @@ export interface FeedbackTokenClaims {
     prNumber?: number;
 }
 
+/**
+ * Session and run ids come from PR comments anyone can post and end up in file system paths, so
+ * only plain identifier characters are accepted: no `/`, `\` or `.` (JUNIE-5625).
+ */
+const SAFE_FEEDBACK_ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
+
 /** session + run + optional token (token needed when Share feedback link is hidden). */
 const FEEDBACK_MARKER_RE =
-    /<!--\s*junie-feedback:session=([^;>\s]+);run=([^;>\s]+)(?:;token=([^>\s]+))?\s*-->/i;
+    /<!--\s*junie-feedback:session=([A-Za-z0-9_-]{1,128});run=([A-Za-z0-9_-]{1,128})(?:;token=([^>\s]+))?\s*-->/i;
 const INLINE_FEEDBACK_MARKER_RE =
-    /<!--\s*junie-inline-feedback:run=([^;>\s]+)\s*-->/i;
+    /<!--\s*junie-inline-feedback:run=([A-Za-z0-9_-]{1,128})\s*-->/i;
 const FEEDBACK_TOKEN_IN_URL_RE =
     /code-review-feedback\?token=([A-Za-z0-9._~\-%=]+)/i;
+
+export function isSafeFeedbackId(value: string): boolean {
+    return SAFE_FEEDBACK_ID_RE.test(value);
+}
 
 export function parseFeedbackMarker(body: string): FeedbackMarkerData | undefined {
     const match = body.match(FEEDBACK_MARKER_RE);
@@ -72,7 +82,7 @@ export function parseFeedbackTokenClaims(token: string): FeedbackTokenClaims | u
         const parsed = JSON.parse(json) as { sid?: unknown; rid?: unknown; repo?: unknown; pr?: unknown };
         const sessionId = typeof parsed.sid === 'string' ? parsed.sid : undefined;
         const runId = parsed.rid != null ? String(parsed.rid) : undefined;
-        if (!sessionId || !runId) {
+        if (!sessionId || !runId || !isSafeFeedbackId(sessionId) || !isSafeFeedbackId(runId)) {
             return undefined;
         }
         return {

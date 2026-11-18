@@ -571,6 +571,12 @@ export function isIssuesAssignedEvent(
     return isIssuesEvent(context) && context.eventAction === "assigned";
 }
 
+export function isWorkflowRunEvent(
+    context: JunieExecutionContext,
+): context is AutomationEventContext & { payload: WorkflowRunEvent } {
+    return context.eventName === "workflow_run";
+}
+
 /**
  * Checks if the context is a workflow_run event triggered by a CI failure
  */
