@@ -5,7 +5,7 @@ import {
     isTriggeredByUserInteraction,
     isPushEvent,
     isJiraWorkflowDispatchEvent,
-    isResolveConflictsWorkflowDispatchEvent, isWorkflowRunFailureEvent,
+    isResolveConflictsWorkflowDispatchEvent, isWorkflowRunEvent, isWorkflowRunFailureEvent,
     isYouTrackWorkflowDispatchEvent,
 } from "../context";
 import {checkHumanActor} from "../validation/actor";
@@ -24,6 +24,7 @@ import {getJiraClient} from "../jira/client";
 import {convertMarkdownToADF} from "../jira/markdown-to-jira";
 import {getYouTrackClient} from "../youtrack/client";
 import {detectJunieTriggerPhrase, shouldAutoCollectFeedback} from "../validation/trigger";
+import type {WorkflowRunEvent} from "@octokit/webhooks-types";
 
 /**
  * Initializes Junie execution by preparing environment, auth, and workflow context
@@ -149,6 +150,13 @@ export async function shouldHandle(context: JunieExecutionContext, octokit: Octo
         }
     }
 
+    if (isWorkflowRunEvent(context)) {
+        const isAuthorized = await verifyWorkflowRunOrigin(context, octokit);
+        if (!isAuthorized) {
+            return false;
+        }
+    }
+
     if (context.inputs.prompt) {
         return true;
     }
@@ -192,6 +200,51 @@ async function verifyActorAuthorization(context: UserInitiatedEventContext, octo
         return false;
     }
 
+    return true;
+}
+
+/**
+ * Security gate for `workflow_run`. The event itself is system-triggered, but the upstream run it
+ * reports on may have been started by anyone who can open a pull request, including from a fork,
+ * and its branch name and logs are attacker-controlled input for Junie (JUNIE-4923).
+ *
+ * Every account the upstream run originates from must pass {@link verifyActorAuthorization}:
+ * the actor that started it, the actor that re-ran it (if different), and the owner of the head
+ * repository when the run came from a fork. Fails closed when the origin cannot be determined.
+ */
+async function verifyWorkflowRunOrigin(
+    context: JunieExecutionContext & { payload: WorkflowRunEvent },
+    octokit: Octokits,
+): Promise<boolean> {
+    const run = context.payload.workflow_run;
+    const headRepository = run?.head_repository?.full_name;
+    if (!headRepository) {
+        console.log("workflow_run does not say which repository it ran from, skipping junie");
+        return false;
+    }
+
+    const actors = new Set<string>([context.actor]);
+    for (const login of [run.actor?.login, run.triggering_actor?.login]) {
+        if (login) {
+            actors.add(login);
+        }
+    }
+    if (headRepository.toLowerCase() !== context.payload.repository.full_name.toLowerCase()) {
+        actors.add(headRepository.split("/")[0]);
+    }
+
+    for (const actor of actors) {
+        console.log(`workflow_run originates from ${actor}, checking its access`);
+        try {
+            if (!await verifyActorAuthorization({...context, actor} as unknown as UserInitiatedEventContext, octokit)) {
+                return false;
+            }
+        } catch (error) {
+            // e.g. the fork owner is not a collaborator: skip instead of failing every fork CI run
+            console.log(`Could not verify ${actor}: ${error instanceof Error ? error.message : String(error)}`);
+            return false;
+        }
+    }
     return true;
 }
 

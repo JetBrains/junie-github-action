@@ -505,7 +505,8 @@ Notes:
 - **Permission Validation**: Only users with write/admin access to the repository can trigger Junie
 - **Actor Verification** (`allowed_bots`): the actor must be a human user; bots are rejected unless explicitly allow-listed
   - ✅ **Applies to all user-triggered events**: `issues`, `issue_comment`, `pull_request` / `pull_request_target`, `pull_request_review`, `pull_request_review_comment`, `push` — in trigger-phrase mode **and** when a fixed `prompt` is provided
-  - ❌ **Does NOT apply to** system-triggered events: `workflow_dispatch`, `schedule`, `workflow_run`, `repository_dispatch`, `check_suite` — secure those with workflow `permissions:` and `if:` conditions
+  - ✅ **`workflow_run`**: the upstream run's actor, the actor that re-ran it, and, for a run from a fork, the fork's owner must all pass the same checks. A failed CI run of an outsider's fork PR is skipped, because its branch name and logs are untrusted input for Junie
+  - ❌ **Does NOT apply to** other system-triggered events: `workflow_dispatch`, `schedule`, `repository_dispatch`, `check_suite` — secure those with workflow `permissions:` and `if:` conditions
   - By default (`allowed_bots` empty) **no bot can trigger Junie**. GitHub Apps cannot be checked against repository collaborators, so an app installed only on a fork would otherwise be able to push to a PR branch and run Junie on your runner with your workflow's token and secrets
   - To let trusted automation trigger Junie, list it explicitly: `allowed_bots: "dependabot[bot], renovate"`. Use `allowed_bots: "*"` only if you fully control who can produce events in your repository
   - ⚠️ **`pull_request_target` + forks**: the workflow runs with the base repository's token while Junie checks out the fork's head. Only enable this for trusted contributors, keep `allowed_bots` empty, and avoid granting `contents: write` to such workflows

@@ -337,9 +337,11 @@ on:
 
 jobs:
   analyze-failure:
-    # Don't run on Junie's own PRs to avoid infinite loops
+    # Don't run on Junie's own PRs to avoid infinite loops, and never on runs from forks:
+    # their branch name and CI logs are untrusted input for a job that holds your secrets
     if: |
       github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
       !startsWith(github.event.workflow_run.head_branch, 'junie/')
     runs-on: ubuntu-latest
     permissions:
@@ -389,9 +391,11 @@ on:
 
 jobs:
   analyze-failure:
-    # Don't run on Junie's own PRs to avoid infinite loops
+    # Don't run on Junie's own PRs to avoid infinite loops, and never on runs from forks:
+    # their branch name and CI logs are untrusted input for a job that holds your secrets
     if: |
       github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
       !startsWith(github.event.workflow_run.head_branch, 'junie/')
     runs-on: ubuntu-latest
     permissions:

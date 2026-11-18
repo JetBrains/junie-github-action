@@ -7,7 +7,11 @@ on:
 
 jobs:
   fix-failures:
-    if: github.event.workflow_run.conclusion == 'failure' && github.event.workflow_run.event == 'pull_request'
+    # Never on runs from forks: their branch name and CI logs are untrusted input for a job with secrets (JUNIE-4923)
+    if: |
+      github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
     permissions:
       contents: write

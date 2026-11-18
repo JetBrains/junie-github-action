@@ -206,4 +206,125 @@ describe("shouldHandle - actor authorization gate", () => {
             expect(getByUsername).not.toHaveBeenCalled();
         });
     });
+
+    /**
+     * JUNIE-4923: `workflow_run` was treated as system-triggered and skipped the authorization gate,
+     * so a failed CI run of an outsider's fork PR started a secret-bearing Junie run on the base
+     * repository with the attacker-controlled branch name and CI logs as input.
+     */
+    describe("JUNIE-4923: workflow_run checks where the upstream run came from", () => {
+        const writers = new Set(["maintainer", "other-maintainer"]);
+
+        const makeWorkflowRunContext = (opts: {
+            actor?: string;
+            runActor?: string;
+            triggeringActor?: string;
+            headRepository?: string | null;
+            allowedBots?: string;
+        }) => {
+            const headRepository = opts.headRepository === undefined ? "test-owner/test-repo" : opts.headRepository;
+            return createMockContext({
+                eventName: "workflow_run" as any,
+                actor: opts.actor ?? opts.runActor ?? "maintainer",
+                inputs: {prompt: "fix-ci", allowedBots: opts.allowedBots ?? ""} as any,
+                payload: {
+                    action: "completed",
+                    repository: forkPrPayload.repository,
+                    workflow_run: {
+                        conclusion: "failure",
+                        head_branch: "feature",
+                        head_sha: "deadbeef",
+                        pull_requests: [],
+                        actor: opts.runActor ? {login: opts.runActor} : undefined,
+                        triggering_actor: opts.triggeringActor ? {login: opts.triggeringActor} : undefined,
+                        head_repository: headRepository ? {full_name: headRepository} : null,
+                    },
+                } as any,
+            });
+        };
+
+        beforeEach(() => {
+            getCollaboratorPermissionLevel.mockImplementation(async ({username}: {username: string}) => ({
+                data: {permission: writers.has(username) ? "write" : "read"},
+            }));
+        });
+
+        test("allows a run started by a collaborator with write access", async () => {
+            const context = makeWorkflowRunContext({runActor: "maintainer"});
+
+            expect(await shouldHandle(context, octokit)).toBe(true);
+            expect(getCollaboratorPermissionLevel).toHaveBeenCalledWith(
+                expect.objectContaining({username: "maintainer"}),
+            );
+        });
+
+        test("rejects a fork PR run started by an outsider even with a fixed prompt", async () => {
+            const context = makeWorkflowRunContext({runActor: "attacker", headRepository: "attacker/test-repo"});
+
+            expect(await shouldHandle(context, octokit)).toBe(false);
+        });
+
+        test("rejects a run of an outsider's fork re-run by a maintainer", async () => {
+            const context = makeWorkflowRunContext({
+                actor: "maintainer",
+                runActor: "maintainer",
+                triggeringActor: "maintainer",
+                headRepository: "attacker/test-repo",
+            });
+
+            expect(await shouldHandle(context, octokit)).toBe(false);
+            expect(getCollaboratorPermissionLevel).toHaveBeenCalledWith(
+                expect.objectContaining({username: "attacker"}),
+            );
+        });
+
+        test("rejects a run whose original actor has no write access", async () => {
+            const context = makeWorkflowRunContext({
+                actor: "maintainer",
+                runActor: "attacker",
+                triggeringActor: "maintainer",
+            });
+
+            expect(await shouldHandle(context, octokit)).toBe(false);
+        });
+
+        test("allows a run from a fork owned by a collaborator with write access", async () => {
+            const context = makeWorkflowRunContext({
+                runActor: "maintainer",
+                headRepository: "other-maintainer/test-repo",
+            });
+
+            expect(await shouldHandle(context, octokit)).toBe(true);
+        });
+
+        test("rejects a run started by a bot that is not allow-listed", async () => {
+            const context = makeWorkflowRunContext({runActor: "dependabot[bot]"});
+
+            expect(await shouldHandle(context, octokit)).toBe(false);
+        });
+
+        test("allows a run started by an allow-listed bot", async () => {
+            const context = makeWorkflowRunContext({runActor: "dependabot[bot]", allowedBots: "dependabot"});
+
+            expect(await shouldHandle(context, octokit)).toBe(true);
+        });
+
+        test("fails closed when the head repository is unknown", async () => {
+            const context = makeWorkflowRunContext({runActor: "maintainer", headRepository: null});
+
+            expect(await shouldHandle(context, octokit)).toBe(false);
+        });
+
+        test("skips instead of throwing when the fork owner cannot be looked up", async () => {
+            getCollaboratorPermissionLevel.mockImplementation(async ({username}: {username: string}) => {
+                if (username === "attacker") {
+                    throw new Error("HttpError: Not Found - 404");
+                }
+                return {data: {permission: "write"}};
+            });
+            const context = makeWorkflowRunContext({runActor: "maintainer", headRepository: "attacker/test-repo"});
+
+            expect(await shouldHandle(context, octokit)).toBe(false);
+        });
+    });
 });
