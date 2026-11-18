@@ -20,7 +20,7 @@ export interface AutoCollectOptions {
     junieFlags?: string;
 }
 
-async function processSession(
+export async function processSession(
     signals: SessionFeedbackSignals,
     options: AutoCollectOptions,
 ): Promise<SessionCollectOutcome> {
@@ -37,6 +37,12 @@ async function processSession(
         const verify = await verifyCodeReviewFeedbackToken(signals.token, options.apiBaseUrl);
         if (!verify.valid) {
             return { ...base, status: 'skipped_invalid_token', detail: 'token invalid or expired' };
+        }
+        // The marker is not signed: a valid token must not lend its validity to a session id taken
+        // from an arbitrary PR comment (JUNIE-5625). `token-<hash>` ids are derived from the token itself.
+        const isDerivedFromToken = signals.sessionId.startsWith('token-');
+        if (verify.sessionId && !isDerivedFromToken && verify.sessionId !== signals.sessionId) {
+            return { ...base, status: 'skipped_invalid_token', detail: 'token was issued for another session' };
         }
         if (verify.alreadySubmitted) {
             return { ...base, status: 'already_submitted' };

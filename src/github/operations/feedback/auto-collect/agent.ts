@@ -163,7 +163,8 @@ export async function runAgentFeedbackEnrichment(
 ): Promise<AgentFeedbackResult | undefined> {
     const { signals, verdict, workingDir, cliToken, junieFlags = '' } = options;
     // Isolate cache/cwd per session: parallel enrichments must not share --cache-dir.
-    const sessionDir = join(workingDir, `auto-collect-${signals.sessionId}`);
+    // The session id comes from a PR comment, keep it from escaping workingDir (JUNIE-5625).
+    const sessionDir = join(workingDir, `auto-collect-${signals.sessionId.replace(/[^A-Za-z0-9_-]/g, '_')}`);
     await mkdir(sessionDir, { recursive: true });
 
     const inputPath = join(sessionDir, 'input.json');

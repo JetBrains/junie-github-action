@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, mock, test } from 'bun:test';
 import {
     CODE_REVIEW_FEEDBACK_SECTION_WITH_MARKER,
     createCodeReviewFeedbackMarker,
@@ -23,6 +23,7 @@ import {
     AUTO_COLLECT_NOTIFY_MARKER,
     buildAutoCollectNotificationBody,
 } from '../src/github/operations/feedback/auto-collect/notify';
+import { processSession } from '../src/github/operations/feedback/auto-collect/orchestrator';
 import type { SessionFeedbackSignals } from '../src/github/operations/feedback/auto-collect/types';
 
 describe('feedback markers', () => {
@@ -507,5 +508,59 @@ describe('buildAutoCollectNotificationBody', () => {
         expect(body.startsWith(AUTO_COLLECT_NOTIFY_MARKER)).toBe(true);
         expect(body).toContain('rating **4**');
         expect(body).toContain('no reactions/replies');
+    });
+});
+
+/**
+ * JUNIE-5625: the session id from an unsigned PR comment marker was joined into the Junie working
+ * directory, so `session=../../checkout` ran Junie (and the PR's project MCP servers) in the PR checkout.
+ */
+describe('JUNIE-5625: feedback session ids cannot escape the working directory', () => {
+    const tokenFor = (sid: string, rid: unknown = 1) =>
+        `${Buffer.from(JSON.stringify({ sid, rid })).toString('base64url')}.sig`;
+
+    test('marker with a path-like session id is ignored', () => {
+        const token = tokenFor('signed-session');
+        for (const session of ['../../../../checkout', 'a/b', 'a\\b', '.', '..', 'x.y']) {
+            const body = `<!-- junie-feedback:session=${session};run=4242;token=${token} -->`;
+            expect(parseFeedbackMarker(body)).toBeUndefined();
+            expect(resolveSessionIdentity(body)).toBeUndefined();
+        }
+        expect(parseFeedbackMarker(`<!-- junie-feedback:session=s1;run=../x;token=${token} -->`)).toBeUndefined();
+        expect(parseInlineFeedbackRunId('<!-- junie-inline-feedback:run=../x -->')).toBeUndefined();
+    });
+
+    test('token claims with a path-like session or run id are ignored', () => {
+        expect(parseFeedbackTokenClaims(tokenFor('../../checkout'))).toBeUndefined();
+        expect(parseFeedbackTokenClaims(tokenFor('s1', '../x'))).toBeUndefined();
+        const body = `[Share feedback](https://x/code-review-feedback?token=${tokenFor('../../checkout')})`;
+        expect(resolveSessionIdentity(body)?.sessionId).toMatch(/^token-[0-9a-f]{16}$/);
+    });
+
+    test('real session ids are still accepted', () => {
+        const body = createCodeReviewFeedbackMarker('session-260727-151332-1bxm', 30278879175, 'abc.def');
+        expect(parseFeedbackMarker(body)?.sessionId).toBe('session-260727-151332-1bxm');
+    });
+
+    test('a valid token is not accepted for a different session', async () => {
+        const fetchMock = mock(async () =>
+            new Response(JSON.stringify({ valid: true, alreadySubmitted: false, sessionId: 'signed-session' }), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+            }),
+        );
+        const originalFetch = globalThis.fetch;
+        globalThis.fetch = fetchMock as typeof fetch;
+        try {
+            const outcome = await processSession(
+                { sessionId: 'other-session', runId: '4242', token: 'tok.en', comments: [] },
+                { octokit: {} as never, owner: 'o', repo: 'r', prNumber: 1, workingDir: '/tmp/unused' },
+            );
+            expect(outcome.status).toBe('skipped_invalid_token');
+            expect(outcome.detail).toContain('another session');
+            expect(fetchMock).toHaveBeenCalledTimes(1);
+        } finally {
+            globalThis.fetch = originalFetch;
+        }
     });
 });
