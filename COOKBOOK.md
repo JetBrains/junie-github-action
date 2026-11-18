@@ -338,9 +338,11 @@ on:
 jobs:
   analyze-failure:
     # Don't run on Junie's own PRs to avoid infinite loops, and never on runs from forks:
-    # their branch name and CI logs are untrusted input for a job that holds your secrets
+    # their branch name and CI logs are untrusted input for a job that holds your secrets.
+    # Only push/pull_request runs report a fork as head_repository, so other upstream events are skipped.
     if: |
       github.event.workflow_run.conclusion == 'failure' &&
+      contains(fromJSON('["push", "pull_request"]'), github.event.workflow_run.event) &&
       github.event.workflow_run.head_repository.full_name == github.repository &&
       !startsWith(github.event.workflow_run.head_branch, 'junie/')
     runs-on: ubuntu-latest
@@ -392,9 +394,11 @@ on:
 jobs:
   analyze-failure:
     # Don't run on Junie's own PRs to avoid infinite loops, and never on runs from forks:
-    # their branch name and CI logs are untrusted input for a job that holds your secrets
+    # their branch name and CI logs are untrusted input for a job that holds your secrets.
+    # Only push/pull_request runs report a fork as head_repository, so other upstream events are skipped.
     if: |
       github.event.workflow_run.conclusion == 'failure' &&
+      contains(fromJSON('["push", "pull_request"]'), github.event.workflow_run.event) &&
       github.event.workflow_run.head_repository.full_name == github.repository &&
       !startsWith(github.event.workflow_run.head_branch, 'junie/')
     runs-on: ubuntu-latest

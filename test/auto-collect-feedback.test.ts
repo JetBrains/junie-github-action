@@ -18,6 +18,7 @@ import { parseAgentFeedbackJson } from '../src/github/operations/feedback/auto-c
 import {
     collectSessionFeedbackSignalsWithFetchers,
     resolveSessionIdentity,
+    tokenDerivedSessionId,
 } from '../src/github/operations/feedback/auto-collect/collector';
 import {
     AUTO_COLLECT_NOTIFY_MARKER,
@@ -542,9 +543,9 @@ describe('JUNIE-5625: feedback session ids cannot escape the working directory',
         expect(parseFeedbackMarker(body)?.sessionId).toBe('session-260727-151332-1bxm');
     });
 
-    test('a valid token is not accepted for a different session', async () => {
+    const processWithVerifyResponse = async (sessionId: string, token: string, verifyResponse: object) => {
         const fetchMock = mock(async () =>
-            new Response(JSON.stringify({ valid: true, alreadySubmitted: false, sessionId: 'signed-session' }), {
+            new Response(JSON.stringify(verifyResponse), {
                 status: 200,
                 headers: { 'Content-Type': 'application/json' },
             }),
@@ -552,15 +553,43 @@ describe('JUNIE-5625: feedback session ids cannot escape the working directory',
         const originalFetch = globalThis.fetch;
         globalThis.fetch = fetchMock as typeof fetch;
         try {
-            const outcome = await processSession(
-                { sessionId: 'other-session', runId: '4242', token: 'tok.en', comments: [] },
+            // No comments: a session that passes the token checks ends as skipped_empty
+            return await processSession(
+                { sessionId, runId: '4242', token, comments: [] },
                 { octokit: {} as never, owner: 'o', repo: 'r', prNumber: 1, workingDir: '/tmp/unused' },
             );
-            expect(outcome.status).toBe('skipped_invalid_token');
-            expect(outcome.detail).toContain('another session');
-            expect(fetchMock).toHaveBeenCalledTimes(1);
         } finally {
             globalThis.fetch = originalFetch;
         }
+    };
+
+    test('a valid token is not accepted for a different session', async () => {
+        const outcome = await processWithVerifyResponse('other-session', 'tok.en', {
+            valid: true, alreadySubmitted: false, sessionId: 'signed-session',
+        });
+        expect(outcome.status).toBe('skipped_invalid_token');
+        expect(outcome.detail).toContain('another session');
+    });
+
+    test('a marker cannot opt out of the binding with a token- prefix', async () => {
+        const outcome = await processWithVerifyResponse('token-attacker', 'tok.en', {
+            valid: true, alreadySubmitted: false, sessionId: 'signed-session',
+        });
+        expect(outcome.status).toBe('skipped_invalid_token');
+    });
+
+    test('a marker session is not accepted when verify does not name the session', async () => {
+        const outcome = await processWithVerifyResponse('signed-session', 'tok.en', { valid: true, alreadySubmitted: false });
+        expect(outcome.status).toBe('skipped_invalid_token');
+    });
+
+    test('the matching session and the token-derived session are accepted', async () => {
+        const matching = await processWithVerifyResponse('signed-session', 'tok.en', {
+            valid: true, alreadySubmitted: false, sessionId: 'signed-session',
+        });
+        expect(matching.status).toBe('skipped_empty');
+
+        const derived = await processWithVerifyResponse(tokenDerivedSessionId('tok.en'), 'tok.en', { valid: true });
+        expect(derived.status).toBe('skipped_empty');
     });
 });

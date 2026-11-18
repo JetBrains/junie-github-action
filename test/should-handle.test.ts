@@ -221,6 +221,7 @@ describe("shouldHandle - actor authorization gate", () => {
             triggeringActor?: string;
             headRepository?: string | null;
             allowedBots?: string;
+            event?: string;
         }) => {
             const headRepository = opts.headRepository === undefined ? "test-owner/test-repo" : opts.headRepository;
             return createMockContext({
@@ -232,6 +233,7 @@ describe("shouldHandle - actor authorization gate", () => {
                     repository: forkPrPayload.repository,
                     workflow_run: {
                         conclusion: "failure",
+                        event: opts.event ?? "pull_request",
                         head_branch: "feature",
                         head_sha: "deadbeef",
                         pull_requests: [],
@@ -307,6 +309,34 @@ describe("shouldHandle - actor authorization gate", () => {
             const context = makeWorkflowRunContext({runActor: "dependabot[bot]", allowedBots: "dependabot"});
 
             expect(await shouldHandle(context, octokit)).toBe(true);
+        });
+
+        test("rejects upstream events that report the base repository for fork PRs", async () => {
+            // e.g. pull_request_review on a fork PR: head_repository is the base repository
+            for (const event of ["pull_request_review", "pull_request_review_comment", "pull_request_target", "issue_comment", "workflow_run"]) {
+                const context = makeWorkflowRunContext({runActor: "maintainer", event});
+
+                expect(await shouldHandle(context, octokit)).toBe(false);
+            }
+        });
+
+        test("allows push and merge_group runs started by a collaborator", async () => {
+            for (const event of ["push", "merge_group"]) {
+                expect(await shouldHandle(makeWorkflowRunContext({runActor: "maintainer", event}), octokit)).toBe(true);
+            }
+        });
+
+        test("does not require the downstream delivery actor to be allow-listed", async () => {
+            const context = makeWorkflowRunContext({actor: "github-actions[bot]", runActor: "maintainer"});
+
+            expect(await shouldHandle(context, octokit)).toBe(true);
+            expect(getByUsername).not.toHaveBeenCalledWith({username: "github-actions[bot]"});
+        });
+
+        test("fails closed when the upstream actor is unknown", async () => {
+            const context = makeWorkflowRunContext({actor: "maintainer"});
+
+            expect(await shouldHandle(context, octokit)).toBe(false);
         });
 
         test("fails closed when the head repository is unknown", async () => {
