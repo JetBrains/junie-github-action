@@ -153,7 +153,7 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 | Input | Description | Default    |
 |-------|-------------|------------|
 | `prompt` | Custom instructions for Junie. Special values: `code-review` for PR reviews, `fix-ci` for CI failure analysis, `minor-fix` for quick PR adjustments. See [Cookbook](COOKBOOK.md) for examples. | -          |
-| `junie_version` | Junie CLI version to install | `4020.10`        |
+| `junie_version` | Junie CLI version to install | `4100.8`        |
 | `model` | Model to use for the primary agent. Available: `sonnet`, `opus`, `gpt`, `gpt-codex`, `gemini-pro`, `gemini-flash`, `grok` | -          |
 | `junie_work_dir` | Working directory for Junie files | `/tmp/junie-work` |
 | `upload_artifacts` | Upload `junie_work_dir` (task input, CLI output JSON) as the `junie-artifacts` workflow artifact for troubleshooting. Files are copied and known secrets are redacted from the copy before upload. See [Security Considerations](#security-considerations). | `true` |
