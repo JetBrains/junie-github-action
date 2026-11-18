@@ -299,11 +299,17 @@ runs:
     - name: Install Junie
       if: steps.prepare.outputs.SHOULD_SKIP != 'true' || steps.prepare.outputs.AUTO_COLLECT_FEEDBACK == 'true'
       shell: bash
+      env:
+        # Passed via env, never interpolated into the script: the input may come from untrusted event data (JUNIE-6113)
+        JUNIE_VERSION_INPUT: ${{ inputs.junie_version }}
       run: |
-        if [ "${{ inputs.junie_version }}" == "latest" ]; then
+        if [ "${JUNIE_VERSION_INPUT}" == "latest" ]; then
           curl -fsSL https://junie.jetbrains.com/install-nightly.sh | bash
+        elif [[ "${JUNIE_VERSION_INPUT}" =~ ^([0-9]+(\.[0-9]+)*)?$ ]]; then
+          curl -fsSL https://junie.jetbrains.com/install.sh | JUNIE_VERSION="${JUNIE_VERSION_INPUT}" bash
         else
-          curl -fsSL https://junie.jetbrains.com/install.sh | JUNIE_VERSION=${{ inputs.junie_version }} bash
+          echo "::error::Invalid junie_version: expected \"latest\" or a version like 4020.10"
+          exit 1
         fi
 
     - name: Auto-collect code review feedback

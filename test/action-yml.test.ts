@@ -141,4 +141,43 @@ describe("action.yml", () => {
             expect(skipStep).toContain("::warning::");
         });
     });
+
+    /**
+     * JUNIE-6113: `${{ inputs.junie_version }}` was substituted into the Install Junie script before
+     * bash ran, so a value from untrusted event data was executed as shell code.
+     */
+    describe("JUNIE-6113: no expressions are interpolated into run scripts", () => {
+        const runScripts = () => {
+            const scripts: { line: number; text: string }[] = [];
+            const lines = actionYaml.split("\n");
+            for (let i = 0; i < lines.length; i++) {
+                const match = lines[i].match(/^(\s*)run: (.*)$/);
+                if (!match) {
+                    continue;
+                }
+                const indent = match[1].length;
+                const body = [match[2]];
+                while (i + 1 < lines.length && (lines[i + 1].trim() === "" || lines[i + 1].search(/\S/) > indent)) {
+                    body.push(lines[++i]);
+                }
+                scripts.push({line: i + 1, text: body.join("\n")});
+            }
+            return scripts;
+        };
+
+        test("every run script reads inputs and step outputs through env", () => {
+            const scripts = runScripts();
+
+            expect(scripts.length).toBeGreaterThan(5);
+            expect(scripts.filter((script) => script.text.includes("${{"))).toEqual([]);
+        });
+
+        test("Install Junie validates junie_version before using it", () => {
+            const installStep = actionYaml.match(/- name: Install Junie[\s\S]*?(?=\n\s{4}- (?:name|uses):)/)?.[0] ?? "";
+
+            expect(installStep).toContain("JUNIE_VERSION_INPUT: ${{ inputs.junie_version }}");
+            expect(installStep).toContain('[[ "${JUNIE_VERSION_INPUT}" =~ ^([0-9]+(\\.[0-9]+)*)?$ ]]');
+            expect(installStep).toContain("exit 1");
+        });
+    });
 });
