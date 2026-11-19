@@ -174,6 +174,15 @@ export type AutomationEventContext = JunieWorkflowContext & {
 // Union type representing all possible Junie execution contexts
 export type JunieExecutionContext = UserInitiatedEventContext | AutomationEventContext;
 
+export function parseWorkflowDispatchPrNumber(value: unknown): number | undefined {
+    if ((typeof value !== "string" && typeof value !== "number") || !/^[1-9]\d*$/.test(String(value))) {
+        return undefined;
+    }
+
+    const prNumber = Number(value);
+    return Number.isSafeInteger(prNumber) ? prNumber : undefined;
+}
+
 /**
  * Extracts and builds Junie workflow context from GitHub event data
  * @param tokenOwner - Information about the token owner (user or app)
@@ -327,10 +336,12 @@ export function extractJunieWorkflowContext(tokenOwner: TokenOwner): JunieExecut
                 break;
             }
 
+            const prNumber = parseWorkflowDispatchPrNumber(payload.inputs?.prNumber);
             parsedContext = {
                 ...commonFields,
                 eventName: context.eventName,
                 payload: context.payload as unknown as WorkflowDispatchEvent,
+                ...(prNumber === undefined ? {} : {isPR: true, entityNumber: prNumber}),
             };
             break;
         }

@@ -109,6 +109,36 @@ jobs:
    - Mention `@junie-agent review this change` in a PR
    - Comment `@junie-agent minor-fix rename variable x to y` in a PR to make quick adjustments
 
+### Manual PR Reviews
+
+Use `workflow_dispatch` with a `prNumber` input to start a code review from the Actions tab:
+
+```yaml
+name: Junie PR Review
+
+on:
+  workflow_dispatch:
+    inputs:
+      prNumber:
+        description: Pull request number
+        required: true
+        type: number
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: JetBrains/junie-github-action@v1
+        with:
+          junie_api_key: ${{ secrets.JUNIE_API_KEY }}
+          prompt: code-review
+```
+
 ## Jira Integration
 
 🔗 **Want to trigger Junie from Jira?** Check out the [Jira Integration Guide](docs/JIRA_INTEGRATION.md) to automatically implement features and fixes based on Jira issues.
