@@ -483,7 +483,7 @@ describe("prepareJunieTask", () => {
             ["3419", true],
             ["3418.9", false],
             ["", false],
-        ])("should choose the code review payload for Junie '%s' (remote: %p)", async (junieVersion, remote) => {
+        ])("should choose the remote review target for Junie '%s' (remote: %p)", async (junieVersion, remote) => {
             const context = createMockContext({
                 eventName: "pull_request",
                 isPR: true,
@@ -495,14 +495,14 @@ describe("prepareJunieTask", () => {
                 } as any
             });
 
-            const result = await prepareJunieTask(context, branchInfo, createMockOctokit(), ["mcp_github_inline_comment_server"]);
+            const result = await prepareJunieTask(context, branchInfo, createMockOctokit(), ["mcp_github_checks_server"]);
 
-            // Older CLI builds reject unknown fields and post inline comments via the MCP tool
             expect(Object.keys(result.codeReviewTask!)).toEqual(
                 remote ? ["description", "diffCommand", "fetchVcsInfo", "reviewTarget"] : ["description", "diffCommand"]
             );
             expect(result.codeReviewTask?.reviewTarget).toEqual(remote ? {type: "remoteRequest", number: 123} : undefined);
-            expect(result.codeReviewTask?.description?.includes("post_inline_review_comment")).toBe(!remote);
+            expect(result.codeReviewTask?.description).toContain("get_pr_failed_checks_info");
+            expect(result.codeReviewTask?.description?.includes("post_inline_review_comment")).toBe(false);
         });
 
         test("should disable remote approval when allowApprove is false", async () => {

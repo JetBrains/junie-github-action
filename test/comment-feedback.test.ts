@@ -372,6 +372,10 @@ describe("Comment Feedback Operations", () => {
       initCommentId: "12345",
       parsedContext: mockIssueCommentContext,
     };
+    const codeReviewContext = (junieVersion: string) => ({
+      ...mockIssueCommentContext,
+      inputs: {...mockIssueCommentContext.inputs, prompt: "code-review", junieVersion},
+    } as JunieExecutionContext);
 
     test("should update comment with success for COMMIT_CHANGES", async () => {
       const data: FinishFeedbackData = {
@@ -504,6 +508,100 @@ describe("Comment Feedback Operations", () => {
       expect(body).toContain("https://junie.example.com/code-review-feedback?token=abc");
       expect(body).not.toContain("Junie successfully finished!");
       expect(body).not.toContain("Analysis complete");
+    });
+
+    test("should keep only the feedback marker for a remote review", async () => {
+      const data: FinishFeedbackData = {
+        ...baseFinishData,
+        parsedContext: codeReviewContext("3419"),
+        isJobFailed: false,
+        successData: {
+          actionToDo: "WRITE_COMMENT",
+          junieTitle: "Analysis complete",
+          junieSummary: "Here are my findings...",
+          isCodeReview: true,
+          codeReviewFeedbackLink: "https://junie.example.com/code-review-feedback?token=abc",
+          junieSessionId: "session-1",
+          githubRunId: "99",
+        },
+      };
+
+      await postJunieCompletionComment(mockOctokit, data);
+
+      expect(deleteCommentSpy).not.toHaveBeenCalled();
+      expect(updateCommentSpy).toHaveBeenCalledTimes(1);
+      const body = updateCommentSpy.mock.calls[0][0].body as string;
+      expect(body).toContain("<!-- junie-feedback:session=session-1;run=99;token=abc -->");
+      expect(body).not.toContain("Here are my findings...");
+    });
+
+    test("should delete the working comment for a remote review without a feedback link", async () => {
+      const data: FinishFeedbackData = {
+        ...baseFinishData,
+        parsedContext: codeReviewContext("latest"),
+        isJobFailed: false,
+        successData: {
+          actionToDo: "WRITE_COMMENT",
+          junieTitle: "Analysis complete",
+          junieSummary: "Here are my findings...",
+          isCodeReview: true,
+        },
+      };
+
+      await postJunieCompletionComment(mockOctokit, data);
+
+      expect(updateCommentSpy).not.toHaveBeenCalled();
+      expect(deleteCommentSpy).toHaveBeenCalledWith({
+        owner: "test-owner",
+        repo: "test-repo",
+        comment_id: 12345,
+      });
+    });
+
+    test.each([
+      ["3419", false],
+      ["latest", false],
+      ["3418", true],
+      ["", true],
+      ["unknown", true],
+    ])("should publish the code review summary for Junie '%s': %p", async (junieVersion, published) => {
+      const data: FinishFeedbackData = {
+        ...baseFinishData,
+        parsedContext: codeReviewContext(junieVersion),
+        isJobFailed: false,
+        successData: {
+          actionToDo: "WRITE_COMMENT",
+          junieTitle: "Analysis complete",
+          junieSummary: "Here are my findings...",
+          isCodeReview: true,
+        },
+      };
+
+      await postJunieCompletionComment(mockOctokit, data);
+
+      expect(updateCommentSpy).toHaveBeenCalledTimes(published ? 1 : 0);
+      expect(deleteCommentSpy).toHaveBeenCalledTimes(published ? 0 : 1);
+      if (published) {
+        expect(updateCommentSpy.mock.calls[0][0].body).toContain("Here are my findings...");
+      }
+    });
+
+    test("should still report failures for a remote review", async () => {
+      const data: FinishFeedbackData = {
+        ...baseFinishData,
+        parsedContext: codeReviewContext("3419"),
+        isJobFailed: true,
+        failureData: {
+          error: "Something went wrong",
+        },
+      };
+
+      await postJunieCompletionComment(mockOctokit, data);
+
+      expect(deleteCommentSpy).not.toHaveBeenCalled();
+      expect(updateCommentSpy).toHaveBeenCalledWith(expect.objectContaining({
+        body: expect.stringContaining("Something went wrong"),
+      }));
     });
 
     test("should delete working status comment when skip_review_summary and no EAP feedback link", async () => {

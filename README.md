@@ -159,7 +159,7 @@ Each recipe includes complete workflows, prompts, and configuration examples you
 | `upload_artifacts` | Upload `junie_work_dir` (task input, CLI output JSON) as the `junie-artifacts` workflow artifact for troubleshooting. Files are copied and known secrets are redacted from the copy before upload. See [Security Considerations](#security-considerations). | `true` |
 | `upload_junie_logs` | ⚠️ Additionally include Junie CLI logs and full session transcripts (`~/.junie/logs`, `~/.junie/sessions`) in the artifact. Transcripts contain everything the agent saw and ran, including the environment of the Junie process. Enable only temporarily for debugging. | `false` |
 | `junie_guidelines_filename` | Filename of the guidelines file (should be in `<project-root>/.junie` dir) | `guidelines.md` |
-| `allowed_mcp_servers` | Comma-separated list of MCP servers to use (e.g., `mcp_github_checks_server`). Note: inline comment server is automatically enabled for PRs. | -          |
+| `allowed_mcp_servers` | Comma-separated list of MCP servers to use (e.g., `mcp_github_checks_server`). Note: inline comment server is automatically enabled for PRs, except code reviews with Junie CLI 3419 or newer. | -          |
 
 **Inline Arguments**: You can pass custom Junie CLI arguments directly in comments, issues, or custom prompts using `junie-args:` syntax. These arguments take priority over workflow inputs.
 
@@ -170,7 +170,7 @@ junie-args: --model=opus
 
 **Available MCP Servers**:
 - `mcp_github_checks_server`: Analyze failed GitHub Actions checks and provide detailed error information
-- `mcp_github_inline_comment_server`: Create inline code review comments with GitHub suggestions on PRs (automatically enabled for pull requests)
+- `mcp_github_inline_comment_server`: Create inline code review comments with GitHub suggestions on PRs (automatically enabled for pull requests, except code reviews with Junie CLI 3419 or newer)
 
 **Example configuration**:
 ```yaml
@@ -181,7 +181,7 @@ junie-args: --model=opus
     model: "opus"  # Optional: specify which model to use
 ```
 
-**Note**: The `mcp_github_inline_comment_server` is automatically enabled for `pull_request` events - no manual configuration needed.
+**Note**: The `mcp_github_inline_comment_server` is automatically enabled for `pull_request` events - no manual configuration needed. Code reviews with Junie CLI 3419 or newer (including `latest`) don't get it: the agent posts inline comments itself.
 
 #### Advanced Features
 
