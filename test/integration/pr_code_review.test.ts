@@ -1,8 +1,9 @@
-import {describe, test, beforeAll, afterAll, expect} from "bun:test";
+import {describe, test, beforeAll, afterAll} from "bun:test";
 import {INIT_COMMENT_BODY} from "../../src/constants/github";
 import {testClient} from "../client/client";
 
 const CODE_REVIEW_SUMMARY_SECTION = "Help us improve Junie";
+const missingClosingParen = /closing (?:parenthes(?:is|es)|paren)|close the parameter lists?|(?:missing|omit(?:ted)?|expected|add)\s+[`'"]?\)|(?:multiply\(a, b\)|avg\(arr\))\s*\{/i;
 
 describe("Code Review: Built-in", () => {
     let repoName: string;
@@ -73,17 +74,10 @@ describe("Code Review: Built-in", () => {
 
             const prNumber = pr.number;
             await testClient.waitForJunieComment(prNumber, INIT_COMMENT_BODY);
-            await testClient.waitForInlineComments(prNumber, testClient.conditionInlineCommentsAtLeast(2))
-            const filteredComments = await testClient.getInlineComments(
-                prNumber,
-                (comment) => {
-                    return testClient.conditionInlineCommentIncludes("multiply(a, b)")(comment)
-                        || testClient.conditionInlineCommentIncludes("+ b;")(comment);
-                }
+            await testClient.waitForInlineComments(prNumber, comments =>
+                comments.some(c => c.path === filename1 && /\bbb\b|\+ b;/i.test(c.body)) &&
+                comments.some(c => c.path === filename2 && missingClosingParen.test(c.body))
             );
-            const expectedLength = 2;
-            const commentTexts = filteredComments.map(c => c.body || '').join('\n---\n');
-            expect(filteredComments.length, `Expected at least ${expectedLength} comments, but got ${filteredComments.length}. All filtered comments:\n${commentTexts}`).toBeGreaterThanOrEqual(expectedLength);
             await testClient.waitForJunieComment(prNumber, CODE_REVIEW_SUMMARY_SECTION);
             testPassed = true;
         },
@@ -161,17 +155,10 @@ describe("Code Review: On-Demand via comment", () => {
             await testClient.waitForCommentReaction(comment.id);
 
             await testClient.waitForJunieComment(prNumber, INIT_COMMENT_BODY);
-            await testClient.waitForInlineComments(prNumber, testClient.conditionInlineCommentsAtLeast(2))
-            const filteredComments = await testClient.getInlineComments(
-                prNumber,
-                (comment) => {
-                    return testClient.conditionInlineCommentIncludes("multiply(a, b)")(comment)
-                        || testClient.conditionInlineCommentIncludes("avg(arr)")(comment);
-                }
+            await testClient.waitForInlineComments(prNumber, comments =>
+                comments.some(c => c.path === filename1 && missingClosingParen.test(c.body)) &&
+                comments.some(c => c.path === filename2 && missingClosingParen.test(c.body))
             );
-            const expectedLength = 2;
-            const commentTexts = filteredComments.map(c => c.body || '').join('\n---\n');
-            expect(filteredComments.length, `Expected at least ${expectedLength} comments, but got ${filteredComments.length}. All filtered comments:\n${commentTexts}`).toBeGreaterThanOrEqual(expectedLength);
             await testClient.waitForJunieComment(prNumber, CODE_REVIEW_SUMMARY_SECTION);
             testPassed = true;
         },
