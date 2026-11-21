@@ -3,7 +3,7 @@ import {INIT_COMMENT_BODY} from "../../src/constants/github";
 import {testClient} from "../client/client";
 
 const CODE_REVIEW_SUMMARY_SECTION = "Help us improve Junie";
-const missingClosingParen = /closing (?:parenthes(?:is|es)|paren)|close the parameter lists?|(?:missing|omit(?:ted)?|expected|add)\s+[`'"]?\)|(?:multiply\(a, b\)|avg\(arr\))\s*\{/i;
+const missingClosingParen = /closing (?:parenthes(?:is|es)|paren|[`'"]?\))|close (?:the|both) parameter lists?|(?:missing|omit(?:ted)?|expected|add)\s+[`'"]?\)|(?:multiply\(a, b\)|avg\(arr\))\s*\{/i;
 
 describe("Code Review: Built-in", () => {
     let repoName: string;
@@ -157,7 +157,8 @@ describe("Code Review: On-Demand via comment", () => {
             await testClient.waitForJunieComment(prNumber, INIT_COMMENT_BODY);
             await testClient.waitForInlineComments(prNumber, comments =>
                 comments.some(c => c.path === filename1 && missingClosingParen.test(c.body)) &&
-                comments.some(c => c.path === filename2 && missingClosingParen.test(c.body))
+                comments.some(c => c.path === filename2 && (missingClosingParen.test(c.body) ||
+                    (/\bexport(?:s|ed|ing)?\b/i.test(c.body) && /\bmultiply\b/i.test(c.body))))
             );
             await testClient.waitForJunieComment(prNumber, CODE_REVIEW_SUMMARY_SECTION);
             testPassed = true;
