@@ -120,6 +120,7 @@ type JunieWorkflowContext = {
         silentMode: boolean;
         skipReviewSummary: boolean;
         allowApprove: boolean;
+        allowHumanMention: boolean;
         skipPr: boolean;
         outputBranch?: string;
         useSingleComment: boolean;
@@ -194,6 +195,7 @@ export function extractJunieWorkflowContext(tokenOwner: TokenOwner): JunieExecut
             silentMode: process.env.SILENT_MODE == "true",
             skipReviewSummary: process.env.SKIP_REVIEW_SUMMARY == "true",
             allowApprove: process.env[ENV_VARS.ALLOW_APPROVE] !== "false",
+            allowHumanMention: process.env[ENV_VARS.ALLOW_HUMAN_MENTION] !== "false",
             skipPr: process.env.SKIP_PR == "true",
             outputBranch: process.env.OUTPUT_BRANCH || undefined,
             useSingleComment: process.env.USE_SINGLE_COMMENT == "true",

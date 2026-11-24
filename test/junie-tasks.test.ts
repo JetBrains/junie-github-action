@@ -22,6 +22,7 @@ describe("prepareJunieTask", () => {
             createNewBranchForPR: false,
             silentMode: false,
             allowApprove: true,
+            allowHumanMention: true,
             useSingleComment: false,
             attachGithubContextToCustomPrompt: true,
             junieWorkingDir: "/tmp",
@@ -432,6 +433,36 @@ describe("prepareJunieTask", () => {
             // For code review, user_instruction should not be attached at all
             expect(result.codeReviewTask?.description).not.toContain("<user_instruction>");
             expect(result.codeReviewTask?.description).not.toContain("code-review");
+            expect(result.codeReviewTask?.allowHumanMention).toBeUndefined();
+        });
+
+        test("should disable human mentions when allowHumanMention is false", async () => {
+            const context = createMockContext({
+                eventName: "pull_request",
+                isPR: true,
+                entityNumber: 123,
+                inputs: {
+                    prompt: "code-review",
+                    junieVersion: "3418.9",
+                    allowHumanMention: false
+                },
+                payload: {
+                    pull_request: {
+                        number: 123,
+                        title: "Test PR",
+                        updated_at: "2024-01-01T00:00:00Z"
+                    },
+                    repository: {
+                        owner: {login: "owner"},
+                        name: "repo"
+                    }
+                } as any
+            });
+            const octokit = createMockOctokit();
+
+            const result = await prepareJunieTask(context, branchInfo, octokit);
+
+            expect(result.codeReviewTask?.allowHumanMention).toBe(false);
         });
 
         test("should trigger codeReviewTask from comment when inputs.prompt is empty and code-review keyword is used", async () => {

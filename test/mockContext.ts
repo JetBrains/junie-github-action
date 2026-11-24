@@ -14,6 +14,7 @@ const defaultInputs = {
     silentMode: false,
     skipReviewSummary: false,
     allowApprove: true,
+    allowHumanMention: true,
     skipPr: false,
     outputBranch: undefined,
     useSingleComment: false,
