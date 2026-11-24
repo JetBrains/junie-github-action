@@ -19,6 +19,7 @@ export interface CodeReview {
     fetchVcsInfo?: boolean;
     reviewTarget?: {type: "remoteRequest"; number: number};
     allowApprove?: boolean;
+    allowHumanMention?: boolean;
 }
 
 export interface CliOutput {

@@ -54,6 +54,10 @@ inputs:
     description: "Allow code-review runs to approve pull/merge requests"
     required: false
     default: "true"
+  allow_human_mention:
+    description: "Allow code-review runs to tag human users"
+    required: false
+    default: "true"
   use_single_comment:
     description: "Use a single comment that gets updated instead of creating new comments for each run(per workflow)"
     required: false
@@ -278,6 +282,7 @@ runs:
         SILENT_MODE: ${{ inputs.silent_mode }}
         SKIP_REVIEW_SUMMARY: ${{ inputs.skip_review_summary }}
         ALLOW_APPROVE: ${{ inputs.allow_approve }}
+        ALLOW_HUMAN_MENTION: ${{ inputs.allow_human_mention }}
         USE_SINGLE_COMMENT: ${{ inputs.use_single_comment }}
         ATTACH_GITHUB_CONTEXT_TO_CUSTOM_PROMPT: ${{ inputs.attach_github_context_to_custom_prompt }}
         SKIP_PR: ${{ inputs.skip_pr }}

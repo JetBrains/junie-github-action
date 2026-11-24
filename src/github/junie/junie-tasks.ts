@@ -88,6 +88,9 @@ export async function prepareJunieTask(
                 diffCommand
             };
             junieCLITask.codeReviewTask = codeReviewTask;
+            if (context.inputs.allowHumanMention === false) {
+                codeReviewTask.allowHumanMention = false;
+            }
             if (isRemoteReview(context)) {
                 if (!context.isPR || !context.entityNumber) {
                     throw new Error("Code review requires a Pull Request number, but none was found in the event context.");
