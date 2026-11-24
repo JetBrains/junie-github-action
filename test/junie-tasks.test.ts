@@ -22,7 +22,6 @@ describe("prepareJunieTask", () => {
             createNewBranchForPR: false,
             silentMode: false,
             allowApprove: true,
-            allowHumanMention: true,
             useSingleComment: false,
             attachGithubContextToCustomPrompt: true,
             junieWorkingDir: "/tmp",

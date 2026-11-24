@@ -120,7 +120,7 @@ type JunieWorkflowContext = {
         silentMode: boolean;
         skipReviewSummary: boolean;
         allowApprove: boolean;
-        allowHumanMention: boolean;
+        allowHumanMention?: boolean;
         skipPr: boolean;
         outputBranch?: string;
         useSingleComment: boolean;

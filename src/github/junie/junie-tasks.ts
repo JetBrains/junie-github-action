@@ -88,7 +88,7 @@ export async function prepareJunieTask(
                 diffCommand
             };
             junieCLITask.codeReviewTask = codeReviewTask;
-            if (!context.inputs.allowHumanMention) {
+            if (context.inputs.allowHumanMention === false) {
                 codeReviewTask.allowHumanMention = false;
             }
             if (isRemoteReview(context)) {
